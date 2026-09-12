@@ -9,6 +9,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.weight
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
@@ -73,7 +74,8 @@ fun FamilyKhataApp(viewModel: FamilyKhataViewModel) {
                     .padding(16.dp)
             ) {
                 Text("Family Khata", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
-                Spacer(Modifier.height(12.dp))
+                Text("v0.3 • Baki Flow Fix", style = MaterialTheme.typography.labelSmall)
+                Spacer(Modifier.height(10.dp))
                 Box(
                     modifier = Modifier
                         .fillMaxWidth()
@@ -192,9 +194,86 @@ private fun TransactionRow(item: TransactionEntity, onDelete: () -> Unit) {
 @Composable
 private fun BakiScreen(viewModel: FamilyKhataViewModel) {
     val people by viewModel.bakiPeople.collectAsState()
+    var selectedId by remember { mutableStateOf<Long?>(null) }
+
+    val selected = selectedId?.let { id -> people.firstOrNull { it.id == id } }
+
+    if (selected == null) {
+        BakiPeopleScreen(
+            people = people,
+            viewModel = viewModel,
+            onSelect = { selectedId = it.id }
+        )
+    } else {
+        BakiEntryScreen(
+            person = selected,
+            viewModel = viewModel,
+            onBack = { selectedId = null }
+        )
+    }
+}
+
+@Composable
+private fun BakiPeopleScreen(
+    people: List<BakiPersonSummary>,
+    viewModel: FamilyKhataViewModel,
+    onSelect: (BakiPersonSummary) -> Unit
+) {
     var name by remember { mutableStateOf("") }
     var phone by remember { mutableStateOf("") }
-    var selected by remember { mutableStateOf<BakiPersonSummary?>(null) }
+
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .verticalScroll(rememberScrollState()),
+        verticalArrangement = Arrangement.spacedBy(10.dp)
+    ) {
+        Text("নতুন ব্যক্তি", fontWeight = FontWeight.Bold)
+        OutlinedTextField(name, { name = it }, label = { Text("নাম") }, modifier = Modifier.fillMaxWidth())
+        OutlinedTextField(phone, { phone = it }, label = { Text("ফোন (ঐচ্ছিক)") }, modifier = Modifier.fillMaxWidth())
+        Button(
+            onClick = {
+                viewModel.addBakiPerson(name, phone)
+                name = ""
+                phone = ""
+            },
+            modifier = Modifier.fillMaxWidth()
+        ) { Text("ব্যক্তি যোগ করুন") }
+
+        Spacer(Modifier.height(4.dp))
+        Text("বাকি/পাওনা", fontWeight = FontWeight.Bold)
+
+        if (people.isEmpty()) {
+            Text("প্রথমে একজন ব্যক্তি যোগ করুন।")
+        } else {
+            people.forEach { person ->
+                Card(
+                    onClick = { onSelect(person) },
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Column(Modifier.padding(14.dp)) {
+                        Text(person.name, fontWeight = FontWeight.Bold)
+                        Text(
+                            when {
+                                person.balance > 0 -> "পাবো: ৳ ${money(person.balance)}"
+                                person.balance < 0 -> "দেবো: ৳ ${money(-person.balance)}"
+                                else -> "হিসাব সমান"
+                            }
+                        )
+                        Text("হিসাব খুলতে চাপুন", style = MaterialTheme.typography.bodySmall)
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun BakiEntryScreen(
+    person: BakiPersonSummary,
+    viewModel: FamilyKhataViewModel,
+    onBack: () -> Unit
+) {
     var action by remember { mutableStateOf("GAVE") }
     var amount by remember { mutableStateOf("") }
     var note by remember { mutableStateOf("") }
@@ -204,61 +283,45 @@ private fun BakiScreen(viewModel: FamilyKhataViewModel) {
         modifier = Modifier
             .fillMaxSize()
             .verticalScroll(rememberScrollState())
-            .padding(bottom = 20.dp),
+            .padding(bottom = 24.dp),
         verticalArrangement = Arrangement.spacedBy(10.dp)
     ) {
-        Text("নতুন ব্যক্তি", fontWeight = FontWeight.Bold)
-        OutlinedTextField(name, { name = it }, label = { Text("নাম") }, modifier = Modifier.fillMaxWidth())
-        OutlinedTextField(phone, { phone = it }, label = { Text("ফোন (ঐচ্ছিক)") }, modifier = Modifier.fillMaxWidth())
-        Button(onClick = {
-            viewModel.addBakiPerson(name, phone)
-            name = ""
-            phone = ""
-        }, modifier = Modifier.fillMaxWidth()) { Text("ব্যক্তি যোগ করুন") }
+        TextButton(onClick = onBack) { Text("← ব্যক্তি তালিকায় ফিরুন") }
 
-        Spacer(Modifier.height(4.dp))
-        Text("বাকি/পাওনা", fontWeight = FontWeight.Bold)
+        Text(person.name, style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
+        Text(
+            when {
+                person.balance > 0 -> "বর্তমানে পাবো: ৳ ${money(person.balance)}"
+                person.balance < 0 -> "বর্তমানে দেবো: ৳ ${money(-person.balance)}"
+                else -> "বর্তমান হিসাব সমান"
+            },
+            style = MaterialTheme.typography.titleMedium
+        )
 
-        if (people.isEmpty()) {
-            Text("প্রথমে একজন ব্যক্তি যোগ করুন।")
-        } else {
-            Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                people.forEach { person ->
-                    val selectedNow = selected?.id == person.id
-                    Card(
-                        onClick = { selected = person },
-                        modifier = Modifier.fillMaxWidth(),
-                        colors = if (selectedNow) CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.secondaryContainer)
-                        else CardDefaults.cardColors()
-                    ) {
-                        Column(Modifier.padding(12.dp)) {
-                            Text(person.name, fontWeight = FontWeight.Bold)
-                            Text(
-                                when {
-                                    person.balance > 0 -> "পাবো: ৳ ${money(person.balance)}"
-                                    person.balance < 0 -> "দেবো: ৳ ${money(-person.balance)}"
-                                    else -> "হিসাব সমান"
-                                }
-                            )
-                        }
-                    }
-                }
-            }
+        Text("কী হয়েছে?", fontWeight = FontWeight.Bold)
+        Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+            ActionButton("দিলাম", "GAVE", action) { action = "GAVE" }
+            ActionButton("ফেরত পেলাম", "RECEIVED_BACK", action) { action = "RECEIVED_BACK" }
+        }
+        Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+            ActionButton("নিলাম", "TOOK", action) { action = "TOOK" }
+            ActionButton("ফেরত দিলাম", "PAID_BACK", action) { action = "PAID_BACK" }
         }
 
-        selected?.let { person ->
-            Text("${person.name}-এর নতুন এন্ট্রি", fontWeight = FontWeight.Bold)
-            Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                ActionButton("দিলাম", "GAVE", action) { action = "GAVE" }
-                ActionButton("ফেরত পেলাম", "RECEIVED_BACK", action) { action = "RECEIVED_BACK" }
-            }
-            Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                ActionButton("নিলাম", "TOOK", action) { action = "TOOK" }
-                ActionButton("ফেরত দিলাম", "PAID_BACK", action) { action = "PAID_BACK" }
-            }
-            OutlinedTextField(amount, { amount = it }, label = { Text("টাকার পরিমাণ") }, modifier = Modifier.fillMaxWidth())
-            OutlinedTextField(note, { note = it }, label = { Text("নোট") }, modifier = Modifier.fillMaxWidth())
-            Button(onClick = {
+        OutlinedTextField(
+            amount,
+            { amount = it },
+            label = { Text("টাকার পরিমাণ") },
+            modifier = Modifier.fillMaxWidth()
+        )
+        OutlinedTextField(
+            note,
+            { note = it },
+            label = { Text("নোট") },
+            modifier = Modifier.fillMaxWidth()
+        )
+        Button(
+            onClick = {
                 val value = parseAmount(amount)
                 if (value == null) {
                     error = "সঠিক টাকার পরিমাণ লিখুন"
@@ -268,9 +331,11 @@ private fun BakiScreen(viewModel: FamilyKhataViewModel) {
                     note = ""
                     error = null
                 }
-            }, modifier = Modifier.fillMaxWidth()) { Text("বাকি এন্ট্রি সেভ") }
-            error?.let { Text(it, color = MaterialTheme.colorScheme.error) }
-        }
+            },
+            modifier = Modifier.fillMaxWidth()
+        ) { Text("বাকি এন্ট্রি সেভ করুন") }
+
+        error?.let { Text(it, color = MaterialTheme.colorScheme.error) }
     }
 }
 

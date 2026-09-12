@@ -1,6 +1,7 @@
 package com.familykhata.app.ui
 
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -8,12 +9,14 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.weight
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
-import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.NavigationBar
 import androidx.compose.material3.NavigationBarItem
@@ -72,11 +75,17 @@ fun FamilyKhataApp(viewModel: FamilyKhataViewModel) {
             ) {
                 Text("Family Khata", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
                 Spacer(Modifier.height(12.dp))
-                when (tab) {
-                    Tab.DASHBOARD -> DashboardScreen(viewModel)
-                    Tab.ADD -> AddTransactionScreen(viewModel)
-                    Tab.BAKI -> BakiScreen(viewModel)
-                    Tab.HISTORY -> HistoryScreen(viewModel)
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .weight(1f)
+                ) {
+                    when (tab) {
+                        Tab.DASHBOARD -> DashboardScreen(viewModel)
+                        Tab.ADD -> AddTransactionScreen(viewModel)
+                        Tab.BAKI -> BakiScreen(viewModel)
+                        Tab.HISTORY -> HistoryScreen(viewModel)
+                    }
                 }
             }
         }
@@ -115,8 +124,14 @@ private fun AddTransactionScreen(viewModel: FamilyKhataViewModel) {
     var amount by remember { mutableStateOf("") }
     var category by remember { mutableStateOf("") }
     var note by remember { mutableStateOf("") }
+    var error by remember { mutableStateOf<String?>(null) }
 
-    Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .verticalScroll(rememberScrollState()),
+        verticalArrangement = Arrangement.spacedBy(10.dp)
+    ) {
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             if (type == "EXPENSE") Button(onClick = { type = "EXPENSE" }) { Text("খরচ") }
             else OutlinedButton(onClick = { type = "EXPENSE" }) { Text("খরচ") }
@@ -128,13 +143,20 @@ private fun AddTransactionScreen(viewModel: FamilyKhataViewModel) {
         OutlinedTextField(note, { note = it }, label = { Text("নোট") }, modifier = Modifier.fillMaxWidth())
         Button(
             onClick = {
-                amount.toDoubleOrNull()?.let { value ->
+                val value = parseAmount(amount)
+                if (value == null) {
+                    error = "সঠিক টাকার পরিমাণ লিখুন"
+                } else {
                     viewModel.addTransaction(type, value, category, note)
-                    amount = ""; category = ""; note = ""
+                    amount = ""
+                    category = ""
+                    note = ""
+                    error = null
                 }
             },
             modifier = Modifier.fillMaxWidth()
         ) { Text("সেভ করুন") }
+        error?.let { Text(it, color = MaterialTheme.colorScheme.error) }
     }
 }
 
@@ -177,14 +199,22 @@ private fun BakiScreen(viewModel: FamilyKhataViewModel) {
     var action by remember { mutableStateOf("GAVE") }
     var amount by remember { mutableStateOf("") }
     var note by remember { mutableStateOf("") }
+    var error by remember { mutableStateOf<String?>(null) }
 
-    Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .verticalScroll(rememberScrollState())
+            .padding(bottom = 20.dp),
+        verticalArrangement = Arrangement.spacedBy(10.dp)
+    ) {
         Text("নতুন ব্যক্তি", fontWeight = FontWeight.Bold)
         OutlinedTextField(name, { name = it }, label = { Text("নাম") }, modifier = Modifier.fillMaxWidth())
         OutlinedTextField(phone, { phone = it }, label = { Text("ফোন (ঐচ্ছিক)") }, modifier = Modifier.fillMaxWidth())
         Button(onClick = {
             viewModel.addBakiPerson(name, phone)
-            name = ""; phone = ""
+            name = ""
+            phone = ""
         }, modifier = Modifier.fillMaxWidth()) { Text("ব্যক্তি যোগ করুন") }
 
         Spacer(Modifier.height(4.dp))
@@ -193,8 +223,8 @@ private fun BakiScreen(viewModel: FamilyKhataViewModel) {
         if (people.isEmpty()) {
             Text("প্রথমে একজন ব্যক্তি যোগ করুন।")
         } else {
-            LazyColumn(modifier = Modifier.height(180.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                items(people, key = { it.id }) { person ->
+            Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                people.forEach { person ->
                     val selectedNow = selected?.id == person.id
                     Card(
                         onClick = { selected = person },
@@ -230,11 +260,17 @@ private fun BakiScreen(viewModel: FamilyKhataViewModel) {
             OutlinedTextField(amount, { amount = it }, label = { Text("টাকার পরিমাণ") }, modifier = Modifier.fillMaxWidth())
             OutlinedTextField(note, { note = it }, label = { Text("নোট") }, modifier = Modifier.fillMaxWidth())
             Button(onClick = {
-                amount.toDoubleOrNull()?.let { value ->
+                val value = parseAmount(amount)
+                if (value == null) {
+                    error = "সঠিক টাকার পরিমাণ লিখুন"
+                } else {
                     viewModel.addBakiEntry(person.id, action, value, note)
-                    amount = ""; note = ""
+                    amount = ""
+                    note = ""
+                    error = null
                 }
             }, modifier = Modifier.fillMaxWidth()) { Text("বাকি এন্ট্রি সেভ") }
+            error?.let { Text(it, color = MaterialTheme.colorScheme.error) }
         }
     }
 }
@@ -243,6 +279,28 @@ private fun BakiScreen(viewModel: FamilyKhataViewModel) {
 private fun ActionButton(label: String, value: String, selected: String, onClick: () -> Unit) {
     if (selected == value) Button(onClick = onClick) { Text(label) }
     else OutlinedButton(onClick = onClick) { Text(label) }
+}
+
+private fun parseAmount(input: String): Double? {
+    val normalized = buildString {
+        input.trim().forEach { char ->
+            when (char) {
+                '০' -> append('0')
+                '১' -> append('1')
+                '২' -> append('2')
+                '৩' -> append('3')
+                '৪' -> append('4')
+                '৫' -> append('5')
+                '৬' -> append('6')
+                '৭' -> append('7')
+                '৮' -> append('8')
+                '৯' -> append('9')
+                ',', '৳', ' ' -> Unit
+                else -> append(char)
+            }
+        }
+    }
+    return normalized.toDoubleOrNull()?.takeIf { it > 0.0 }
 }
 
 private fun money(value: Double): String = if (value % 1.0 == 0.0) value.toLong().toString() else String.format(Locale.US, "%.2f", value)

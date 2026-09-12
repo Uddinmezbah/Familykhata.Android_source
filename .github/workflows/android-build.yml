@@ -1,4 +1,4 @@
-name: Build Android APK
+name: Build Stable Android APK
 
 on:
   push:
@@ -29,12 +29,47 @@ jobs:
         with:
           gradle-version: '8.7'
 
-      - name: Build debug APK
-        run: gradle :app:assembleDebug --stacktrace
+      - name: Prepare stable signing key
+        env:
+          RELEASE_KEYSTORE_BASE64: ${{ secrets.RELEASE_KEYSTORE_BASE64 }}
+          RELEASE_KEYSTORE_PASSWORD: ${{ secrets.RELEASE_KEYSTORE_PASSWORD }}
+        run: |
+          test -n "$RELEASE_KEYSTORE_BASE64" || { echo "::error::Missing RELEASE_KEYSTORE_BASE64 secret"; exit 1; }
+          test -n "$RELEASE_KEYSTORE_PASSWORD" || { echo "::error::Missing RELEASE_KEYSTORE_PASSWORD secret"; exit 1; }
+          printf '%s' "$RELEASE_KEYSTORE_BASE64" | base64 --decode > "$RUNNER_TEMP/familykhata-release.jks"
+          keytool -list \
+            -keystore "$RUNNER_TEMP/familykhata-release.jks" \
+            -storepass "$RELEASE_KEYSTORE_PASSWORD" \
+            -alias familykhata >/dev/null
 
-      - name: Upload APK artifact
+      - name: Build signed release APK
+        env:
+          RELEASE_STORE_FILE: ${{ runner.temp }}/familykhata-release.jks
+          RELEASE_KEYSTORE_PASSWORD: ${{ secrets.RELEASE_KEYSTORE_PASSWORD }}
+        run: gradle :app:assembleRelease --stacktrace
+
+      - name: Verify APK signature
+        run: |
+          set -euo pipefail
+          APK="app/build/outputs/apk/release/app-release.apk"
+          EXPECTED_CERT_SHA256="a2eaefe393888974b8a95aa6355bf029ba3b8ca11665d8b432328f4248cfc1e1"
+
+          "$ANDROID_HOME/build-tools/35.0.0/apksigner" verify \
+            --verbose \
+            --print-certs \
+            "$APK"
+
+          ACTUAL_CERT_SHA256="$("$ANDROID_HOME/build-tools/35.0.0/apksigner" verify --print-certs "$APK" \
+            | awk -F': ' '/Signer #1 certificate SHA-256 digest:/ {print tolower($2); exit}')"
+
+          test "$ACTUAL_CERT_SHA256" = "$EXPECTED_CERT_SHA256" || {
+            echo "::error::APK certificate fingerprint does not match the Family Khata stable signing key"
+            exit 1
+          }
+
+      - name: Upload stable APK artifact
         uses: actions/upload-artifact@v4
         with:
-          name: FamilyKhata-debug-apk
-          path: app/build/outputs/apk/debug/app-debug.apk
+          name: FamilyKhata-v0.5-stable-apk
+          path: app/build/outputs/apk/release/app-release.apk
           if-no-files-found: error

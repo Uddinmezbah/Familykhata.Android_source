@@ -4,6 +4,10 @@ plugins {
     id("com.google.devtools.ksp")
 }
 
+val releaseStoreFile = System.getenv("RELEASE_STORE_FILE")
+val releaseKeystorePassword = System.getenv("RELEASE_KEYSTORE_PASSWORD")
+val hasReleaseSigning = !releaseStoreFile.isNullOrBlank() && !releaseKeystorePassword.isNullOrBlank()
+
 android {
     namespace = "com.familykhata.app"
     compileSdk = 35
@@ -12,15 +16,29 @@ android {
         applicationId = "com.familykhata.app"
         minSdk = 24
         targetSdk = 35
-        versionCode = 1
-        versionName = "0.1.0"
+        versionCode = 5
+        versionName = "0.5.0"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         vectorDrawables.useSupportLibrary = true
     }
 
+    signingConfigs {
+        if (hasReleaseSigning) {
+            create("stableRelease") {
+                storeFile = file(releaseStoreFile!!)
+                storePassword = releaseKeystorePassword!!
+                keyAlias = "familykhata"
+                keyPassword = releaseKeystorePassword
+            }
+        }
+    }
+
     buildTypes {
         release {
+            if (hasReleaseSigning) {
+                signingConfig = signingConfigs.getByName("stableRelease")
+            }
             isMinifyEnabled = false
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),

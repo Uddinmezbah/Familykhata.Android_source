@@ -6,10 +6,10 @@ import android.net.Uri
 import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
@@ -24,9 +24,11 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.NavigationBar
 import androidx.compose.material3.NavigationBarItem
+import androidx.compose.material3.NavigationBarItemDefaults
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
@@ -39,10 +41,12 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import com.familykhata.app.FamilyKhataViewModel
 import com.familykhata.app.data.BakiEntryEntity
@@ -58,6 +62,15 @@ private const val WEBSITE_URL = "https://uddinmezbah.github.io/Familykhata.Andro
 private const val PRIVACY_URL = "https://uddinmezbah.github.io/Familykhata.Android_source/privacy.html"
 private const val SUPPORT_URL = "https://github.com/Uddinmezbah/Familykhata.Android_source/issues/new?title=Support%3A%20"
 private const val FEATURE_REQUEST_URL = "https://github.com/Uddinmezbah/Familykhata.Android_source/issues/new?title=Feature%20request%3A%20"
+
+private val PersonalAccent = Color(0xFF6C4CCF)
+private val FamilyAccent = Color(0xFF1479B8)
+private val ShopAccent = Color(0xFFB85C00)
+private val IncomeAccent = Color(0xFF0B7A53)
+private val ExpenseAccent = Color(0xFFC4473A)
+private val ReceivableAccent = Color(0xFF1565C0)
+private val PayableAccent = Color(0xFFD17A00)
+private val NeutralAccent = Color(0xFF5D6672)
 
 private enum class Tab(val label: String) {
     DASHBOARD("হোম"),
@@ -75,20 +88,37 @@ fun FamilyKhataApp(viewModel: FamilyKhataViewModel) {
 
     HisabiKhataTheme {
         Scaffold(
+            containerColor = MaterialTheme.colorScheme.background,
             bottomBar = {
-                NavigationBar(containerColor = MaterialTheme.colorScheme.surface) {
+                NavigationBar(
+                    containerColor = MaterialTheme.colorScheme.surface,
+                    tonalElevation = 8.dp
+                ) {
                     Tab.entries.forEach { item ->
+                        val accent = tabAccent(item)
                         NavigationBarItem(
                             selected = tab == item,
                             onClick = { tab = item },
+                            colors = NavigationBarItemDefaults.colors(
+                                selectedIconColor = accent,
+                                selectedTextColor = accent,
+                                indicatorColor = accent.copy(alpha = 0.16f),
+                                unselectedIconColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                                unselectedTextColor = MaterialTheme.colorScheme.onSurfaceVariant
+                            ),
                             icon = {
                                 Text(
                                     tabSymbol(item),
                                     style = MaterialTheme.typography.titleMedium,
-                                    fontWeight = FontWeight.SemiBold
+                                    fontWeight = if (tab == item) FontWeight.Bold else FontWeight.Medium
                                 )
                             },
-                            label = { Text(tabLabel(item, workspace)) }
+                            label = {
+                                Text(
+                                    tabLabel(item, workspace),
+                                    fontWeight = if (tab == item) FontWeight.Bold else FontWeight.Medium
+                                )
+                            }
                         )
                     }
                 }
@@ -148,49 +178,53 @@ fun FamilyKhataApp(viewModel: FamilyKhataViewModel) {
 
 @Composable
 private fun BrandHeader(workspace: String) {
+    val accent = workspaceAccent(workspace)
     Surface(
         modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(24.dp),
-        color = MaterialTheme.colorScheme.primaryContainer
+        shape = RoundedCornerShape(26.dp),
+        color = accent.copy(alpha = 0.12f),
+        border = BorderStroke(1.dp, accent.copy(alpha = 0.28f))
     ) {
         Column(
-            modifier = Modifier.padding(horizontal = 18.dp, vertical = 15.dp),
-            verticalArrangement = Arrangement.spacedBy(6.dp)
+            modifier = Modifier.padding(horizontal = 18.dp, vertical = 16.dp),
+            verticalArrangement = Arrangement.spacedBy(7.dp)
         ) {
             Row(
                 modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.Top
             ) {
-                Column {
+                Column(modifier = Modifier.weight(1f).padding(end = 8.dp)) {
                     Text(
                         "হিসাবী খাতা",
                         style = MaterialTheme.typography.headlineSmall,
-                        fontWeight = FontWeight.Bold,
-                        color = MaterialTheme.colorScheme.onPrimaryContainer
+                        fontWeight = FontWeight.ExtraBold,
+                        color = MaterialTheme.colorScheme.onSurface
                     )
                     Text(
                         "নিজের, পরিবারের ও দোকান/প্রতিষ্ঠানের হিসাব এক জায়গায়",
                         style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onPrimaryContainer
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                 }
                 Surface(
                     shape = RoundedCornerShape(50),
-                    color = MaterialTheme.colorScheme.primary
+                    color = accent
                 ) {
                     Text(
                         workspaceLabel(workspace),
-                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
+                        modifier = Modifier.padding(horizontal = 11.dp, vertical = 7.dp),
                         style = MaterialTheme.typography.labelMedium,
-                        fontWeight = FontWeight.SemiBold,
-                        color = MaterialTheme.colorScheme.onPrimary
+                        fontWeight = FontWeight.Bold,
+                        color = Color.White
                     )
                 }
             }
             Text(
-                "v1.0 • Launch Foundation",
+                "v1.1 • Visual Polish",
                 style = MaterialTheme.typography.labelSmall,
-                color = MaterialTheme.colorScheme.onPrimaryContainer
+                fontWeight = FontWeight.SemiBold,
+                color = accent
             )
         }
     }
@@ -203,37 +237,42 @@ private fun WorkspaceSwitcher(
 ) {
     Surface(
         modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(18.dp),
-        color = MaterialTheme.colorScheme.surfaceVariant
+        shape = RoundedCornerShape(22.dp),
+        color = MaterialTheme.colorScheme.surface,
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.18f))
     ) {
         Column(
-            modifier = Modifier.padding(10.dp),
-            verticalArrangement = Arrangement.spacedBy(8.dp)
+            modifier = Modifier.padding(12.dp),
+            verticalArrangement = Arrangement.spacedBy(10.dp)
         ) {
             Text(
                 "কোন হিসাব দেখবেন?",
-                style = MaterialTheme.typography.labelLarge,
-                fontWeight = FontWeight.SemiBold
+                style = MaterialTheme.typography.titleSmall,
+                fontWeight = FontWeight.Bold,
+                color = MaterialTheme.colorScheme.onSurface
             )
             Row(
                 modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(6.dp)
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
             ) {
-                WorkspaceButton(
+                WorkspaceCard(
+                    symbol = "●",
                     label = "নিজের",
                     value = "PERSONAL",
                     selected = selected,
                     modifier = Modifier.weight(1f),
                     onSelect = onSelect
                 )
-                WorkspaceButton(
+                WorkspaceCard(
+                    symbol = "⌂",
                     label = "পরিবার",
                     value = "FAMILY",
                     selected = selected,
                     modifier = Modifier.weight(1f),
                     onSelect = onSelect
                 )
-                WorkspaceButton(
+                WorkspaceCard(
+                    symbol = "▦",
                     label = "দোকান/\nপ্রতিষ্ঠান",
                     value = "SHOP",
                     selected = selected,
@@ -246,26 +285,51 @@ private fun WorkspaceSwitcher(
 }
 
 @Composable
-private fun WorkspaceButton(
+private fun WorkspaceCard(
+    symbol: String,
     label: String,
     value: String,
     selected: String,
     modifier: Modifier,
     onSelect: (String) -> Unit
 ) {
-    val contentPadding = PaddingValues(horizontal = 4.dp, vertical = 8.dp)
-    if (selected == value) {
-        Button(
-            onClick = { onSelect(value) },
-            modifier = modifier,
-            contentPadding = contentPadding
-        ) { Text(label, style = MaterialTheme.typography.labelSmall) }
-    } else {
-        OutlinedButton(
-            onClick = { onSelect(value) },
-            modifier = modifier,
-            contentPadding = contentPadding
-        ) { Text(label, style = MaterialTheme.typography.labelSmall) }
+    val isSelected = selected == value
+    val accent = workspaceAccent(value)
+    Card(
+        onClick = { onSelect(value) },
+        modifier = modifier,
+        shape = RoundedCornerShape(18.dp),
+        colors = CardDefaults.cardColors(
+            containerColor = if (isSelected) accent else accent.copy(alpha = 0.10f),
+            contentColor = if (isSelected) Color.White else MaterialTheme.colorScheme.onSurface
+        ),
+        elevation = CardDefaults.cardElevation(defaultElevation = if (isSelected) 4.dp else 0.dp),
+        border = BorderStroke(
+            width = if (isSelected) 2.dp else 1.dp,
+            color = if (isSelected) accent else accent.copy(alpha = 0.28f)
+        )
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 6.dp, vertical = 11.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.spacedBy(4.dp)
+        ) {
+            Text(
+                symbol,
+                style = MaterialTheme.typography.titleLarge,
+                fontWeight = FontWeight.ExtraBold,
+                color = if (isSelected) Color.White else accent
+            )
+            Text(
+                label,
+                style = MaterialTheme.typography.labelMedium,
+                fontWeight = FontWeight.Bold,
+                color = if (isSelected) Color.White else MaterialTheme.colorScheme.onSurface,
+                textAlign = TextAlign.Center
+            )
+        }
     }
 }
 
@@ -283,6 +347,7 @@ private fun DashboardScreen(
     val receivable = bakiPeople.filter { it.balance > 0 }.sumOf { it.balance }
     val payable = -bakiPeople.filter { it.balance < 0 }.sumOf { it.balance }
     val balance = totals.income - totals.expense
+    val accent = workspaceAccent(workspace)
 
     if (workspace == "SHOP") {
         BusinessDashboard(
@@ -309,7 +374,7 @@ private fun DashboardScreen(
         Surface(
             modifier = Modifier.fillMaxWidth(),
             shape = RoundedCornerShape(24.dp),
-            color = MaterialTheme.colorScheme.primary
+            color = accent
         ) {
             Column(
                 modifier = Modifier.padding(20.dp),
@@ -318,18 +383,18 @@ private fun DashboardScreen(
                 Text(
                     "বর্তমান ব্যালেন্স",
                     style = MaterialTheme.typography.labelLarge,
-                    color = MaterialTheme.colorScheme.onPrimary
+                    color = Color.White
                 )
                 Text(
                     "৳ ${money(balance)}",
                     style = MaterialTheme.typography.headlineLarge,
                     fontWeight = FontWeight.Bold,
-                    color = MaterialTheme.colorScheme.onPrimary
+                    color = Color.White
                 )
                 Text(
                     workspaceSummary(workspace),
                     style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onPrimary
+                    color = Color.White
                 )
             }
         }
@@ -342,13 +407,13 @@ private fun DashboardScreen(
                 title = "মোট আয়",
                 amount = totals.income,
                 modifier = Modifier.weight(1f),
-                containerColor = MaterialTheme.colorScheme.primaryContainer
+                accentColor = IncomeAccent
             )
             MetricCard(
                 title = "মোট খরচ",
                 amount = totals.expense,
                 modifier = Modifier.weight(1f),
-                containerColor = MaterialTheme.colorScheme.secondaryContainer
+                accentColor = ExpenseAccent
             )
         }
 
@@ -360,20 +425,20 @@ private fun DashboardScreen(
                 title = "পাবো",
                 amount = receivable,
                 modifier = Modifier.weight(1f),
-                containerColor = MaterialTheme.colorScheme.tertiaryContainer
+                accentColor = ReceivableAccent
             )
             MetricCard(
                 title = "দেবো",
                 amount = payable,
                 modifier = Modifier.weight(1f),
-                containerColor = MaterialTheme.colorScheme.surfaceVariant
+                accentColor = PayableAccent
             )
         }
 
         Surface(
             modifier = Modifier.fillMaxWidth(),
             shape = RoundedCornerShape(18.dp),
-            color = MaterialTheme.colorScheme.surfaceVariant
+            color = accent.copy(alpha = 0.09f)
         ) {
             Column(
                 modifier = Modifier.padding(16.dp),
@@ -412,7 +477,7 @@ private fun BusinessDashboard(
         Surface(
             modifier = Modifier.fillMaxWidth(),
             shape = RoundedCornerShape(24.dp),
-            color = MaterialTheme.colorScheme.primary
+            color = ShopAccent
         ) {
             Column(
                 modifier = Modifier.padding(20.dp),
@@ -421,18 +486,18 @@ private fun BusinessDashboard(
                 Text(
                     "ব্যবসার ক্যাশ ব্যালেন্স",
                     style = MaterialTheme.typography.labelLarge,
-                    color = MaterialTheme.colorScheme.onPrimary
+                    color = Color.White
                 )
                 Text(
                     "৳ ${money(balance)}",
                     style = MaterialTheme.typography.headlineLarge,
                     fontWeight = FontWeight.Bold,
-                    color = MaterialTheme.colorScheme.onPrimary
+                    color = Color.White
                 )
                 Text(
                     "দোকান/প্রতিষ্ঠানের আয়-খরচের বর্তমান হিসাব",
                     style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onPrimary
+                    color = Color.White
                 )
             }
         }
@@ -445,13 +510,13 @@ private fun BusinessDashboard(
                 title = "মোট ক্যাশ ইন",
                 amount = income,
                 modifier = Modifier.weight(1f),
-                containerColor = MaterialTheme.colorScheme.primaryContainer
+                accentColor = IncomeAccent
             )
             MetricCard(
                 title = "মোট ক্যাশ আউট",
                 amount = expense,
                 modifier = Modifier.weight(1f),
-                containerColor = MaterialTheme.colorScheme.secondaryContainer
+                accentColor = ExpenseAccent
             )
         }
 
@@ -463,13 +528,13 @@ private fun BusinessDashboard(
                 title = "পাবো",
                 amount = receivable,
                 modifier = Modifier.weight(1f),
-                containerColor = MaterialTheme.colorScheme.tertiaryContainer
+                accentColor = ReceivableAccent
             )
             MetricCard(
                 title = "দেবো",
                 amount = payable,
                 modifier = Modifier.weight(1f),
-                containerColor = MaterialTheme.colorScheme.surfaceVariant
+                accentColor = PayableAccent
             )
         }
 
@@ -487,6 +552,7 @@ private fun BusinessDashboard(
                 symbol = "＋",
                 title = "ক্যাশ ইন",
                 subtitle = "আয় বা টাকা জমা",
+                accentColor = IncomeAccent,
                 modifier = Modifier.weight(1f),
                 onClick = onCashIn
             )
@@ -494,6 +560,7 @@ private fun BusinessDashboard(
                 symbol = "−",
                 title = "ক্যাশ আউট",
                 subtitle = "খরচ বা টাকা বের",
+                accentColor = ExpenseAccent,
                 modifier = Modifier.weight(1f),
                 onClick = onCashOut
             )
@@ -507,6 +574,7 @@ private fun BusinessDashboard(
                 symbol = "৳",
                 title = "খাতা",
                 subtitle = "কাস্টমার/সাপ্লায়ার",
+                accentColor = ReceivableAccent,
                 modifier = Modifier.weight(1f),
                 onClick = onLedger
             )
@@ -514,6 +582,7 @@ private fun BusinessDashboard(
                 symbol = "≡",
                 title = "লেনদেন",
                 subtitle = "সব ক্যাশ ইতিহাস",
+                accentColor = ShopAccent,
                 modifier = Modifier.weight(1f),
                 onClick = onHistory
             )
@@ -522,7 +591,7 @@ private fun BusinessDashboard(
         Surface(
             modifier = Modifier.fillMaxWidth(),
             shape = RoundedCornerShape(18.dp),
-            color = MaterialTheme.colorScheme.surfaceVariant
+            color = ShopAccent.copy(alpha = 0.09f)
         ) {
             Column(
                 modifier = Modifier.padding(16.dp),
@@ -547,12 +616,18 @@ private fun BusinessActionCard(
     symbol: String,
     title: String,
     subtitle: String,
+    accentColor: Color,
     modifier: Modifier = Modifier,
     onClick: () -> Unit
 ) {
     Card(
         onClick = onClick,
-        modifier = modifier
+        modifier = modifier,
+        shape = RoundedCornerShape(20.dp),
+        colors = CardDefaults.cardColors(
+            containerColor = accentColor.copy(alpha = 0.10f)
+        ),
+        border = BorderStroke(1.dp, accentColor.copy(alpha = 0.22f))
     ) {
         Column(
             modifier = Modifier.padding(14.dp),
@@ -560,18 +635,26 @@ private fun BusinessActionCard(
         ) {
             Surface(
                 shape = RoundedCornerShape(12.dp),
-                color = MaterialTheme.colorScheme.primaryContainer
+                color = accentColor
             ) {
                 Text(
                     symbol,
                     modifier = Modifier.padding(horizontal = 10.dp, vertical = 5.dp),
                     style = MaterialTheme.typography.titleMedium,
                     fontWeight = FontWeight.Bold,
-                    color = MaterialTheme.colorScheme.primary
+                    color = Color.White
                 )
             }
-            Text(title, fontWeight = FontWeight.Bold)
-            Text(subtitle, style = MaterialTheme.typography.bodySmall)
+            Text(
+                title,
+                fontWeight = FontWeight.Bold,
+                color = MaterialTheme.colorScheme.onSurface
+            )
+            Text(
+                subtitle,
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
         }
     }
 }
@@ -581,22 +664,45 @@ private fun MetricCard(
     title: String,
     amount: Double,
     modifier: Modifier = Modifier,
-    containerColor: Color = MaterialTheme.colorScheme.surfaceVariant
+    accentColor: Color = NeutralAccent
 ) {
     Surface(
         modifier = modifier,
-        shape = RoundedCornerShape(18.dp),
-        color = containerColor
+        shape = RoundedCornerShape(20.dp),
+        color = accentColor.copy(alpha = 0.12f),
+        border = BorderStroke(1.dp, accentColor.copy(alpha = 0.22f))
     ) {
         Column(
             modifier = Modifier.padding(15.dp),
-            verticalArrangement = Arrangement.spacedBy(5.dp)
+            verticalArrangement = Arrangement.spacedBy(6.dp)
         ) {
-            Text(title, style = MaterialTheme.typography.labelLarge)
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(6.dp)
+            ) {
+                Surface(
+                    shape = RoundedCornerShape(50),
+                    color = accentColor
+                ) {
+                    Text(
+                        "•",
+                        modifier = Modifier.padding(horizontal = 6.dp, vertical = 1.dp),
+                        color = Color.White,
+                        fontWeight = FontWeight.Bold
+                    )
+                }
+                Text(
+                    title,
+                    style = MaterialTheme.typography.labelLarge,
+                    fontWeight = FontWeight.SemiBold,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
             Text(
                 "৳ ${money(amount)}",
                 style = MaterialTheme.typography.titleLarge,
-                fontWeight = FontWeight.Bold
+                fontWeight = FontWeight.ExtraBold,
+                color = MaterialTheme.colorScheme.onSurface
             )
         }
     }
@@ -633,13 +739,26 @@ private fun AddTransactionScreen(
             )
         }
 
-        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
             val expenseLabel = if (isBusiness) "ক্যাশ আউট" else "খরচ"
             val incomeLabel = if (isBusiness) "ক্যাশ ইন" else "আয়"
-            if (type == "EXPENSE") Button(onClick = { type = "EXPENSE" }) { Text(expenseLabel) }
-            else OutlinedButton(onClick = { type = "EXPENSE" }) { Text(expenseLabel) }
-            if (type == "INCOME") Button(onClick = { type = "INCOME" }) { Text(incomeLabel) }
-            else OutlinedButton(onClick = { type = "INCOME" }) { Text(incomeLabel) }
+            TransactionTypeCard(
+                label = expenseLabel,
+                selected = type == "EXPENSE",
+                accent = ExpenseAccent,
+                modifier = Modifier.weight(1f),
+                onClick = { type = "EXPENSE" }
+            )
+            TransactionTypeCard(
+                label = incomeLabel,
+                selected = type == "INCOME",
+                accent = IncomeAccent,
+                modifier = Modifier.weight(1f),
+                onClick = { type = "INCOME" }
+            )
         }
 
         OutlinedTextField(
@@ -676,6 +795,39 @@ private fun AddTransactionScreen(
             modifier = Modifier.fillMaxWidth()
         ) { Text(if (isBusiness) "ক্যাশ লেনদেন সেভ করুন" else "সেভ করুন") }
         error?.let { Text(it, color = MaterialTheme.colorScheme.error) }
+    }
+}
+
+@Composable
+private fun TransactionTypeCard(
+    label: String,
+    selected: Boolean,
+    accent: Color,
+    modifier: Modifier = Modifier,
+    onClick: () -> Unit
+) {
+    Card(
+        onClick = onClick,
+        modifier = modifier,
+        shape = RoundedCornerShape(16.dp),
+        colors = CardDefaults.cardColors(
+            containerColor = if (selected) accent else accent.copy(alpha = 0.10f)
+        ),
+        border = BorderStroke(
+            1.dp,
+            if (selected) accent else accent.copy(alpha = 0.25f)
+        )
+    ) {
+        Text(
+            label,
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(vertical = 11.dp),
+            style = MaterialTheme.typography.labelLarge,
+            fontWeight = FontWeight.Bold,
+            color = if (selected) Color.White else accent,
+            textAlign = TextAlign.Center
+        )
     }
 }
 
@@ -720,8 +872,18 @@ private fun TransactionRow(
     isBusiness: Boolean,
     onDelete: () -> Unit
 ) {
-    Card(modifier = Modifier.fillMaxWidth()) {
-        Column(Modifier.padding(12.dp)) {
+    val accent = if (item.type == "INCOME") IncomeAccent else ExpenseAccent
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        colors = CardDefaults.cardColors(
+            containerColor = accent.copy(alpha = 0.09f)
+        ),
+        border = BorderStroke(1.dp, accent.copy(alpha = 0.20f))
+    ) {
+        Column(
+            modifier = Modifier.padding(14.dp),
+            verticalArrangement = Arrangement.spacedBy(3.dp)
+        ) {
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
                 Text(
                     if (isBusiness) {
@@ -729,13 +891,28 @@ private fun TransactionRow(
                     } else {
                         if (item.type == "INCOME") "আয়" else "খরচ"
                     },
-                    fontWeight = FontWeight.Bold
+                    fontWeight = FontWeight.Bold,
+                    color = accent
                 )
-                Text("৳ ${money(item.amount)}", fontWeight = FontWeight.Bold)
+                Text(
+                    "৳ ${money(item.amount)}",
+                    fontWeight = FontWeight.ExtraBold,
+                    color = accent
+                )
             }
-            Text(item.category)
-            if (item.note.isNotBlank()) Text(item.note, style = MaterialTheme.typography.bodySmall)
-            Text(formatDate(item.createdAt), style = MaterialTheme.typography.bodySmall)
+            Text(item.category, fontWeight = FontWeight.SemiBold)
+            if (item.note.isNotBlank()) {
+                Text(
+                    item.note,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+            Text(
+                formatDate(item.createdAt),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
             TextButton(onClick = onDelete) { Text("মুছুন") }
         }
     }
@@ -802,22 +979,37 @@ private fun BakiPeopleScreen(
             Text("প্রথমে একজন $personLabel যোগ করুন।")
         } else {
             people.forEach { person ->
+                val accent = balanceAccent(person.balance)
                 Card(
                     onClick = { onSelect(person) },
-                    modifier = Modifier.fillMaxWidth()
+                    modifier = Modifier.fillMaxWidth(),
+                    colors = CardDefaults.cardColors(
+                        containerColor = accent.copy(alpha = 0.08f)
+                    ),
+                    border = BorderStroke(1.dp, accent.copy(alpha = 0.20f))
                 ) {
-                    Column(Modifier.padding(14.dp)) {
-                        Text(person.name, fontWeight = FontWeight.Bold)
+                    Column(
+                        modifier = Modifier.padding(14.dp),
+                        verticalArrangement = Arrangement.spacedBy(3.dp)
+                    ) {
+                        Text(
+                            person.name,
+                            fontWeight = FontWeight.Bold,
+                            style = MaterialTheme.typography.titleMedium
+                        )
                         Text(
                             when {
                                 person.balance > 0 -> "পাবো: ৳ ${money(person.balance)}"
                                 person.balance < 0 -> "দেবো: ৳ ${money(-person.balance)}"
                                 else -> "হিসাব সমান"
-                            }
+                            },
+                            fontWeight = FontWeight.Bold,
+                            color = accent
                         )
                         Text(
                             if (workspace == "SHOP") "খাতা ও লেনদেন দেখতে চাপুন" else "হিসাব ও ইতিহাস দেখতে চাপুন",
-                            style = MaterialTheme.typography.bodySmall
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
                     }
                 }
@@ -841,6 +1033,7 @@ private fun BakiEntryScreen(
     var note by remember { mutableStateOf("") }
     var error by remember { mutableStateOf<String?>(null) }
     var pendingDelete by remember { mutableStateOf<BakiEntryEntity?>(null) }
+    val balanceTone = balanceAccent(person.balance)
 
     Column(
         modifier = Modifier
@@ -854,14 +1047,24 @@ private fun BakiEntryScreen(
         }
 
         Text(person.name, style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
-        Text(
-            when {
-                person.balance > 0 -> "বর্তমানে পাবো: ৳ ${money(person.balance)}"
-                person.balance < 0 -> "বর্তমানে দেবো: ৳ ${money(-person.balance)}"
-                else -> "বর্তমান হিসাব সমান"
-            },
-            style = MaterialTheme.typography.titleMedium
-        )
+        Surface(
+            modifier = Modifier.fillMaxWidth(),
+            shape = RoundedCornerShape(18.dp),
+            color = balanceTone.copy(alpha = 0.11f),
+            border = BorderStroke(1.dp, balanceTone.copy(alpha = 0.22f))
+        ) {
+            Text(
+                when {
+                    person.balance > 0 -> "বর্তমানে পাবো: ৳ ${money(person.balance)}"
+                    person.balance < 0 -> "বর্তমানে দেবো: ৳ ${money(-person.balance)}"
+                    else -> "বর্তমান হিসাব সমান"
+                },
+                modifier = Modifier.padding(horizontal = 14.dp, vertical = 12.dp),
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.Bold,
+                color = balanceTone
+            )
+        }
 
         if (person.phone.isNotBlank()) {
             OutlinedButton(
@@ -956,25 +1159,68 @@ private fun BakiEntryScreen(
 
 @Composable
 private fun BakiHistoryCard(item: BakiEntryEntity, onDelete: () -> Unit) {
-    Card(modifier = Modifier.fillMaxWidth()) {
-        Column(Modifier.padding(12.dp)) {
+    val accent = bakiActionAccent(item.action)
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        colors = CardDefaults.cardColors(
+            containerColor = accent.copy(alpha = 0.08f)
+        ),
+        border = BorderStroke(1.dp, accent.copy(alpha = 0.18f))
+    ) {
+        Column(
+            modifier = Modifier.padding(13.dp),
+            verticalArrangement = Arrangement.spacedBy(3.dp)
+        ) {
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                Text(actionLabel(item.action), fontWeight = FontWeight.Bold)
-                Text("৳ ${money(item.amount)}", fontWeight = FontWeight.Bold)
+                Text(
+                    actionLabel(item.action),
+                    fontWeight = FontWeight.Bold,
+                    color = accent
+                )
+                Text(
+                    "৳ ${money(item.amount)}",
+                    fontWeight = FontWeight.ExtraBold,
+                    color = accent
+                )
             }
             if (item.note.isNotBlank()) {
                 Text(item.note)
             }
-            Text(formatDate(item.createdAt), style = MaterialTheme.typography.bodySmall)
+            Text(
+                formatDate(item.createdAt),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
             TextButton(onClick = onDelete) { Text("এন্ট্রি মুছুন") }
         }
     }
 }
 
 @Composable
-private fun ActionButton(label: String, value: String, selected: String, onClick: () -> Unit) {
-    if (selected == value) Button(onClick = onClick) { Text(label) }
-    else OutlinedButton(onClick = onClick) { Text(label) }
+private fun ActionButton(
+    label: String,
+    value: String,
+    selected: String,
+    onClick: () -> Unit
+) {
+    val isSelected = selected == value
+    val accent = bakiActionAccent(value)
+    Card(
+        onClick = onClick,
+        shape = RoundedCornerShape(14.dp),
+        colors = CardDefaults.cardColors(
+            containerColor = if (isSelected) accent else accent.copy(alpha = 0.09f)
+        ),
+        border = BorderStroke(1.dp, accent.copy(alpha = if (isSelected) 0.70f else 0.22f))
+    ) {
+        Text(
+            label,
+            modifier = Modifier.padding(horizontal = 12.dp, vertical = 9.dp),
+            style = MaterialTheme.typography.labelMedium,
+            fontWeight = FontWeight.Bold,
+            color = if (isSelected) Color.White else accent
+        )
+    }
 }
 
 
@@ -1113,7 +1359,7 @@ private fun MoreScreen(viewModel: FamilyKhataViewModel) {
                 modifier = Modifier.padding(16.dp),
                 verticalArrangement = Arrangement.spacedBy(4.dp)
             ) {
-                Text("হিসাবী খাতা v1.0", fontWeight = FontWeight.Bold)
+                Text("হিসাবী খাতা v1.1", fontWeight = FontWeight.Bold)
                 Text(
                     "আপনার টাকা-পয়সার সহজ হিসাব • ডেটা আপনার ডিভাইসে থাকে",
                     style = MaterialTheme.typography.bodySmall
@@ -1169,32 +1415,55 @@ private fun MoreActionCard(
     subtitle: String,
     onClick: () -> Unit
 ) {
+    val accent = when (symbol) {
+        "⇩" -> IncomeAccent
+        "⇧" -> ReceivableAccent
+        "↗" -> FamilyAccent
+        "★" -> PayableAccent
+        "✦" -> PersonalAccent
+        "?" -> ExpenseAccent
+        "⌂" -> ShopAccent
+        else -> NeutralAccent
+    }
     Card(
         onClick = onClick,
-        modifier = Modifier.fillMaxWidth()
+        modifier = Modifier.fillMaxWidth(),
+        colors = CardDefaults.cardColors(
+            containerColor = accent.copy(alpha = 0.07f)
+        ),
+        border = BorderStroke(1.dp, accent.copy(alpha = 0.16f))
     ) {
         Row(
             modifier = Modifier.padding(14.dp),
-            horizontalArrangement = Arrangement.spacedBy(12.dp)
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
+            verticalAlignment = Alignment.CenterVertically
         ) {
             Surface(
                 shape = RoundedCornerShape(12.dp),
-                color = MaterialTheme.colorScheme.primaryContainer
+                color = accent
             ) {
                 Text(
                     symbol,
                     modifier = Modifier.padding(horizontal = 11.dp, vertical = 7.dp),
                     style = MaterialTheme.typography.titleMedium,
                     fontWeight = FontWeight.Bold,
-                    color = MaterialTheme.colorScheme.primary
+                    color = Color.White
                 )
             }
             Column(
                 modifier = Modifier.weight(1f),
                 verticalArrangement = Arrangement.spacedBy(3.dp)
             ) {
-                Text(title, fontWeight = FontWeight.Bold)
-                Text(subtitle, style = MaterialTheme.typography.bodySmall)
+                Text(
+                    title,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.onSurface
+                )
+                Text(
+                    subtitle,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
             }
         }
     }
@@ -1249,6 +1518,32 @@ private fun openUrl(context: Context, url: String) {
 
 private fun toast(context: Context, message: String) {
     Toast.makeText(context, message, Toast.LENGTH_SHORT).show()
+}
+
+private fun workspaceAccent(workspace: String): Color = when (workspace) {
+    "PERSONAL" -> PersonalAccent
+    "SHOP" -> ShopAccent
+    else -> FamilyAccent
+}
+
+private fun balanceAccent(balance: Double): Color = when {
+    balance > 0 -> ReceivableAccent
+    balance < 0 -> PayableAccent
+    else -> NeutralAccent
+}
+
+private fun bakiActionAccent(action: String): Color = when (action) {
+    "GAVE", "RECEIVED_BACK" -> ReceivableAccent
+    "TOOK", "PAID_BACK" -> PayableAccent
+    else -> NeutralAccent
+}
+
+private fun tabAccent(tab: Tab): Color = when (tab) {
+    Tab.DASHBOARD -> Color(0xFF0B6B58)
+    Tab.ADD -> IncomeAccent
+    Tab.BAKI -> ReceivableAccent
+    Tab.HISTORY -> Color(0xFF6C4CCF)
+    Tab.MORE -> ShopAccent
 }
 
 private fun workspaceLabel(workspace: String): String = when (workspace) {

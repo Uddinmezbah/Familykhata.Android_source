@@ -9,6 +9,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
@@ -22,6 +23,7 @@ import androidx.compose.material3.NavigationBarItem
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -31,6 +33,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.familykhata.app.FamilyKhataViewModel
@@ -52,10 +55,10 @@ private enum class Tab(val label: String) {
 fun FamilyKhataApp(viewModel: FamilyKhataViewModel) {
     var tab by remember { mutableStateOf(Tab.DASHBOARD) }
 
-    MaterialTheme {
+    HisabiKhataTheme {
         Scaffold(
             bottomBar = {
-                NavigationBar {
+                NavigationBar(containerColor = MaterialTheme.colorScheme.surface) {
                     Tab.entries.forEach { item ->
                         NavigationBarItem(
                             selected = tab == item,
@@ -73,9 +76,8 @@ fun FamilyKhataApp(viewModel: FamilyKhataViewModel) {
                     .padding(padding)
                     .padding(16.dp)
             ) {
-                Text("Family Khata", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
-                Text("v0.6 • Play Ready Build", style = MaterialTheme.typography.labelSmall)
-                Spacer(Modifier.height(10.dp))
+                BrandHeader()
+                Spacer(Modifier.height(14.dp))
                 Box(
                     modifier = Modifier
                         .fillMaxWidth()
@@ -94,27 +96,174 @@ fun FamilyKhataApp(viewModel: FamilyKhataViewModel) {
 }
 
 @Composable
+private fun BrandHeader() {
+    Surface(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(24.dp),
+        color = MaterialTheme.colorScheme.primaryContainer
+    ) {
+        Column(
+            modifier = Modifier.padding(horizontal = 18.dp, vertical = 15.dp),
+            verticalArrangement = Arrangement.spacedBy(6.dp)
+        ) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween
+            ) {
+                Column {
+                    Text(
+                        "হিসাবী খাতা",
+                        style = MaterialTheme.typography.headlineSmall,
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.onPrimaryContainer
+                    )
+                    Text(
+                        "আপনার টাকা-পয়সার সহজ হিসাব",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onPrimaryContainer
+                    )
+                }
+                Surface(
+                    shape = RoundedCornerShape(50),
+                    color = MaterialTheme.colorScheme.primary
+                ) {
+                    Text(
+                        "পরিবার",
+                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
+                        style = MaterialTheme.typography.labelMedium,
+                        fontWeight = FontWeight.SemiBold,
+                        color = MaterialTheme.colorScheme.onPrimary
+                    )
+                }
+            }
+            Text(
+                "v0.7 • Brand UI",
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onPrimaryContainer
+            )
+        }
+    }
+}
+
+@Composable
 private fun DashboardScreen(viewModel: FamilyKhataViewModel) {
     val totals by viewModel.totals.collectAsState()
     val bakiPeople by viewModel.bakiPeople.collectAsState()
     val receivable = bakiPeople.filter { it.balance > 0 }.sumOf { it.balance }
     val payable = -bakiPeople.filter { it.balance < 0 }.sumOf { it.balance }
+    val balance = totals.income - totals.expense
 
-    Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-        SummaryCard("মোট আয়", totals.income)
-        SummaryCard("মোট খরচ", totals.expense)
-        SummaryCard("বর্তমান ব্যালেন্স", totals.income - totals.expense)
-        SummaryCard("পাবো", receivable)
-        SummaryCard("দেবো", payable)
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .verticalScroll(rememberScrollState()),
+        verticalArrangement = Arrangement.spacedBy(12.dp)
+    ) {
+        Surface(
+            modifier = Modifier.fillMaxWidth(),
+            shape = RoundedCornerShape(24.dp),
+            color = MaterialTheme.colorScheme.primary
+        ) {
+            Column(
+                modifier = Modifier.padding(20.dp),
+                verticalArrangement = Arrangement.spacedBy(4.dp)
+            ) {
+                Text(
+                    "বর্তমান ব্যালেন্স",
+                    style = MaterialTheme.typography.labelLarge,
+                    color = MaterialTheme.colorScheme.onPrimary
+                )
+                Text(
+                    "৳ ${money(balance)}",
+                    style = MaterialTheme.typography.headlineLarge,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.onPrimary
+                )
+                Text(
+                    "পরিবারের সার্বিক হিসাব",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onPrimary
+                )
+            }
+        }
+
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(10.dp)
+        ) {
+            MetricCard(
+                title = "মোট আয়",
+                amount = totals.income,
+                modifier = Modifier.weight(1f),
+                containerColor = MaterialTheme.colorScheme.primaryContainer
+            )
+            MetricCard(
+                title = "মোট খরচ",
+                amount = totals.expense,
+                modifier = Modifier.weight(1f),
+                containerColor = MaterialTheme.colorScheme.secondaryContainer
+            )
+        }
+
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(10.dp)
+        ) {
+            MetricCard(
+                title = "পাবো",
+                amount = receivable,
+                modifier = Modifier.weight(1f),
+                containerColor = MaterialTheme.colorScheme.tertiaryContainer
+            )
+            MetricCard(
+                title = "দেবো",
+                amount = payable,
+                modifier = Modifier.weight(1f),
+                containerColor = MaterialTheme.colorScheme.surfaceVariant
+            )
+        }
+
+        Surface(
+            modifier = Modifier.fillMaxWidth(),
+            shape = RoundedCornerShape(18.dp),
+            color = MaterialTheme.colorScheme.surfaceVariant
+        ) {
+            Column(
+                modifier = Modifier.padding(16.dp),
+                verticalArrangement = Arrangement.spacedBy(3.dp)
+            ) {
+                Text("হিসাব গুছিয়ে রাখুন", fontWeight = FontWeight.Bold)
+                Text(
+                    "নিচের “নতুন” থেকে আয়-খরচ এবং “বাকি” থেকে দেনা-পাওনা যোগ করুন।",
+                    style = MaterialTheme.typography.bodySmall
+                )
+            }
+        }
     }
 }
 
 @Composable
-private fun SummaryCard(title: String, amount: Double) {
-    Card(modifier = Modifier.fillMaxWidth()) {
-        Column(Modifier.padding(16.dp)) {
+private fun MetricCard(
+    title: String,
+    amount: Double,
+    modifier: Modifier = Modifier,
+    containerColor: Color = MaterialTheme.colorScheme.surfaceVariant
+) {
+    Surface(
+        modifier = modifier,
+        shape = RoundedCornerShape(18.dp),
+        color = containerColor
+    ) {
+        Column(
+            modifier = Modifier.padding(15.dp),
+            verticalArrangement = Arrangement.spacedBy(5.dp)
+        ) {
             Text(title, style = MaterialTheme.typography.labelLarge)
-            Text("৳ ${money(amount)}", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
+            Text(
+                "৳ ${money(amount)}",
+                style = MaterialTheme.typography.titleLarge,
+                fontWeight = FontWeight.Bold
+            )
         }
     }
 }

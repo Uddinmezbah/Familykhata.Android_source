@@ -37,15 +37,15 @@ jobs:
           set -euo pipefail
           test -n "$RELEASE_KEYSTORE_BASE64" || { echo "::error::Missing RELEASE_KEYSTORE_BASE64 secret"; exit 1; }
           test -n "$RELEASE_KEYSTORE_PASSWORD" || { echo "::error::Missing RELEASE_KEYSTORE_PASSWORD secret"; exit 1; }
-          printf '%s' "$RELEASE_KEYSTORE_BASE64" | base64 --decode > "$RUNNER_TEMP/familykhata-release.jks"
+          printf '%s' "$RELEASE_KEYSTORE_BASE64" | base64 --decode > "$RUNNER_TEMP/hisabikhata-release.jks"
           keytool -list \
-            -keystore "$RUNNER_TEMP/familykhata-release.jks" \
+            -keystore "$RUNNER_TEMP/hisabikhata-release.jks" \
             -storepass "$RELEASE_KEYSTORE_PASSWORD" \
             -alias familykhata >/dev/null
 
       - name: Build signed APK and App Bundle
         env:
-          RELEASE_STORE_FILE: ${{ runner.temp }}/familykhata-release.jks
+          RELEASE_STORE_FILE: ${{ runner.temp }}/hisabikhata-release.jks
           RELEASE_KEYSTORE_PASSWORD: ${{ secrets.RELEASE_KEYSTORE_PASSWORD }}
         run: gradle :app:assembleRelease :app:bundleRelease --stacktrace
 
@@ -64,7 +64,7 @@ jobs:
             | awk -F': ' '/Signer #1 certificate SHA-256 digest:/ {print tolower($2); exit}')"
 
           test "$ACTUAL_CERT_SHA256" = "$EXPECTED_CERT_SHA256" || {
-            echo "::error::APK certificate fingerprint does not match the Family Khata stable signing key"
+            echo "::error::APK certificate fingerprint does not match the Hisabi Khata stable signing key"
             exit 1
           }
 
@@ -78,23 +78,24 @@ jobs:
           test -s "$AAB"
           jarsigner -verify "$AAB"
 
-          ACTUAL_AAB_CERT_SHA256="$(keytool -printcert -jarfile "$AAB"             | awk -F': ' '/SHA256:/ {gsub(":", "", $2); print tolower($2); exit}')"
+          ACTUAL_AAB_CERT_SHA256="$(keytool -printcert -jarfile "$AAB" \
+            | awk -F': ' '/SHA256:/ {gsub(":", "", $2); print tolower($2); exit}')"
 
           test "$ACTUAL_AAB_CERT_SHA256" = "$EXPECTED_CERT_SHA256" || {
-            echo "::error::AAB certificate fingerprint does not match the Family Khata stable signing key"
+            echo "::error::AAB certificate fingerprint does not match the Hisabi Khata stable signing key"
             exit 1
           }
 
       - name: Upload Play Store AAB
         uses: actions/upload-artifact@v4
         with:
-          name: FamilyKhata-v0.6-play-aab
+          name: HisabiKhata-v0.7-play-aab
           path: app/build/outputs/bundle/release/app-release.aab
           if-no-files-found: error
 
       - name: Upload direct-install APK
         uses: actions/upload-artifact@v4
         with:
-          name: FamilyKhata-v0.6-direct-apk
+          name: HisabiKhata-v0.7-direct-apk
           path: app/build/outputs/apk/release/app-release.apk
           if-no-files-found: error

@@ -1,9 +1,12 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <style name="Theme.FamilyKhata" parent="android:style/Theme.Material.Light.NoActionBar">
+    <style name="Theme.HisabiKhata" parent="android:style/Theme.Material.Light.NoActionBar">
         <item name="android:fontFamily">sans</item>
         <item name="android:windowLightStatusBar">true</item>
-        <item name="android:statusBarColor">#FFFFFF</item>
-        <item name="android:navigationBarColor">#FFFFFF</item>
+        <item name="android:statusBarColor">@color/brand_surface</item>
+        <item name="android:navigationBarColor">@color/brand_surface</item>
+        <item name="android:windowActionModeOverlay">true</item>
     </style>
+
+    <style name="Theme.FamilyKhata" parent="@style/Theme.HisabiKhata" />
 </resources>

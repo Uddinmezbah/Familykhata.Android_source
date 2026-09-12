@@ -53,4 +53,24 @@ interface FamilyKhataDao {
 
     @Query("SELECT * FROM baki_entries WHERE personId = :personId ORDER BY createdAt DESC")
     fun observeBakiEntries(personId: Long): Flow<List<BakiEntryEntity>>
+
+
+    @Query("SELECT * FROM transactions ORDER BY id ASC")
+    suspend fun getAllTransactions(): List<TransactionEntity>
+
+    @Query("SELECT * FROM baki_people ORDER BY id ASC")
+    suspend fun getAllPeople(): List<BakiPersonEntity>
+
+    @Query("SELECT * FROM baki_entries ORDER BY id ASC")
+    suspend fun getAllBakiEntries(): List<BakiEntryEntity>
+
+    @Query("DELETE FROM baki_entries")
+    suspend fun clearBakiEntries()
+
+    @Query("DELETE FROM baki_people")
+    suspend fun clearPeople()
+
+    @Query("DELETE FROM transactions")
+    suspend fun clearTransactions()
+
 }

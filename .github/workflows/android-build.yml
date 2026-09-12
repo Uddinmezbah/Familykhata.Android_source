@@ -89,13 +89,13 @@ jobs:
       - name: Upload Play Store AAB
         uses: actions/upload-artifact@v4
         with:
-          name: HisabiKhata-v0.9-play-aab
+          name: HisabiKhata-v1.0-play-aab
           path: app/build/outputs/bundle/release/app-release.aab
           if-no-files-found: error
 
       - name: Upload direct-install APK
         uses: actions/upload-artifact@v4
         with:
-          name: HisabiKhata-v0.9-direct-apk
+          name: HisabiKhata-v1.0-direct-apk
           path: app/build/outputs/apk/release/app-release.apk
           if-no-files-found: error

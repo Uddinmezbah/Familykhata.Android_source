@@ -1,5 +1,11 @@
 package com.familykhata.app.ui
 
+import android.content.Context
+import android.content.Intent
+import android.net.Uri
+import android.widget.Toast
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -35,6 +41,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.familykhata.app.FamilyKhataViewModel
@@ -45,11 +52,19 @@ import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
 
+private const val APP_PACKAGE = "com.familykhata.app"
+private const val PLAY_STORE_URL = "https://play.google.com/store/apps/details?id=$APP_PACKAGE"
+private const val WEBSITE_URL = "https://uddinmezbah.github.io/Familykhata.Android_source/"
+private const val PRIVACY_URL = "https://uddinmezbah.github.io/Familykhata.Android_source/privacy.html"
+private const val SUPPORT_URL = "https://github.com/Uddinmezbah/Familykhata.Android_source/issues/new?title=Support%3A%20"
+private const val FEATURE_REQUEST_URL = "https://github.com/Uddinmezbah/Familykhata.Android_source/issues/new?title=Feature%20request%3A%20"
+
 private enum class Tab(val label: String) {
     DASHBOARD("হোম"),
     ADD("নতুন"),
     BAKI("বাকি"),
-    HISTORY("হিসাব")
+    HISTORY("হিসাব"),
+    MORE("আরও")
 }
 
 @Composable
@@ -123,6 +138,7 @@ fun FamilyKhataApp(viewModel: FamilyKhataViewModel) {
                         )
                         Tab.BAKI -> BakiScreen(viewModel, workspace)
                         Tab.HISTORY -> HistoryScreen(viewModel, workspace)
+                        Tab.MORE -> MoreScreen(viewModel)
                     }
                 }
             }
@@ -172,7 +188,7 @@ private fun BrandHeader(workspace: String) {
                 }
             }
             Text(
-                "v0.9 • Business Foundation",
+                "v1.0 • Launch Foundation",
                 style = MaterialTheme.typography.labelSmall,
                 color = MaterialTheme.colorScheme.onPrimaryContainer
             )
@@ -817,6 +833,7 @@ private fun BakiEntryScreen(
     workspace: String,
     onBack: () -> Unit
 ) {
+    val context = LocalContext.current
     val entriesFlow = remember(person.id) { viewModel.observeBakiEntries(person.id) }
     val entries by entriesFlow.collectAsState(initial = emptyList())
     var action by remember { mutableStateOf("GAVE") }
@@ -845,6 +862,15 @@ private fun BakiEntryScreen(
             },
             style = MaterialTheme.typography.titleMedium
         )
+
+        if (person.phone.isNotBlank()) {
+            OutlinedButton(
+                onClick = { sendLedgerSms(context, person) },
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Text("SMS-এ হিসাব পাঠান")
+            }
+        }
 
         Text("নতুন এন্ট্রি", fontWeight = FontWeight.Bold)
         Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
@@ -951,6 +977,280 @@ private fun ActionButton(label: String, value: String, selected: String, onClick
     else OutlinedButton(onClick = onClick) { Text(label) }
 }
 
+
+@Composable
+private fun MoreScreen(viewModel: FamilyKhataViewModel) {
+    val context = LocalContext.current
+    var backupJson by remember { mutableStateOf<String?>(null) }
+    var pendingRestoreJson by remember { mutableStateOf<String?>(null) }
+
+    val createBackupFile = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.CreateDocument("application/json")
+    ) { uri ->
+        val json = backupJson
+        backupJson = null
+        if (uri != null && json != null) {
+            runCatching {
+                context.contentResolver.openOutputStream(uri)?.bufferedWriter()?.use { writer ->
+                    writer.write(json)
+                } ?: error("ফাইল লেখা যায়নি")
+            }.onSuccess {
+                toast(context, "ব্যাকআপ সেভ হয়েছে")
+            }.onFailure {
+                toast(context, it.message ?: "ব্যাকআপ সেভ করা যায়নি")
+            }
+        }
+    }
+
+    val openBackupFile = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.OpenDocument()
+    ) { uri ->
+        if (uri != null) {
+            runCatching {
+                context.contentResolver.openInputStream(uri)?.bufferedReader()?.use { reader ->
+                    reader.readText()
+                } ?: error("ফাইল পড়া যায়নি")
+            }.onSuccess { json ->
+                pendingRestoreJson = json
+            }.onFailure {
+                toast(context, it.message ?: "ব্যাকআপ ফাইল পড়া যায়নি")
+            }
+        }
+    }
+
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .verticalScroll(rememberScrollState())
+            .padding(bottom = 24.dp),
+        verticalArrangement = Arrangement.spacedBy(12.dp)
+    ) {
+        Text(
+            "আরও",
+            style = MaterialTheme.typography.headlineSmall,
+            fontWeight = FontWeight.Bold
+        )
+        Text(
+            "ডেটা নিরাপত্তা, শেয়ার, সাপোর্ট ও অ্যাপ সম্পর্কিত প্রয়োজনীয় অপশন।",
+            style = MaterialTheme.typography.bodyMedium
+        )
+
+        MoreSectionTitle("ডেটা নিরাপত্তা")
+        MoreActionCard(
+            symbol = "⇩",
+            title = "ব্যাকআপ তৈরি করুন",
+            subtitle = "সব ওয়ার্কস্পেসের আয়-খরচ ও বাকি হিসাব একটি JSON ফাইলে রাখুন"
+        ) {
+            viewModel.createBackup(
+                onReady = { json ->
+                    backupJson = json
+                    val stamp = SimpleDateFormat("yyyy-MM-dd-HHmm", Locale.US).format(Date())
+                    createBackupFile.launch("HisabiKhata-backup-$stamp.json")
+                },
+                onError = { toast(context, it) }
+            )
+        }
+        MoreActionCard(
+            symbol = "⇧",
+            title = "ব্যাকআপ রিস্টোর করুন",
+            subtitle = "আগের হিসাবী খাতা ব্যাকআপ থেকে সব ডেটা ফিরিয়ে আনুন"
+        ) {
+            openBackupFile.launch(arrayOf("application/json", "text/plain"))
+        }
+
+        MoreSectionTitle("শেয়ার ও মতামত")
+        MoreActionCard(
+            symbol = "↗",
+            title = "অ্যাপ শেয়ার করুন",
+            subtitle = "পরিবার, বন্ধু বা ব্যবসায়িক পরিচিতদের হিসাবী খাতা জানান"
+        ) {
+            shareApp(context)
+        }
+        MoreActionCard(
+            symbol = "★",
+            title = "রিভিউ দিন",
+            subtitle = "Play Store-এ প্রকাশের পর এখান থেকে রেটিং ও রিভিউ দেওয়া যাবে"
+        ) {
+            openPlayStore(context)
+        }
+        MoreActionCard(
+            symbol = "✦",
+            title = "ফিচার রিকোয়েস্ট",
+            subtitle = "কোন নতুন সুবিধা চান তা আমাদের জানান"
+        ) {
+            openUrl(context, FEATURE_REQUEST_URL)
+        }
+
+        MoreSectionTitle("সাপোর্ট ও তথ্য")
+        MoreActionCard(
+            symbol = "?",
+            title = "আমাদের সাথে যোগাযোগ",
+            subtitle = "সাপোর্ট প্রশ্ন বা সমস্যার জন্য যোগাযোগ করুন"
+        ) {
+            openUrl(context, SUPPORT_URL)
+        }
+        MoreActionCard(
+            symbol = "⌂",
+            title = "ওয়েবসাইট",
+            subtitle = "হিসাবী খাতার অফিসিয়াল ওয়েবসাইট"
+        ) {
+            openUrl(context, WEBSITE_URL)
+        }
+        MoreActionCard(
+            symbol = "ⓘ",
+            title = "Privacy Policy",
+            subtitle = "আপনার ডেটা কীভাবে সংরক্ষণ ও ব্যবহার করা হয়"
+        ) {
+            openUrl(context, PRIVACY_URL)
+        }
+
+        Surface(
+            modifier = Modifier.fillMaxWidth(),
+            shape = RoundedCornerShape(18.dp),
+            color = MaterialTheme.colorScheme.surfaceVariant
+        ) {
+            Column(
+                modifier = Modifier.padding(16.dp),
+                verticalArrangement = Arrangement.spacedBy(4.dp)
+            ) {
+                Text("হিসাবী খাতা v1.0", fontWeight = FontWeight.Bold)
+                Text(
+                    "আপনার টাকা-পয়সার সহজ হিসাব • ডেটা আপনার ডিভাইসে থাকে",
+                    style = MaterialTheme.typography.bodySmall
+                )
+            }
+        }
+    }
+
+    pendingRestoreJson?.let { json ->
+        AlertDialog(
+            onDismissRequest = { pendingRestoreJson = null },
+            title = { Text("ব্যাকআপ রিস্টোর করবেন?") },
+            text = {
+                Text(
+                    "বর্তমান অ্যাপের সব হিসাব মুছে ব্যাকআপ ফাইলের ডেটা বসবে। " +
+                        "নিশ্চিত হওয়ার আগে চাইলে বর্তমান ডেটার একটি ব্যাকআপ তৈরি করুন।"
+                )
+            },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        pendingRestoreJson = null
+                        viewModel.restoreBackup(
+                            json = json,
+                            onDone = { count ->
+                                toast(context, "রিস্টোর সম্পন্ন: $count টি রেকর্ড")
+                            },
+                            onError = { toast(context, it) }
+                        )
+                    }
+                ) { Text("রিস্টোর করুন") }
+            },
+            dismissButton = {
+                TextButton(onClick = { pendingRestoreJson = null }) { Text("বাতিল") }
+            }
+        )
+    }
+}
+
+@Composable
+private fun MoreSectionTitle(title: String) {
+    Text(
+        title,
+        style = MaterialTheme.typography.titleMedium,
+        fontWeight = FontWeight.Bold
+    )
+}
+
+@Composable
+private fun MoreActionCard(
+    symbol: String,
+    title: String,
+    subtitle: String,
+    onClick: () -> Unit
+) {
+    Card(
+        onClick = onClick,
+        modifier = Modifier.fillMaxWidth()
+    ) {
+        Row(
+            modifier = Modifier.padding(14.dp),
+            horizontalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            Surface(
+                shape = RoundedCornerShape(12.dp),
+                color = MaterialTheme.colorScheme.primaryContainer
+            ) {
+                Text(
+                    symbol,
+                    modifier = Modifier.padding(horizontal = 11.dp, vertical = 7.dp),
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.primary
+                )
+            }
+            Column(
+                modifier = Modifier.weight(1f),
+                verticalArrangement = Arrangement.spacedBy(3.dp)
+            ) {
+                Text(title, fontWeight = FontWeight.Bold)
+                Text(subtitle, style = MaterialTheme.typography.bodySmall)
+            }
+        }
+    }
+}
+
+private fun sendLedgerSms(context: Context, person: BakiPersonSummary) {
+    val balanceText = when {
+        person.balance > 0 -> "আপনার কাছে ৳ ${money(person.balance)} পাওনা আছে।"
+        person.balance < 0 -> "আপনাকে ৳ ${money(-person.balance)} পরিশোধযোগ্য আছে।"
+        else -> "আপনার হিসাব বর্তমানে সমান আছে।"
+    }
+    val message = "হিসাবী খাতা: ${person.name}, $balanceText"
+    val intent = Intent(Intent.ACTION_SENDTO).apply {
+        data = Uri.parse("smsto:${Uri.encode(person.phone)}")
+        putExtra("sms_body", message)
+    }
+    runCatching { context.startActivity(intent) }
+        .onFailure { toast(context, "SMS অ্যাপ খোলা যায়নি") }
+}
+
+private fun shareApp(context: Context) {
+    val text = "হিসাবী খাতা – আয় ব্যয় ও বাকি\n$PLAY_STORE_URL"
+    val intent = Intent(Intent.ACTION_SEND).apply {
+        type = "text/plain"
+        putExtra(Intent.EXTRA_SUBJECT, "হিসাবী খাতা")
+        putExtra(Intent.EXTRA_TEXT, text)
+    }
+    runCatching {
+        context.startActivity(Intent.createChooser(intent, "অ্যাপ শেয়ার করুন"))
+    }.onFailure {
+        toast(context, "শেয়ার অপশন খোলা যায়নি")
+    }
+}
+
+private fun openPlayStore(context: Context) {
+    val marketIntent = Intent(
+        Intent.ACTION_VIEW,
+        Uri.parse("market://details?id=$APP_PACKAGE")
+    )
+    runCatching { context.startActivity(marketIntent) }
+        .recoverCatching { openUrl(context, PLAY_STORE_URL) }
+        .onFailure { toast(context, "Play Store খোলা যায়নি") }
+}
+
+private fun openUrl(context: Context, url: String) {
+    runCatching {
+        context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(url)))
+    }.onFailure {
+        toast(context, "লিংক খোলা যায়নি")
+    }
+}
+
+private fun toast(context: Context, message: String) {
+    Toast.makeText(context, message, Toast.LENGTH_SHORT).show()
+}
+
 private fun workspaceLabel(workspace: String): String = when (workspace) {
     "PERSONAL" -> "নিজের"
     "SHOP" -> "দোকান/প্রতিষ্ঠান"
@@ -970,6 +1270,7 @@ private fun tabLabel(tab: Tab, workspace: String): String {
         Tab.ADD -> "ক্যাশ"
         Tab.BAKI -> "খাতা"
         Tab.HISTORY -> "লেনদেন"
+        Tab.MORE -> "আরও"
     }
 }
 
@@ -978,6 +1279,7 @@ private fun tabSymbol(tab: Tab): String = when (tab) {
     Tab.ADD -> "＋"
     Tab.BAKI -> "৳"
     Tab.HISTORY -> "≡"
+    Tab.MORE -> "⋯"
 }
 
 private fun actionLabel(action: String): String = when (action) {

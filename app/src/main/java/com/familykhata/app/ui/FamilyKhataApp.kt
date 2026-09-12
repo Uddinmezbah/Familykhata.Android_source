@@ -3,6 +3,7 @@ package com.familykhata.app.ui
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
@@ -54,6 +55,7 @@ private enum class Tab(val label: String) {
 @Composable
 fun FamilyKhataApp(viewModel: FamilyKhataViewModel) {
     var tab by remember { mutableStateOf(Tab.DASHBOARD) }
+    var addTypePreset by remember { mutableStateOf("EXPENSE") }
     val workspace by viewModel.selectedWorkspace.collectAsState()
 
     HisabiKhataTheme {
@@ -64,8 +66,14 @@ fun FamilyKhataApp(viewModel: FamilyKhataViewModel) {
                         NavigationBarItem(
                             selected = tab == item,
                             onClick = { tab = item },
-                            icon = { Text(if (tab == item) "●" else "○") },
-                            label = { Text(item.label) }
+                            icon = {
+                                Text(
+                                    tabSymbol(item),
+                                    style = MaterialTheme.typography.titleMedium,
+                                    fontWeight = FontWeight.SemiBold
+                                )
+                            },
+                            label = { Text(tabLabel(item, workspace)) }
                         )
                     }
                 }
@@ -83,6 +91,7 @@ fun FamilyKhataApp(viewModel: FamilyKhataViewModel) {
                     selected = workspace,
                     onSelect = {
                         viewModel.selectWorkspace(it)
+                        addTypePreset = "EXPENSE"
                         tab = Tab.DASHBOARD
                     }
                 )
@@ -93,10 +102,27 @@ fun FamilyKhataApp(viewModel: FamilyKhataViewModel) {
                         .weight(1f)
                 ) {
                     when (tab) {
-                        Tab.DASHBOARD -> DashboardScreen(viewModel, workspace)
-                        Tab.ADD -> AddTransactionScreen(viewModel)
+                        Tab.DASHBOARD -> DashboardScreen(
+                            viewModel = viewModel,
+                            workspace = workspace,
+                            onCashIn = {
+                                addTypePreset = "INCOME"
+                                tab = Tab.ADD
+                            },
+                            onCashOut = {
+                                addTypePreset = "EXPENSE"
+                                tab = Tab.ADD
+                            },
+                            onLedger = { tab = Tab.BAKI },
+                            onHistory = { tab = Tab.HISTORY }
+                        )
+                        Tab.ADD -> AddTransactionScreen(
+                            viewModel = viewModel,
+                            workspace = workspace,
+                            initialType = addTypePreset
+                        )
                         Tab.BAKI -> BakiScreen(viewModel, workspace)
-                        Tab.HISTORY -> HistoryScreen(viewModel)
+                        Tab.HISTORY -> HistoryScreen(viewModel, workspace)
                     }
                 }
             }
@@ -127,7 +153,7 @@ private fun BrandHeader(workspace: String) {
                         color = MaterialTheme.colorScheme.onPrimaryContainer
                     )
                     Text(
-                        "নিজের, পরিবারের ও দোকানের হিসাব এক জায়গায়",
+                        "নিজের, পরিবারের ও দোকান/প্রতিষ্ঠানের হিসাব এক জায়গায়",
                         style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.onPrimaryContainer
                     )
@@ -146,7 +172,7 @@ private fun BrandHeader(workspace: String) {
                 }
             }
             Text(
-                "v0.8 • Smart Workspaces",
+                "v0.9 • Business Foundation",
                 style = MaterialTheme.typography.labelSmall,
                 color = MaterialTheme.colorScheme.onPrimaryContainer
             )
@@ -192,7 +218,7 @@ private fun WorkspaceSwitcher(
                     onSelect = onSelect
                 )
                 WorkspaceButton(
-                    label = "দোকান",
+                    label = "দোকান/\nপ্রতিষ্ঠান",
                     value = "SHOP",
                     selected = selected,
                     modifier = Modifier.weight(1f),
@@ -211,26 +237,52 @@ private fun WorkspaceButton(
     modifier: Modifier,
     onSelect: (String) -> Unit
 ) {
+    val contentPadding = PaddingValues(horizontal = 4.dp, vertical = 8.dp)
     if (selected == value) {
         Button(
             onClick = { onSelect(value) },
-            modifier = modifier
-        ) { Text(label) }
+            modifier = modifier,
+            contentPadding = contentPadding
+        ) { Text(label, style = MaterialTheme.typography.labelSmall) }
     } else {
         OutlinedButton(
             onClick = { onSelect(value) },
-            modifier = modifier
-        ) { Text(label) }
+            modifier = modifier,
+            contentPadding = contentPadding
+        ) { Text(label, style = MaterialTheme.typography.labelSmall) }
     }
 }
 
 @Composable
-private fun DashboardScreen(viewModel: FamilyKhataViewModel, workspace: String) {
+private fun DashboardScreen(
+    viewModel: FamilyKhataViewModel,
+    workspace: String,
+    onCashIn: () -> Unit,
+    onCashOut: () -> Unit,
+    onLedger: () -> Unit,
+    onHistory: () -> Unit
+) {
     val totals by viewModel.totals.collectAsState()
     val bakiPeople by viewModel.bakiPeople.collectAsState()
     val receivable = bakiPeople.filter { it.balance > 0 }.sumOf { it.balance }
     val payable = -bakiPeople.filter { it.balance < 0 }.sumOf { it.balance }
     val balance = totals.income - totals.expense
+
+    if (workspace == "SHOP") {
+        BusinessDashboard(
+            balance = balance,
+            income = totals.income,
+            expense = totals.expense,
+            receivable = receivable,
+            payable = payable,
+            ledgerCount = bakiPeople.size,
+            onCashIn = onCashIn,
+            onCashOut = onCashOut,
+            onLedger = onLedger,
+            onHistory = onHistory
+        )
+        return
+    }
 
     Column(
         modifier = Modifier
@@ -322,6 +374,193 @@ private fun DashboardScreen(viewModel: FamilyKhataViewModel, workspace: String) 
 }
 
 @Composable
+private fun BusinessDashboard(
+    balance: Double,
+    income: Double,
+    expense: Double,
+    receivable: Double,
+    payable: Double,
+    ledgerCount: Int,
+    onCashIn: () -> Unit,
+    onCashOut: () -> Unit,
+    onLedger: () -> Unit,
+    onHistory: () -> Unit
+) {
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .verticalScroll(rememberScrollState())
+            .padding(bottom = 20.dp),
+        verticalArrangement = Arrangement.spacedBy(12.dp)
+    ) {
+        Surface(
+            modifier = Modifier.fillMaxWidth(),
+            shape = RoundedCornerShape(24.dp),
+            color = MaterialTheme.colorScheme.primary
+        ) {
+            Column(
+                modifier = Modifier.padding(20.dp),
+                verticalArrangement = Arrangement.spacedBy(5.dp)
+            ) {
+                Text(
+                    "ব্যবসার ক্যাশ ব্যালেন্স",
+                    style = MaterialTheme.typography.labelLarge,
+                    color = MaterialTheme.colorScheme.onPrimary
+                )
+                Text(
+                    "৳ ${money(balance)}",
+                    style = MaterialTheme.typography.headlineLarge,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.onPrimary
+                )
+                Text(
+                    "দোকান/প্রতিষ্ঠানের আয়-খরচের বর্তমান হিসাব",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onPrimary
+                )
+            }
+        }
+
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(10.dp)
+        ) {
+            MetricCard(
+                title = "মোট ক্যাশ ইন",
+                amount = income,
+                modifier = Modifier.weight(1f),
+                containerColor = MaterialTheme.colorScheme.primaryContainer
+            )
+            MetricCard(
+                title = "মোট ক্যাশ আউট",
+                amount = expense,
+                modifier = Modifier.weight(1f),
+                containerColor = MaterialTheme.colorScheme.secondaryContainer
+            )
+        }
+
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(10.dp)
+        ) {
+            MetricCard(
+                title = "পাবো",
+                amount = receivable,
+                modifier = Modifier.weight(1f),
+                containerColor = MaterialTheme.colorScheme.tertiaryContainer
+            )
+            MetricCard(
+                title = "দেবো",
+                amount = payable,
+                modifier = Modifier.weight(1f),
+                containerColor = MaterialTheme.colorScheme.surfaceVariant
+            )
+        }
+
+        Text(
+            "দ্রুত কাজ",
+            style = MaterialTheme.typography.titleMedium,
+            fontWeight = FontWeight.Bold
+        )
+
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(10.dp)
+        ) {
+            BusinessActionCard(
+                symbol = "＋",
+                title = "ক্যাশ ইন",
+                subtitle = "আয় বা টাকা জমা",
+                modifier = Modifier.weight(1f),
+                onClick = onCashIn
+            )
+            BusinessActionCard(
+                symbol = "−",
+                title = "ক্যাশ আউট",
+                subtitle = "খরচ বা টাকা বের",
+                modifier = Modifier.weight(1f),
+                onClick = onCashOut
+            )
+        }
+
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(10.dp)
+        ) {
+            BusinessActionCard(
+                symbol = "৳",
+                title = "খাতা",
+                subtitle = "কাস্টমার/সাপ্লায়ার",
+                modifier = Modifier.weight(1f),
+                onClick = onLedger
+            )
+            BusinessActionCard(
+                symbol = "≡",
+                title = "লেনদেন",
+                subtitle = "সব ক্যাশ ইতিহাস",
+                modifier = Modifier.weight(1f),
+                onClick = onHistory
+            )
+        }
+
+        Surface(
+            modifier = Modifier.fillMaxWidth(),
+            shape = RoundedCornerShape(18.dp),
+            color = MaterialTheme.colorScheme.surfaceVariant
+        ) {
+            Column(
+                modifier = Modifier.padding(16.dp),
+                verticalArrangement = Arrangement.spacedBy(4.dp)
+            ) {
+                Text("ব্যবসার খাতা", fontWeight = FontWeight.Bold)
+                Text(
+                    "কাস্টমার/সাপ্লায়ার: $ledgerCount জন • পাবো ৳ ${money(receivable)} • দেবো ৳ ${money(payable)}",
+                    style = MaterialTheme.typography.bodySmall
+                )
+                Text(
+                    "পরবর্তী ধাপে পণ্য-স্টক, ক্রয়-বিক্রি, ইনভয়েস/চালান ও রিপোর্ট যোগ হবে।",
+                    style = MaterialTheme.typography.bodySmall
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun BusinessActionCard(
+    symbol: String,
+    title: String,
+    subtitle: String,
+    modifier: Modifier = Modifier,
+    onClick: () -> Unit
+) {
+    Card(
+        onClick = onClick,
+        modifier = modifier
+    ) {
+        Column(
+            modifier = Modifier.padding(14.dp),
+            verticalArrangement = Arrangement.spacedBy(6.dp)
+        ) {
+            Surface(
+                shape = RoundedCornerShape(12.dp),
+                color = MaterialTheme.colorScheme.primaryContainer
+            ) {
+                Text(
+                    symbol,
+                    modifier = Modifier.padding(horizontal = 10.dp, vertical = 5.dp),
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.primary
+                )
+            }
+            Text(title, fontWeight = FontWeight.Bold)
+            Text(subtitle, style = MaterialTheme.typography.bodySmall)
+        }
+    }
+}
+
+@Composable
 private fun MetricCard(
     title: String,
     amount: Double,
@@ -348,8 +587,13 @@ private fun MetricCard(
 }
 
 @Composable
-private fun AddTransactionScreen(viewModel: FamilyKhataViewModel) {
-    var type by remember { mutableStateOf("EXPENSE") }
+private fun AddTransactionScreen(
+    viewModel: FamilyKhataViewModel,
+    workspace: String,
+    initialType: String
+) {
+    val isBusiness = workspace == "SHOP"
+    var type by remember(initialType) { mutableStateOf(initialType) }
     var amount by remember { mutableStateOf("") }
     var category by remember { mutableStateOf("") }
     var note by remember { mutableStateOf("") }
@@ -361,15 +605,45 @@ private fun AddTransactionScreen(viewModel: FamilyKhataViewModel) {
             .verticalScroll(rememberScrollState()),
         verticalArrangement = Arrangement.spacedBy(10.dp)
     ) {
-        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            if (type == "EXPENSE") Button(onClick = { type = "EXPENSE" }) { Text("খরচ") }
-            else OutlinedButton(onClick = { type = "EXPENSE" }) { Text("খরচ") }
-            if (type == "INCOME") Button(onClick = { type = "INCOME" }) { Text("আয়") }
-            else OutlinedButton(onClick = { type = "INCOME" }) { Text("আয়") }
+        Text(
+            if (isBusiness) "ক্যাশ লেনদেন" else "নতুন আয়/খরচ",
+            style = MaterialTheme.typography.titleMedium,
+            fontWeight = FontWeight.Bold
+        )
+        if (isBusiness) {
+            Text(
+                "দোকান/প্রতিষ্ঠানের টাকা আসা বা বের হওয়ার হিসাব যোগ করুন।",
+                style = MaterialTheme.typography.bodySmall
+            )
         }
-        OutlinedTextField(amount, { amount = it }, label = { Text("টাকার পরিমাণ") }, modifier = Modifier.fillMaxWidth())
-        OutlinedTextField(category, { category = it }, label = { Text("ক্যাটাগরি") }, modifier = Modifier.fillMaxWidth())
-        OutlinedTextField(note, { note = it }, label = { Text("নোট") }, modifier = Modifier.fillMaxWidth())
+
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            val expenseLabel = if (isBusiness) "ক্যাশ আউট" else "খরচ"
+            val incomeLabel = if (isBusiness) "ক্যাশ ইন" else "আয়"
+            if (type == "EXPENSE") Button(onClick = { type = "EXPENSE" }) { Text(expenseLabel) }
+            else OutlinedButton(onClick = { type = "EXPENSE" }) { Text(expenseLabel) }
+            if (type == "INCOME") Button(onClick = { type = "INCOME" }) { Text(incomeLabel) }
+            else OutlinedButton(onClick = { type = "INCOME" }) { Text(incomeLabel) }
+        }
+
+        OutlinedTextField(
+            amount,
+            { amount = it },
+            label = { Text("টাকার পরিমাণ") },
+            modifier = Modifier.fillMaxWidth()
+        )
+        OutlinedTextField(
+            category,
+            { category = it },
+            label = { Text(if (isBusiness) "ক্যাটাগরি / খাত" else "ক্যাটাগরি") },
+            modifier = Modifier.fillMaxWidth()
+        )
+        OutlinedTextField(
+            note,
+            { note = it },
+            label = { Text("নোট") },
+            modifier = Modifier.fillMaxWidth()
+        )
         Button(
             onClick = {
                 val value = parseAmount(amount)
@@ -384,31 +658,63 @@ private fun AddTransactionScreen(viewModel: FamilyKhataViewModel) {
                 }
             },
             modifier = Modifier.fillMaxWidth()
-        ) { Text("সেভ করুন") }
+        ) { Text(if (isBusiness) "ক্যাশ লেনদেন সেভ করুন" else "সেভ করুন") }
         error?.let { Text(it, color = MaterialTheme.colorScheme.error) }
     }
 }
 
 @Composable
-private fun HistoryScreen(viewModel: FamilyKhataViewModel) {
+private fun HistoryScreen(viewModel: FamilyKhataViewModel, workspace: String) {
     val transactions by viewModel.transactions.collectAsState()
+    val isBusiness = workspace == "SHOP"
+
     if (transactions.isEmpty()) {
-        Text("এখনও কোনো আয়/খরচ যোগ করা হয়নি।")
+        Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+            Text(
+                if (isBusiness) "ব্যবসার লেনদেন" else "আয়-খরচের ইতিহাস",
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.Bold
+            )
+            Text(if (isBusiness) "এখনও কোনো ক্যাশ লেনদেন যোগ করা হয়নি।" else "এখনও কোনো আয়/খরচ যোগ করা হয়নি।")
+        }
         return
     }
+
     LazyColumn(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        item {
+            Text(
+                if (isBusiness) "ব্যবসার লেনদেন" else "আয়-খরচের ইতিহাস",
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.Bold
+            )
+        }
         items(transactions, key = { it.id }) { item ->
-            TransactionRow(item, onDelete = { viewModel.deleteTransaction(item) })
+            TransactionRow(
+                item = item,
+                isBusiness = isBusiness,
+                onDelete = { viewModel.deleteTransaction(item) }
+            )
         }
     }
 }
 
 @Composable
-private fun TransactionRow(item: TransactionEntity, onDelete: () -> Unit) {
+private fun TransactionRow(
+    item: TransactionEntity,
+    isBusiness: Boolean,
+    onDelete: () -> Unit
+) {
     Card(modifier = Modifier.fillMaxWidth()) {
         Column(Modifier.padding(12.dp)) {
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                Text(if (item.type == "INCOME") "আয়" else "খরচ", fontWeight = FontWeight.Bold)
+                Text(
+                    if (isBusiness) {
+                        if (item.type == "INCOME") "ক্যাশ ইন" else "ক্যাশ আউট"
+                    } else {
+                        if (item.type == "INCOME") "আয়" else "খরচ"
+                    },
+                    fontWeight = FontWeight.Bold
+                )
                 Text("৳ ${money(item.amount)}", fontWeight = FontWeight.Bold)
             }
             Text(item.category)
@@ -437,6 +743,7 @@ private fun BakiScreen(viewModel: FamilyKhataViewModel, workspace: String) {
         BakiEntryScreen(
             person = selected,
             viewModel = viewModel,
+            workspace = workspace,
             onBack = { selectedId = null }
         )
     }
@@ -452,6 +759,7 @@ private fun BakiPeopleScreen(
     var name by remember { mutableStateOf("") }
     var phone by remember { mutableStateOf("") }
     val personLabel = if (workspace == "SHOP") "কাস্টমার/সাপ্লায়ার" else "ব্যক্তি"
+    val sectionTitle = if (workspace == "SHOP") "কাস্টমার/সাপ্লায়ার খাতা" else "বাকি/পাওনা"
 
     Column(
         modifier = Modifier
@@ -472,7 +780,7 @@ private fun BakiPeopleScreen(
         ) { Text("$personLabel যোগ করুন") }
 
         Spacer(Modifier.height(4.dp))
-        Text("বাকি/পাওনা", fontWeight = FontWeight.Bold)
+        Text(sectionTitle, fontWeight = FontWeight.Bold)
 
         if (people.isEmpty()) {
             Text("প্রথমে একজন $personLabel যোগ করুন।")
@@ -491,7 +799,10 @@ private fun BakiPeopleScreen(
                                 else -> "হিসাব সমান"
                             }
                         )
-                        Text("হিসাব ও ইতিহাস দেখতে চাপুন", style = MaterialTheme.typography.bodySmall)
+                        Text(
+                            if (workspace == "SHOP") "খাতা ও লেনদেন দেখতে চাপুন" else "হিসাব ও ইতিহাস দেখতে চাপুন",
+                            style = MaterialTheme.typography.bodySmall
+                        )
                     }
                 }
             }
@@ -503,6 +814,7 @@ private fun BakiPeopleScreen(
 private fun BakiEntryScreen(
     person: BakiPersonSummary,
     viewModel: FamilyKhataViewModel,
+    workspace: String,
     onBack: () -> Unit
 ) {
     val entriesFlow = remember(person.id) { viewModel.observeBakiEntries(person.id) }
@@ -520,7 +832,9 @@ private fun BakiEntryScreen(
             .padding(bottom = 24.dp),
         verticalArrangement = Arrangement.spacedBy(10.dp)
     ) {
-        TextButton(onClick = onBack) { Text("← ব্যক্তি তালিকায় ফিরুন") }
+        TextButton(onClick = onBack) {
+            Text(if (workspace == "SHOP") "← কাস্টমার/সাপ্লায়ার তালিকায় ফিরুন" else "← ব্যক্তি তালিকায় ফিরুন")
+        }
 
         Text(person.name, style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
         Text(
@@ -567,7 +881,7 @@ private fun BakiEntryScreen(
                 }
             },
             modifier = Modifier.fillMaxWidth()
-        ) { Text("বাকি এন্ট্রি সেভ করুন") }
+        ) { Text(if (workspace == "SHOP") "খাতার এন্ট্রি সেভ করুন" else "বাকি এন্ট্রি সেভ করুন") }
 
         error?.let { Text(it, color = MaterialTheme.colorScheme.error) }
 
@@ -575,7 +889,10 @@ private fun BakiEntryScreen(
         Text("লেনদেনের ইতিহাস (${entries.size})", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
 
         if (entries.isEmpty()) {
-            Text("এই ব্যক্তির কোনো বাকি লেনদেন এখনো নেই।")
+            Text(
+                if (workspace == "SHOP") "এই খাতায় এখনো কোনো লেনদেন নেই।"
+                else "এই ব্যক্তির কোনো বাকি লেনদেন এখনো নেই।"
+            )
         } else {
             entries.forEach { entry ->
                 BakiHistoryCard(
@@ -636,14 +953,31 @@ private fun ActionButton(label: String, value: String, selected: String, onClick
 
 private fun workspaceLabel(workspace: String): String = when (workspace) {
     "PERSONAL" -> "নিজের"
-    "SHOP" -> "দোকান"
+    "SHOP" -> "দোকান/প্রতিষ্ঠান"
     else -> "পরিবার"
 }
 
 private fun workspaceSummary(workspace: String): String = when (workspace) {
     "PERSONAL" -> "আপনার ব্যক্তিগত আয়-খরচ ও দেনা-পাওনা"
-    "SHOP" -> "দোকানের আয়-খরচ ও দেনা-পাওনার হিসাব"
+    "SHOP" -> "দোকান/প্রতিষ্ঠানের আয়-খরচ ও দেনা-পাওনার হিসাব"
     else -> "পরিবারের সার্বিক আয়-খরচ ও দেনা-পাওনা"
+}
+
+private fun tabLabel(tab: Tab, workspace: String): String {
+    if (workspace != "SHOP") return tab.label
+    return when (tab) {
+        Tab.DASHBOARD -> "হোম"
+        Tab.ADD -> "ক্যাশ"
+        Tab.BAKI -> "খাতা"
+        Tab.HISTORY -> "লেনদেন"
+    }
+}
+
+private fun tabSymbol(tab: Tab): String = when (tab) {
+    Tab.DASHBOARD -> "⌂"
+    Tab.ADD -> "＋"
+    Tab.BAKI -> "৳"
+    Tab.HISTORY -> "≡"
 }
 
 private fun actionLabel(action: String): String = when (action) {

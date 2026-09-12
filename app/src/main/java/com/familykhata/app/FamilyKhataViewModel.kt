@@ -74,5 +74,10 @@ class FamilyKhataViewModel(application: Application) : AndroidViewModel(applicat
         }
     }
 
-    fun observeBakiEntries(personId: Long): Flow<List<BakiEntryEntity>> = dao.observeBakiEntries(personId)
+    fun deleteBakiEntry(item: BakiEntryEntity) {
+        viewModelScope.launch { dao.deleteBakiEntry(item) }
+    }
+
+    fun observeBakiEntries(personId: Long): Flow<List<BakiEntryEntity>> =
+        dao.observeBakiEntries(personId)
 }

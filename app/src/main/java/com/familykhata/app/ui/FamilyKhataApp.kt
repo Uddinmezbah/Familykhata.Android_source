@@ -13,9 +13,9 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
-import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.NavigationBar
 import androidx.compose.material3.NavigationBarItem
@@ -34,6 +34,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.familykhata.app.FamilyKhataViewModel
+import com.familykhata.app.data.BakiEntryEntity
 import com.familykhata.app.data.BakiPersonSummary
 import com.familykhata.app.data.TransactionEntity
 import java.text.SimpleDateFormat
@@ -73,7 +74,7 @@ fun FamilyKhataApp(viewModel: FamilyKhataViewModel) {
                     .padding(16.dp)
             ) {
                 Text("Family Khata", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
-                Text("v0.3 • Baki Flow Fix", style = MaterialTheme.typography.labelSmall)
+                Text("v0.4 • Baki History", style = MaterialTheme.typography.labelSmall)
                 Spacer(Modifier.height(10.dp))
                 Box(
                     modifier = Modifier
@@ -259,7 +260,7 @@ private fun BakiPeopleScreen(
                                 else -> "হিসাব সমান"
                             }
                         )
-                        Text("হিসাব খুলতে চাপুন", style = MaterialTheme.typography.bodySmall)
+                        Text("হিসাব ও ইতিহাস দেখতে চাপুন", style = MaterialTheme.typography.bodySmall)
                     }
                 }
             }
@@ -273,10 +274,13 @@ private fun BakiEntryScreen(
     viewModel: FamilyKhataViewModel,
     onBack: () -> Unit
 ) {
+    val entriesFlow = remember(person.id) { viewModel.observeBakiEntries(person.id) }
+    val entries by entriesFlow.collectAsState(initial = emptyList())
     var action by remember { mutableStateOf("GAVE") }
     var amount by remember { mutableStateOf("") }
     var note by remember { mutableStateOf("") }
     var error by remember { mutableStateOf<String?>(null) }
+    var pendingDelete by remember { mutableStateOf<BakiEntryEntity?>(null) }
 
     Column(
         modifier = Modifier
@@ -297,7 +301,7 @@ private fun BakiEntryScreen(
             style = MaterialTheme.typography.titleMedium
         )
 
-        Text("কী হয়েছে?", fontWeight = FontWeight.Bold)
+        Text("নতুন এন্ট্রি", fontWeight = FontWeight.Bold)
         Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
             ActionButton("দিলাম", "GAVE", action) { action = "GAVE" }
             ActionButton("ফেরত পেলাম", "RECEIVED_BACK", action) { action = "RECEIVED_BACK" }
@@ -335,6 +339,61 @@ private fun BakiEntryScreen(
         ) { Text("বাকি এন্ট্রি সেভ করুন") }
 
         error?.let { Text(it, color = MaterialTheme.colorScheme.error) }
+
+        Spacer(Modifier.height(8.dp))
+        Text("লেনদেনের ইতিহাস (${entries.size})", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+
+        if (entries.isEmpty()) {
+            Text("এই ব্যক্তির কোনো বাকি লেনদেন এখনো নেই।")
+        } else {
+            entries.forEach { entry ->
+                BakiHistoryCard(
+                    item = entry,
+                    onDelete = { pendingDelete = entry }
+                )
+            }
+        }
+    }
+
+    pendingDelete?.let { entry ->
+        AlertDialog(
+            onDismissRequest = { pendingDelete = null },
+            title = { Text("এন্ট্রি মুছবেন?") },
+            text = {
+                Text(
+                    "${actionLabel(entry.action)} — ৳ ${money(entry.amount)}\n" +
+                        "মুছে দিলে ব্যক্তির বর্তমান হিসাবও স্বয়ংক্রিয়ভাবে বদলে যাবে।"
+                )
+            },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        viewModel.deleteBakiEntry(entry)
+                        pendingDelete = null
+                    }
+                ) { Text("মুছুন") }
+            },
+            dismissButton = {
+                TextButton(onClick = { pendingDelete = null }) { Text("বাতিল") }
+            }
+        )
+    }
+}
+
+@Composable
+private fun BakiHistoryCard(item: BakiEntryEntity, onDelete: () -> Unit) {
+    Card(modifier = Modifier.fillMaxWidth()) {
+        Column(Modifier.padding(12.dp)) {
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                Text(actionLabel(item.action), fontWeight = FontWeight.Bold)
+                Text("৳ ${money(item.amount)}", fontWeight = FontWeight.Bold)
+            }
+            if (item.note.isNotBlank()) {
+                Text(item.note)
+            }
+            Text(formatDate(item.createdAt), style = MaterialTheme.typography.bodySmall)
+            TextButton(onClick = onDelete) { Text("এন্ট্রি মুছুন") }
+        }
     }
 }
 
@@ -342,6 +401,14 @@ private fun BakiEntryScreen(
 private fun ActionButton(label: String, value: String, selected: String, onClick: () -> Unit) {
     if (selected == value) Button(onClick = onClick) { Text(label) }
     else OutlinedButton(onClick = onClick) { Text(label) }
+}
+
+private fun actionLabel(action: String): String = when (action) {
+    "GAVE" -> "দিলাম"
+    "RECEIVED_BACK" -> "ফেরত পেলাম"
+    "TOOK" -> "নিলাম"
+    "PAID_BACK" -> "ফেরত দিলাম"
+    else -> action
 }
 
 private fun parseAmount(input: String): Double? {
@@ -366,6 +433,9 @@ private fun parseAmount(input: String): Double? {
     return normalized.toDoubleOrNull()?.takeIf { it > 0.0 }
 }
 
-private fun money(value: Double): String = if (value % 1.0 == 0.0) value.toLong().toString() else String.format(Locale.US, "%.2f", value)
+private fun money(value: Double): String =
+    if (value % 1.0 == 0.0) value.toLong().toString()
+    else String.format(Locale.US, "%.2f", value)
 
-private fun formatDate(timestamp: Long): String = SimpleDateFormat("dd MMM yyyy, hh:mm a", Locale.getDefault()).format(Date(timestamp))
+private fun formatDate(timestamp: Long): String =
+    SimpleDateFormat("dd MMM yyyy, hh:mm a", Locale.getDefault()).format(Date(timestamp))

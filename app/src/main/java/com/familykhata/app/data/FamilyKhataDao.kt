@@ -34,6 +34,9 @@ interface FamilyKhataDao {
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertBakiEntry(entry: BakiEntryEntity)
 
+    @Delete
+    suspend fun deleteBakiEntry(entry: BakiEntryEntity)
+
     @Query(
         """
         SELECT p.id AS id, p.name AS name, p.phone AS phone,

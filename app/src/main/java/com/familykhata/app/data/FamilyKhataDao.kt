@@ -15,8 +15,8 @@ interface FamilyKhataDao {
     @Delete
     suspend fun deleteTransaction(item: TransactionEntity)
 
-    @Query("SELECT * FROM transactions ORDER BY createdAt DESC")
-    fun observeTransactions(): Flow<List<TransactionEntity>>
+    @Query("SELECT * FROM transactions WHERE workspace = :workspace ORDER BY createdAt DESC")
+    fun observeTransactions(workspace: String): Flow<List<TransactionEntity>>
 
     @Query(
         """
@@ -24,9 +24,10 @@ interface FamilyKhataDao {
             COALESCE(SUM(CASE WHEN type = 'INCOME' THEN amount ELSE 0 END), 0) AS income,
             COALESCE(SUM(CASE WHEN type = 'EXPENSE' THEN amount ELSE 0 END), 0) AS expense
         FROM transactions
+        WHERE workspace = :workspace
         """
     )
-    fun observeDashboardTotals(): Flow<DashboardTotals>
+    fun observeDashboardTotals(workspace: String): Flow<DashboardTotals>
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertPerson(person: BakiPersonEntity): Long
@@ -43,11 +44,12 @@ interface FamilyKhataDao {
                COALESCE(SUM(e.balanceDelta), 0) AS balance
         FROM baki_people p
         LEFT JOIN baki_entries e ON p.id = e.personId
+        WHERE p.workspace = :workspace
         GROUP BY p.id
         ORDER BY p.name COLLATE NOCASE ASC
         """
     )
-    fun observeBakiSummaries(): Flow<List<BakiPersonSummary>>
+    fun observeBakiSummaries(workspace: String): Flow<List<BakiPersonSummary>>
 
     @Query("SELECT * FROM baki_entries WHERE personId = :personId ORDER BY createdAt DESC")
     fun observeBakiEntries(personId: Long): Flow<List<BakiEntryEntity>>

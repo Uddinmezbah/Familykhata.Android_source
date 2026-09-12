@@ -54,6 +54,7 @@ private enum class Tab(val label: String) {
 @Composable
 fun FamilyKhataApp(viewModel: FamilyKhataViewModel) {
     var tab by remember { mutableStateOf(Tab.DASHBOARD) }
+    val workspace by viewModel.selectedWorkspace.collectAsState()
 
     HisabiKhataTheme {
         Scaffold(
@@ -76,17 +77,25 @@ fun FamilyKhataApp(viewModel: FamilyKhataViewModel) {
                     .padding(padding)
                     .padding(16.dp)
             ) {
-                BrandHeader()
-                Spacer(Modifier.height(14.dp))
+                BrandHeader(workspace)
+                Spacer(Modifier.height(10.dp))
+                WorkspaceSwitcher(
+                    selected = workspace,
+                    onSelect = {
+                        viewModel.selectWorkspace(it)
+                        tab = Tab.DASHBOARD
+                    }
+                )
+                Spacer(Modifier.height(12.dp))
                 Box(
                     modifier = Modifier
                         .fillMaxWidth()
                         .weight(1f)
                 ) {
                     when (tab) {
-                        Tab.DASHBOARD -> DashboardScreen(viewModel)
+                        Tab.DASHBOARD -> DashboardScreen(viewModel, workspace)
                         Tab.ADD -> AddTransactionScreen(viewModel)
-                        Tab.BAKI -> BakiScreen(viewModel)
+                        Tab.BAKI -> BakiScreen(viewModel, workspace)
                         Tab.HISTORY -> HistoryScreen(viewModel)
                     }
                 }
@@ -96,7 +105,7 @@ fun FamilyKhataApp(viewModel: FamilyKhataViewModel) {
 }
 
 @Composable
-private fun BrandHeader() {
+private fun BrandHeader(workspace: String) {
     Surface(
         modifier = Modifier.fillMaxWidth(),
         shape = RoundedCornerShape(24.dp),
@@ -118,7 +127,7 @@ private fun BrandHeader() {
                         color = MaterialTheme.colorScheme.onPrimaryContainer
                     )
                     Text(
-                        "আপনার টাকা-পয়সার সহজ হিসাব",
+                        "নিজের, পরিবারের ও দোকানের হিসাব এক জায়গায়",
                         style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.onPrimaryContainer
                     )
@@ -128,7 +137,7 @@ private fun BrandHeader() {
                     color = MaterialTheme.colorScheme.primary
                 ) {
                     Text(
-                        "পরিবার",
+                        workspaceLabel(workspace),
                         modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
                         style = MaterialTheme.typography.labelMedium,
                         fontWeight = FontWeight.SemiBold,
@@ -137,7 +146,7 @@ private fun BrandHeader() {
                 }
             }
             Text(
-                "v0.7 • Brand UI",
+                "v0.8 • Smart Workspaces",
                 style = MaterialTheme.typography.labelSmall,
                 color = MaterialTheme.colorScheme.onPrimaryContainer
             )
@@ -146,7 +155,77 @@ private fun BrandHeader() {
 }
 
 @Composable
-private fun DashboardScreen(viewModel: FamilyKhataViewModel) {
+private fun WorkspaceSwitcher(
+    selected: String,
+    onSelect: (String) -> Unit
+) {
+    Surface(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(18.dp),
+        color = MaterialTheme.colorScheme.surfaceVariant
+    ) {
+        Column(
+            modifier = Modifier.padding(10.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            Text(
+                "কোন হিসাব দেখবেন?",
+                style = MaterialTheme.typography.labelLarge,
+                fontWeight = FontWeight.SemiBold
+            )
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(6.dp)
+            ) {
+                WorkspaceButton(
+                    label = "নিজের",
+                    value = "PERSONAL",
+                    selected = selected,
+                    modifier = Modifier.weight(1f),
+                    onSelect = onSelect
+                )
+                WorkspaceButton(
+                    label = "পরিবার",
+                    value = "FAMILY",
+                    selected = selected,
+                    modifier = Modifier.weight(1f),
+                    onSelect = onSelect
+                )
+                WorkspaceButton(
+                    label = "দোকান",
+                    value = "SHOP",
+                    selected = selected,
+                    modifier = Modifier.weight(1f),
+                    onSelect = onSelect
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun WorkspaceButton(
+    label: String,
+    value: String,
+    selected: String,
+    modifier: Modifier,
+    onSelect: (String) -> Unit
+) {
+    if (selected == value) {
+        Button(
+            onClick = { onSelect(value) },
+            modifier = modifier
+        ) { Text(label) }
+    } else {
+        OutlinedButton(
+            onClick = { onSelect(value) },
+            modifier = modifier
+        ) { Text(label) }
+    }
+}
+
+@Composable
+private fun DashboardScreen(viewModel: FamilyKhataViewModel, workspace: String) {
     val totals by viewModel.totals.collectAsState()
     val bakiPeople by viewModel.bakiPeople.collectAsState()
     val receivable = bakiPeople.filter { it.balance > 0 }.sumOf { it.balance }
@@ -180,7 +259,7 @@ private fun DashboardScreen(viewModel: FamilyKhataViewModel) {
                     color = MaterialTheme.colorScheme.onPrimary
                 )
                 Text(
-                    "পরিবারের সার্বিক হিসাব",
+                    workspaceSummary(workspace),
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onPrimary
                 )
@@ -341,7 +420,7 @@ private fun TransactionRow(item: TransactionEntity, onDelete: () -> Unit) {
 }
 
 @Composable
-private fun BakiScreen(viewModel: FamilyKhataViewModel) {
+private fun BakiScreen(viewModel: FamilyKhataViewModel, workspace: String) {
     val people by viewModel.bakiPeople.collectAsState()
     var selectedId by remember { mutableStateOf<Long?>(null) }
 
@@ -351,6 +430,7 @@ private fun BakiScreen(viewModel: FamilyKhataViewModel) {
         BakiPeopleScreen(
             people = people,
             viewModel = viewModel,
+            workspace = workspace,
             onSelect = { selectedId = it.id }
         )
     } else {
@@ -366,10 +446,12 @@ private fun BakiScreen(viewModel: FamilyKhataViewModel) {
 private fun BakiPeopleScreen(
     people: List<BakiPersonSummary>,
     viewModel: FamilyKhataViewModel,
+    workspace: String,
     onSelect: (BakiPersonSummary) -> Unit
 ) {
     var name by remember { mutableStateOf("") }
     var phone by remember { mutableStateOf("") }
+    val personLabel = if (workspace == "SHOP") "কাস্টমার/সাপ্লায়ার" else "ব্যক্তি"
 
     Column(
         modifier = Modifier
@@ -377,7 +459,7 @@ private fun BakiPeopleScreen(
             .verticalScroll(rememberScrollState()),
         verticalArrangement = Arrangement.spacedBy(10.dp)
     ) {
-        Text("নতুন ব্যক্তি", fontWeight = FontWeight.Bold)
+        Text("নতুন $personLabel", fontWeight = FontWeight.Bold)
         OutlinedTextField(name, { name = it }, label = { Text("নাম") }, modifier = Modifier.fillMaxWidth())
         OutlinedTextField(phone, { phone = it }, label = { Text("ফোন (ঐচ্ছিক)") }, modifier = Modifier.fillMaxWidth())
         Button(
@@ -387,13 +469,13 @@ private fun BakiPeopleScreen(
                 phone = ""
             },
             modifier = Modifier.fillMaxWidth()
-        ) { Text("ব্যক্তি যোগ করুন") }
+        ) { Text("$personLabel যোগ করুন") }
 
         Spacer(Modifier.height(4.dp))
         Text("বাকি/পাওনা", fontWeight = FontWeight.Bold)
 
         if (people.isEmpty()) {
-            Text("প্রথমে একজন ব্যক্তি যোগ করুন।")
+            Text("প্রথমে একজন $personLabel যোগ করুন।")
         } else {
             people.forEach { person ->
                 Card(
@@ -550,6 +632,18 @@ private fun BakiHistoryCard(item: BakiEntryEntity, onDelete: () -> Unit) {
 private fun ActionButton(label: String, value: String, selected: String, onClick: () -> Unit) {
     if (selected == value) Button(onClick = onClick) { Text(label) }
     else OutlinedButton(onClick = onClick) { Text(label) }
+}
+
+private fun workspaceLabel(workspace: String): String = when (workspace) {
+    "PERSONAL" -> "নিজের"
+    "SHOP" -> "দোকান"
+    else -> "পরিবার"
+}
+
+private fun workspaceSummary(workspace: String): String = when (workspace) {
+    "PERSONAL" -> "আপনার ব্যক্তিগত আয়-খরচ ও দেনা-পাওনা"
+    "SHOP" -> "দোকানের আয়-খরচ ও দেনা-পাওনার হিসাব"
+    else -> "পরিবারের সার্বিক আয়-খরচ ও দেনা-পাওনা"
 }
 
 private fun actionLabel(action: String): String = when (action) {

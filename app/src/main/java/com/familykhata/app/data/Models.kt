@@ -1,5 +1,6 @@
 package com.familykhata.app.data
 
+import androidx.room.ColumnInfo
 import androidx.room.Entity
 import androidx.room.ForeignKey
 import androidx.room.Index
@@ -12,6 +13,7 @@ data class TransactionEntity(
     val amount: Double,
     val category: String,
     val note: String,
+    @ColumnInfo(defaultValue = "'FAMILY'") val workspace: String = "FAMILY",
     val createdAt: Long = System.currentTimeMillis()
 )
 
@@ -21,6 +23,7 @@ data class BakiPersonEntity(
     val name: String,
     val phone: String = "",
     val note: String = "",
+    @ColumnInfo(defaultValue = "'FAMILY'") val workspace: String = "FAMILY",
     val createdAt: Long = System.currentTimeMillis()
 )
 

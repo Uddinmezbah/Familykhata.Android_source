@@ -32,6 +32,12 @@ interface FamilyKhataDao {
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertPerson(person: BakiPersonEntity): Long
 
+    @Query("UPDATE baki_people SET name = :name, phone = :phone WHERE id = :personId")
+    suspend fun updatePerson(personId: Long, name: String, phone: String)
+
+    @Query("DELETE FROM baki_people WHERE id = :personId")
+    suspend fun deletePersonById(personId: Long)
+
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertBakiEntry(entry: BakiEntryEntity)
 

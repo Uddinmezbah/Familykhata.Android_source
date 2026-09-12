@@ -85,9 +85,14 @@ fun FamilyKhataApp(viewModel: FamilyKhataViewModel) {
     var tab by remember { mutableStateOf(Tab.DASHBOARD) }
     var addTypePreset by remember { mutableStateOf("EXPENSE") }
     val workspace by viewModel.selectedWorkspace.collectAsState()
+    val trialStatus by viewModel.trialStatus.collectAsState()
+    val isAppUnlocked by viewModel.isAppUnlocked.collectAsState()
 
     HisabiKhataTheme {
-        Scaffold(
+        if (!isAppUnlocked) {
+            AppLockScreen(viewModel)
+        } else {
+            Scaffold(
             containerColor = MaterialTheme.colorScheme.background,
             bottomBar = {
                 NavigationBar(
@@ -140,6 +145,8 @@ fun FamilyKhataApp(viewModel: FamilyKhataViewModel) {
                         tab = Tab.DASHBOARD
                     }
                 )
+                Spacer(Modifier.height(8.dp))
+                TrialNotice(trialStatus)
                 Spacer(Modifier.height(12.dp))
                 Box(
                     modifier = Modifier
@@ -164,14 +171,16 @@ fun FamilyKhataApp(viewModel: FamilyKhataViewModel) {
                         Tab.ADD -> AddTransactionScreen(
                             viewModel = viewModel,
                             workspace = workspace,
-                            initialType = addTypePreset
+                            initialType = addTypePreset,
+                            canWrite = !trialStatus.expired
                         )
-                        Tab.BAKI -> BakiScreen(viewModel, workspace)
+                        Tab.BAKI -> BakiScreen(viewModel, workspace, canWrite = !trialStatus.expired)
                         Tab.HISTORY -> HistoryScreen(viewModel, workspace)
                         Tab.MORE -> MoreScreen(viewModel)
                     }
                 }
             }
+        }
         }
     }
 }
@@ -221,7 +230,7 @@ private fun BrandHeader(workspace: String) {
                 }
             }
             Text(
-                "v1.1 • Visual Polish",
+                "v1.2 • Commercial Tools",
                 style = MaterialTheme.typography.labelSmall,
                 fontWeight = FontWeight.SemiBold,
                 color = accent
@@ -712,7 +721,8 @@ private fun MetricCard(
 private fun AddTransactionScreen(
     viewModel: FamilyKhataViewModel,
     workspace: String,
-    initialType: String
+    initialType: String,
+    canWrite: Boolean
 ) {
     val isBusiness = workspace == "SHOP"
     var type by remember(initialType) { mutableStateOf(initialType) }
@@ -737,6 +747,9 @@ private fun AddTransactionScreen(
                 "দোকান/প্রতিষ্ঠানের টাকা আসা বা বের হওয়ার হিসাব যোগ করুন।",
                 style = MaterialTheme.typography.bodySmall
             )
+        }
+        if (!canWrite) {
+            TrialLockedMessage()
         }
 
         Row(
@@ -792,7 +805,8 @@ private fun AddTransactionScreen(
                     error = null
                 }
             },
-            modifier = Modifier.fillMaxWidth()
+            modifier = Modifier.fillMaxWidth(),
+            enabled = canWrite
         ) { Text(if (isBusiness) "ক্যাশ লেনদেন সেভ করুন" else "সেভ করুন") }
         error?.let { Text(it, color = MaterialTheme.colorScheme.error) }
     }
@@ -919,7 +933,7 @@ private fun TransactionRow(
 }
 
 @Composable
-private fun BakiScreen(viewModel: FamilyKhataViewModel, workspace: String) {
+private fun BakiScreen(viewModel: FamilyKhataViewModel, workspace: String, canWrite: Boolean) {
     val people by viewModel.bakiPeople.collectAsState()
     var selectedId by remember { mutableStateOf<Long?>(null) }
 
@@ -930,6 +944,7 @@ private fun BakiScreen(viewModel: FamilyKhataViewModel, workspace: String) {
             people = people,
             viewModel = viewModel,
             workspace = workspace,
+            canWrite = canWrite,
             onSelect = { selectedId = it.id }
         )
     } else {
@@ -937,6 +952,7 @@ private fun BakiScreen(viewModel: FamilyKhataViewModel, workspace: String) {
             person = selected,
             viewModel = viewModel,
             workspace = workspace,
+            canWrite = canWrite,
             onBack = { selectedId = null }
         )
     }
@@ -947,10 +963,12 @@ private fun BakiPeopleScreen(
     people: List<BakiPersonSummary>,
     viewModel: FamilyKhataViewModel,
     workspace: String,
+    canWrite: Boolean,
     onSelect: (BakiPersonSummary) -> Unit
 ) {
     var name by remember { mutableStateOf("") }
     var phone by remember { mutableStateOf("") }
+    var query by remember { mutableStateOf("") }
     val personLabel = if (workspace == "SHOP") "কাস্টমার/সাপ্লায়ার" else "ব্যক্তি"
     val sectionTitle = if (workspace == "SHOP") "কাস্টমার/সাপ্লায়ার খাতা" else "বাকি/পাওনা"
 
@@ -969,24 +987,45 @@ private fun BakiPeopleScreen(
                 name = ""
                 phone = ""
             },
-            modifier = Modifier.fillMaxWidth()
+            modifier = Modifier.fillMaxWidth(),
+            enabled = canWrite
         ) { Text("$personLabel যোগ করুন") }
+
+        if (!canWrite) {
+            TrialLockedMessage()
+        }
 
         Spacer(Modifier.height(4.dp))
         Text(sectionTitle, fontWeight = FontWeight.Bold)
 
+        if (people.isNotEmpty()) {
+            OutlinedTextField(
+                value = query,
+                onValueChange = { query = it },
+                label = { Text("নাম বা ফোন দিয়ে খুঁজুন") },
+                singleLine = true,
+                modifier = Modifier.fillMaxWidth()
+            )
+        }
+        val filteredPeople = people.filter { person ->
+            query.isBlank() || person.name.contains(query, ignoreCase = true) || person.phone.contains(query)
+        }
+
         if (people.isEmpty()) {
             Text("প্রথমে একজন $personLabel যোগ করুন।")
+        } else if (filteredPeople.isEmpty()) {
+            Text("এই নামে বা ফোন নম্বরে কাউকে পাওয়া যায়নি।")
         } else {
-            people.forEach { person ->
-                val accent = balanceAccent(person.balance)
+            filteredPeople.forEach { person ->
+                val personTone = personAccent(person.id)
+                val balanceTone = balanceAccent(person.balance)
                 Card(
                     onClick = { onSelect(person) },
                     modifier = Modifier.fillMaxWidth(),
                     colors = CardDefaults.cardColors(
-                        containerColor = accent.copy(alpha = 0.08f)
+                        containerColor = personTone.copy(alpha = 0.10f)
                     ),
-                    border = BorderStroke(1.dp, accent.copy(alpha = 0.20f))
+                    border = BorderStroke(1.dp, personTone.copy(alpha = 0.24f))
                 ) {
                     Column(
                         modifier = Modifier.padding(14.dp),
@@ -994,8 +1033,9 @@ private fun BakiPeopleScreen(
                     ) {
                         Text(
                             person.name,
-                            fontWeight = FontWeight.Bold,
-                            style = MaterialTheme.typography.titleMedium
+                            fontWeight = FontWeight.ExtraBold,
+                            style = MaterialTheme.typography.titleMedium,
+                            color = personTone
                         )
                         Text(
                             when {
@@ -1004,7 +1044,7 @@ private fun BakiPeopleScreen(
                                 else -> "হিসাব সমান"
                             },
                             fontWeight = FontWeight.Bold,
-                            color = accent
+                            color = balanceTone
                         )
                         Text(
                             if (workspace == "SHOP") "খাতা ও লেনদেন দেখতে চাপুন" else "হিসাব ও ইতিহাস দেখতে চাপুন",
@@ -1023,6 +1063,7 @@ private fun BakiEntryScreen(
     person: BakiPersonSummary,
     viewModel: FamilyKhataViewModel,
     workspace: String,
+    canWrite: Boolean,
     onBack: () -> Unit
 ) {
     val context = LocalContext.current
@@ -1046,7 +1087,12 @@ private fun BakiEntryScreen(
             Text(if (workspace == "SHOP") "← কাস্টমার/সাপ্লায়ার তালিকায় ফিরুন" else "← ব্যক্তি তালিকায় ফিরুন")
         }
 
-        Text(person.name, style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
+        Text(
+            person.name,
+            style = MaterialTheme.typography.headlineSmall,
+            fontWeight = FontWeight.ExtraBold,
+            color = personAccent(person.id)
+        )
         Surface(
             modifier = Modifier.fillMaxWidth(),
             shape = RoundedCornerShape(18.dp),
@@ -1066,6 +1112,14 @@ private fun BakiEntryScreen(
             )
         }
 
+        PersonManagementActions(
+            person = person,
+            personLabel = if (workspace == "SHOP") "কাস্টমার/সাপ্লায়ার" else "ব্যক্তি",
+            canWrite = canWrite,
+            viewModel = viewModel,
+            onDeleted = onBack
+        )
+
         if (person.phone.isNotBlank()) {
             OutlinedButton(
                 onClick = { sendLedgerSms(context, person) },
@@ -1075,6 +1129,9 @@ private fun BakiEntryScreen(
             }
         }
 
+        if (!canWrite) {
+            TrialLockedMessage()
+        }
         Text("নতুন এন্ট্রি", fontWeight = FontWeight.Bold)
         Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
             ActionButton("দিলাম", "GAVE", action) { action = "GAVE" }
@@ -1109,7 +1166,8 @@ private fun BakiEntryScreen(
                     error = null
                 }
             },
-            modifier = Modifier.fillMaxWidth()
+            modifier = Modifier.fillMaxWidth(),
+            enabled = canWrite
         ) { Text(if (workspace == "SHOP") "খাতার এন্ট্রি সেভ করুন" else "বাকি এন্ট্রি সেভ করুন") }
 
         error?.let { Text(it, color = MaterialTheme.colorScheme.error) }
@@ -1281,6 +1339,8 @@ private fun MoreScreen(viewModel: FamilyKhataViewModel) {
             style = MaterialTheme.typography.bodyMedium
         )
 
+        CommercialToolsSection(viewModel)
+
         MoreSectionTitle("ডেটা নিরাপত্তা")
         MoreActionCard(
             symbol = "⇩",
@@ -1359,7 +1419,7 @@ private fun MoreScreen(viewModel: FamilyKhataViewModel) {
                 modifier = Modifier.padding(16.dp),
                 verticalArrangement = Arrangement.spacedBy(4.dp)
             ) {
-                Text("হিসাবী খাতা v1.1", fontWeight = FontWeight.Bold)
+                Text("হিসাবী খাতা v1.2", fontWeight = FontWeight.Bold)
                 Text(
                     "আপনার টাকা-পয়সার সহজ হিসাব • ডেটা আপনার ডিভাইসে থাকে",
                     style = MaterialTheme.typography.bodySmall

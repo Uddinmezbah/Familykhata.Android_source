@@ -74,7 +74,7 @@ fun FamilyKhataApp(viewModel: FamilyKhataViewModel) {
                     .padding(16.dp)
             ) {
                 Text("Family Khata", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
-                Text("v0.5.1 • Update Test", style = MaterialTheme.typography.labelSmall)
+                Text("v0.6 • Play Ready Build", style = MaterialTheme.typography.labelSmall)
                 Spacer(Modifier.height(10.dp))
                 Box(
                     modifier = Modifier

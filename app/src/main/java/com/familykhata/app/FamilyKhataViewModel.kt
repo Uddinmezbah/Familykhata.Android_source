@@ -11,6 +11,9 @@ import com.familykhata.app.data.BakiPersonEntity
 import com.familykhata.app.data.BakiPersonSummary
 import com.familykhata.app.data.DashboardTotals
 import com.familykhata.app.data.DueReceivableItem
+import com.familykhata.app.data.InventoryBackupBridge
+import com.familykhata.app.data.ProductEntity
+import com.familykhata.app.data.StockBatchEntity
 import com.familykhata.app.data.TransactionEntity
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.Flow
@@ -465,10 +468,11 @@ class FamilyKhataViewModel(application: Application) : AndroidViewModel(applicat
                 val transactions = dao.getAllTransactions()
                 val people = dao.getAllPeople()
                 val entries = dao.getAllBakiEntries()
+                val inventory = InventoryBackupBridge.export(getApplication())
 
                 JSONObject().apply {
                     put("format", "hisabi-khata-backup")
-                    put("version", 2)
+                    put("version", 3)
                     put("createdAt", System.currentTimeMillis())
                     put("transactions", JSONArray().apply {
                         transactions.forEach { item ->
@@ -509,6 +513,34 @@ class FamilyKhataViewModel(application: Application) : AndroidViewModel(applicat
                             })
                         }
                     })
+                    put("inventoryProducts", JSONArray().apply {
+                        inventory.products.forEach { product ->
+                            put(JSONObject().apply {
+                                put("id", product.id)
+                                put("name", product.name)
+                                put("category", product.category)
+                                put("sku", product.sku)
+                                put("sellingPrice", product.sellingPrice)
+                                put("lowStockLevel", product.lowStockLevel)
+                                put("note", product.note)
+                                put("workspace", product.workspace)
+                                put("createdAt", product.createdAt)
+                            })
+                        }
+                    })
+                    put("inventoryBatches", JSONArray().apply {
+                        inventory.batches.forEach { batch ->
+                            put(JSONObject().apply {
+                                put("id", batch.id)
+                                put("productId", batch.productId)
+                                put("quantity", batch.quantity)
+                                put("purchasePrice", batch.purchasePrice)
+                                put("purchaseDate", batch.purchaseDate)
+                                if (batch.expiryDate != null) put("expiryDate", batch.expiryDate)
+                                put("createdAt", batch.createdAt)
+                            })
+                        }
+                    })
                 }.toString()
             }.onSuccess(onReady).onFailure {
                 onError(it.message ?: "ব্যাকআপ তৈরি করা যায়নি")
@@ -528,13 +560,15 @@ class FamilyKhataViewModel(application: Application) : AndroidViewModel(applicat
                     "এটি হিসাবী খাতার সঠিক ব্যাকআপ ফাইল নয়"
                 }
                 val backupVersion = root.optInt("version")
-                require(backupVersion in 1..2) {
+                require(backupVersion in 1..3) {
                     "এই ব্যাকআপ ভার্সনটি এখনো সমর্থিত নয়"
                 }
 
                 val transactions = mutableListOf<TransactionEntity>()
                 val people = mutableListOf<BakiPersonEntity>()
                 val entries = mutableListOf<BakiEntryEntity>()
+                val inventoryProducts = mutableListOf<ProductEntity>()
+                val inventoryBatches = mutableListOf<StockBatchEntity>()
                 val actions = setOf("GAVE", "RECEIVED_BACK", "TOOK", "PAID_BACK")
 
                 val transactionArray = root.getJSONArray("transactions")
@@ -605,6 +639,44 @@ class FamilyKhataViewModel(application: Application) : AndroidViewModel(applicat
                     )
                 }
 
+                if (backupVersion >= 3) {
+                    val productArray = root.optJSONArray("inventoryProducts") ?: JSONArray()
+                    for (index in 0 until productArray.length()) {
+                        val item = productArray.getJSONObject(index)
+                        val name = item.getString("name").trim()
+                        val workspace = item.optString("workspace", "SHOP")
+                        require(name.isNotBlank()) { "পণ্যের নাম খালি হতে পারে না" }
+                        require(workspace in allowedWorkspaces) { "পণ্যের workspace সঠিক নয়" }
+                        inventoryProducts += ProductEntity(
+                            id = item.getLong("id"),
+                            name = name,
+                            category = item.optString("category", ""),
+                            sku = item.optString("sku", ""),
+                            sellingPrice = item.optDouble("sellingPrice", 0.0).coerceAtLeast(0.0),
+                            lowStockLevel = item.optInt("lowStockLevel", 0).coerceAtLeast(0),
+                            note = item.optString("note", ""),
+                            workspace = workspace,
+                            createdAt = item.optLong("createdAt", System.currentTimeMillis())
+                        )
+                    }
+                    val productIds = inventoryProducts.map { it.id }.toSet()
+                    val batchArray = root.optJSONArray("inventoryBatches") ?: JSONArray()
+                    for (index in 0 until batchArray.length()) {
+                        val item = batchArray.getJSONObject(index)
+                        val productId = item.getLong("productId")
+                        require(productId in productIds) { "স্টক ব্যাচের পণ্য পাওয়া যায়নি" }
+                        inventoryBatches += StockBatchEntity(
+                            id = item.getLong("id"),
+                            productId = productId,
+                            quantity = item.optInt("quantity", 0).coerceAtLeast(0),
+                            purchasePrice = item.optDouble("purchasePrice", 0.0).coerceAtLeast(0.0),
+                            purchaseDate = item.optLong("purchaseDate", System.currentTimeMillis()),
+                            expiryDate = item.optLong("expiryDate", 0L).takeIf { it > 0L },
+                            createdAt = item.optLong("createdAt", System.currentTimeMillis())
+                        )
+                    }
+                }
+
                 database.withTransaction {
                     dao.clearBakiEntries()
                     dao.clearPeople()
@@ -615,7 +687,11 @@ class FamilyKhataViewModel(application: Application) : AndroidViewModel(applicat
                     entries.forEach { dao.insertBakiEntry(it) }
                 }
 
-                transactions.size + people.size + entries.size
+                if (backupVersion >= 3) {
+                    InventoryBackupBridge.restore(getApplication(), inventoryProducts, inventoryBatches)
+                }
+
+                transactions.size + people.size + entries.size + inventoryProducts.size + inventoryBatches.size
             }.onSuccess(onDone).onFailure {
                 onError(it.message ?: "ব্যাকআপ রিস্টোর করা যায়নি")
             }

@@ -6,6 +6,7 @@ import android.content.Intent
 import android.net.Uri
 import android.os.Build
 import android.widget.Toast
+import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.BorderStroke
@@ -85,10 +86,12 @@ internal fun V14SettingsScreen(
     viewModel: FamilyKhataViewModel,
     onClose: () -> Unit,
     onOpenLedger: () -> Unit,
+    onOpenProducts: () -> Unit,
     onOpenMore: () -> Unit
 ) {
     val context = LocalContext.current
     val prefs = remember { context.getSharedPreferences(V14_PREFS, Context.MODE_PRIVATE) }
+    BackHandler { onClose() }
 
     var profileName by remember { mutableStateOf(prefs.getString("profile_name", "") ?: "") }
     var businessName by remember { mutableStateOf(prefs.getString("business_name", "") ?: "") }
@@ -113,7 +116,7 @@ internal fun V14SettingsScreen(
         ) {
             TextButton(onClick = onClose) { Text("✕") }
             Text("সেটিংস", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.ExtraBold)
-            Text("v1.4", color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.Bold)
+            Text("v1.5", color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.Bold)
         }
 
         Card(
@@ -140,7 +143,7 @@ internal fun V14SettingsScreen(
             }
         }
 
-        SettingsActionCard("🌐", "ভাষা পরিবর্তন", "বাংলা সক্রিয় • English/Hindi/Arabic প্রস্তুত করা হবে") { showLanguage = true }
+        SettingsActionCard("🌐", "ভাষা পরিবর্তন", "বাংলা / English") { showLanguage = true }
         SettingsActionCard("★", "প্রিমিয়াম হয়ে যান", "মাসিক • বার্ষিক • Lifetime") { showPlan = true }
         SettingsActionCard("💬", "তাগাদা মেসেজ", "SMS/WhatsApp-এ প্রস্তুত বার্তা; আলাদা SMS প্যাক এখন লাগবে না") { showSmsInfo = true }
         SettingsActionCard("🔒", "PIN / পাসওয়ার্ড পরিবর্তন", "অ্যাপ লক সেট, পরিবর্তন বা বন্ধ করুন") { showPin = true }
@@ -174,6 +177,7 @@ internal fun V14SettingsScreen(
 
         SettingsSectionTitle("দ্রুত কাজ")
         SettingsActionCard("👥", "কাস্টমার / ব্যক্তি খাতা", "নাম বা ফোন দিয়ে খুঁজুন, বাকি ও লেনদেন দেখুন") { onOpenLedger() }
+        SettingsActionCard("📦", "পণ্য / স্টক / Expiry", "ব্যাচ, কেনার তারিখ, মেয়াদ ও low-stock দেখুন") { onOpenProducts() }
         SettingsActionCard("↥", "ডাটা ব্যাকআপ ও রিপোর্ট", "JSON Backup/Restore এবং CSV রিপোর্ট") { onOpenMore() }
         SettingsActionCard("▶", "কিভাবে ব্যবহার করব?", "ব্যবহারের নিয়ম ও ভিডিও টিউটোরিয়াল") { openUrlV14(context, TUTORIAL_URL_V14) }
         SettingsActionCard("☏", "আমাদের সাথে যোগাযোগ করুন", "WhatsApp / SMS / Website") { openSupportChooser(context) }
@@ -190,7 +194,7 @@ internal fun V14SettingsScreen(
         }
 
         Text(
-            "হিসাবী খাতা v1.4 • Offline-first • লোকাল ডেটা",
+            "হিসাবী খাতা v1.5 • Offline-first • লোকাল ডেটা",
             modifier = Modifier.fillMaxWidth().padding(vertical = 10.dp),
             textAlign = TextAlign.Center,
             style = MaterialTheme.typography.bodySmall,
@@ -207,7 +211,7 @@ internal fun V14SettingsScreen(
             showProfile = false
         }
     }
-    if (showLanguage) LanguageDialog { showLanguage = false }
+    if (showLanguage) LanguageDialog(context) { showLanguage = false }
     if (showCurrency) CurrencyDialog(
         currentCode = prefs.getString("currency_code", "BDT") ?: "BDT",
         onDismiss = { showCurrency = false },
@@ -285,20 +289,24 @@ private fun ProfileDialog(
 }
 
 @Composable
-private fun LanguageDialog(onDismiss: () -> Unit) {
+private fun LanguageDialog(context: Context, onDismiss: () -> Unit) {
+    val current = V15LanguageState.languageCode ?: "bn"
     AlertDialog(
         onDismissRequest = onDismiss,
         title = { Text("Select app language") },
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                Button(onClick = onDismiss, modifier = Modifier.fillMaxWidth()) { Text("বাংলা ✓") }
-                OutlinedButton(onClick = {}, enabled = false, modifier = Modifier.fillMaxWidth()) { Text("English — শিগগিরই") }
-                OutlinedButton(onClick = {}, enabled = false, modifier = Modifier.fillMaxWidth()) { Text("हिंदी — শিগগিরই") }
-                OutlinedButton(onClick = {}, enabled = false, modifier = Modifier.fillMaxWidth()) { Text("العربية — শিগগিরই") }
-                Text("v1.4-এ বাংলা সম্পূর্ণ সক্রিয়। অন্য ভাষাগুলো পুরো UI translation resource-এ স্থানান্তরের পর চালু করা হবে।", style = MaterialTheme.typography.bodySmall)
+                if (current == "bn") {
+                    Button(onClick = { V15LanguageState.setLanguage(context, "bn"); onDismiss() }, modifier = Modifier.fillMaxWidth()) { Text("বাংলা ✓") }
+                    OutlinedButton(onClick = { V15LanguageState.setLanguage(context, "en"); onDismiss() }, modifier = Modifier.fillMaxWidth()) { Text("English") }
+                } else {
+                    OutlinedButton(onClick = { V15LanguageState.setLanguage(context, "bn"); onDismiss() }, modifier = Modifier.fillMaxWidth()) { Text("বাংলা") }
+                    Button(onClick = { V15LanguageState.setLanguage(context, "en"); onDismiss() }, modifier = Modifier.fillMaxWidth()) { Text("English ✓") }
+                }
+                Text("Bangla and English are the supported languages in v1.5.", style = MaterialTheme.typography.bodySmall)
             }
         },
-        confirmButton = { TextButton(onClick = onDismiss) { Text("সম্পন্ন") } }
+        confirmButton = { TextButton(onClick = onDismiss) { Text("Close") } }
     )
 }
 

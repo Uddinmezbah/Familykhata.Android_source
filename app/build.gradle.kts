@@ -16,8 +16,8 @@ android {
         applicationId = "com.familykhata.app"
         minSdk = 24
         targetSdk = 36
-        versionCode = 15
-        versionName = "1.4.0"
+        versionCode = 16
+        versionName = "1.5.0"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         vectorDrawables.useSupportLibrary = true
@@ -86,4 +86,5 @@ dependencies {
 
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.8.1")
     implementation("androidx.work:work-runtime-ktx:2.9.1")
+    implementation("com.google.android.gms:play-services-code-scanner:16.1.0")
 }

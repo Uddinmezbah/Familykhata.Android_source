@@ -10,6 +10,7 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         DueReminderScheduler.schedule(applicationContext)
+        InventoryReminderScheduler.schedule(applicationContext)
         setContent {
             val vm: FamilyKhataViewModel = viewModel()
             FamilyKhataApp(vm)

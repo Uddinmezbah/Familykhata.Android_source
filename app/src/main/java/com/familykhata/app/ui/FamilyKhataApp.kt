@@ -4,6 +4,7 @@ import android.content.Context
 import android.content.Intent
 import android.net.Uri
 import android.widget.Toast
+import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.BorderStroke
@@ -77,6 +78,7 @@ private enum class Tab(val label: String) {
     DASHBOARD("হোম"),
     ADD("নতুন"),
     BAKI("বাকি"),
+    PRODUCTS("পণ্য"),
     HISTORY("হিসাব"),
     MORE("আরও")
 }
@@ -89,17 +91,21 @@ fun FamilyKhataApp(viewModel: FamilyKhataViewModel) {
     val trialStatus by viewModel.trialStatus.collectAsState()
     val isAppUnlocked by viewModel.isAppUnlocked.collectAsState()
     val appContext = LocalContext.current
+    V15LanguageState.ensureInitialized(appContext)
     var showSettingsMenu by remember { mutableStateOf(false) }
     LaunchedEffect(Unit) { V14DisplayState.initialize(appContext) }
 
     HisabiKhataTheme {
-        if (!isAppUnlocked) {
+        if (V15LanguageState.languageCode == null) {
+            LanguageOnboardingScreen()
+        } else if (!isAppUnlocked) {
             AppLockScreen(viewModel)
         } else if (showSettingsMenu) {
             V14SettingsScreen(
                 viewModel = viewModel,
                 onClose = { showSettingsMenu = false },
                 onOpenLedger = { showSettingsMenu = false; tab = Tab.BAKI },
+                onOpenProducts = { showSettingsMenu = false; tab = Tab.PRODUCTS },
                 onOpenMore = { showSettingsMenu = false; tab = Tab.MORE }
             )
         } else {
@@ -110,7 +116,12 @@ fun FamilyKhataApp(viewModel: FamilyKhataViewModel) {
                     containerColor = MaterialTheme.colorScheme.surface,
                     tonalElevation = 8.dp
                 ) {
-                    Tab.entries.forEach { item ->
+                    val navTabs = if (workspace == "SHOP") {
+                        listOf(Tab.DASHBOARD, Tab.ADD, Tab.BAKI, Tab.PRODUCTS, Tab.HISTORY)
+                    } else {
+                        listOf(Tab.DASHBOARD, Tab.ADD, Tab.BAKI, Tab.HISTORY, Tab.MORE)
+                    }
+                    navTabs.forEach { item ->
                         val accent = tabAccent(item)
                         NavigationBarItem(
                             selected = tab == item,
@@ -187,7 +198,17 @@ fun FamilyKhataApp(viewModel: FamilyKhataViewModel) {
                             initialType = addTypePreset,
                             canWrite = !trialStatus.expired
                         )
-                        Tab.BAKI -> BakiScreen(viewModel, workspace, canWrite = !trialStatus.expired)
+                        Tab.BAKI -> BakiScreen(
+                            viewModel = viewModel,
+                            workspace = workspace,
+                            canWrite = !trialStatus.expired,
+                            onExit = { tab = Tab.DASHBOARD }
+                        )
+                        Tab.PRODUCTS -> V15InventoryScreen(
+                            workspace = workspace,
+                            canWrite = !trialStatus.expired,
+                            onExit = { tab = Tab.DASHBOARD }
+                        )
                         Tab.HISTORY -> HistoryScreen(viewModel, workspace)
                         Tab.MORE -> MoreScreen(viewModel)
                     }
@@ -243,7 +264,7 @@ private fun BrandHeader(workspace: String) {
                 }
             }
             Text(
-                "v1.4 • Smart Due & Settings",
+                "v1.5 • Customers, Stock & Expiry",
                 style = MaterialTheme.typography.labelSmall,
                 fontWeight = FontWeight.SemiBold,
                 color = accent
@@ -958,11 +979,18 @@ private fun TransactionRow(
 }
 
 @Composable
-private fun BakiScreen(viewModel: FamilyKhataViewModel, workspace: String, canWrite: Boolean) {
+private fun BakiScreen(
+    viewModel: FamilyKhataViewModel,
+    workspace: String,
+    canWrite: Boolean,
+    onExit: () -> Unit
+) {
     val people by viewModel.bakiPeople.collectAsState()
     var selectedId by remember { mutableStateOf<Long?>(null) }
-
     val selected = selectedId?.let { id -> people.firstOrNull { it.id == id } }
+
+    BackHandler(enabled = selected != null) { selectedId = null }
+    BackHandler(enabled = selected == null) { onExit() }
 
     if (selected == null) {
         BakiPeopleScreen(
@@ -991,95 +1019,108 @@ private fun BakiPeopleScreen(
     canWrite: Boolean,
     onSelect: (BakiPersonSummary) -> Unit
 ) {
-    var name by remember { mutableStateOf("") }
-    var phone by remember { mutableStateOf("") }
     var query by remember { mutableStateOf("") }
-    val personLabel = if (workspace == "SHOP") "কাস্টমার/সাপ্লায়ার" else "ব্যক্তি"
-    val sectionTitle = if (workspace == "SHOP") "কাস্টমার/সাপ্লায়ার খাতা" else "বাকি/পাওনা"
+    var showAdd by remember { mutableStateOf(false) }
+    val personLabel = if (workspace == "SHOP") v15Text("কাস্টমার/সাপ্লায়ার", "Customer/Supplier") else v15Text("ব্যক্তি", "Person")
+    val sectionTitle = if (workspace == "SHOP") v15Text("কাস্টমার/সাপ্লায়ার", "Customers & Suppliers") else v15Text("বাকি/পাওনা", "Due Accounts")
+    val dueItems by viewModel.dueReceivables.collectAsState()
 
     Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .verticalScroll(rememberScrollState()),
+        modifier = Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(bottom = 24.dp),
         verticalArrangement = Arrangement.spacedBy(10.dp)
     ) {
-        Text("নতুন $personLabel", fontWeight = FontWeight.Bold)
-        OutlinedTextField(name, { name = it }, label = { Text("নাম") }, modifier = Modifier.fillMaxWidth())
-        OutlinedTextField(phone, { phone = it }, label = { Text("ফোন (ঐচ্ছিক)") }, modifier = Modifier.fillMaxWidth())
-        Button(
-            onClick = {
-                viewModel.addBakiPerson(name, phone)
-                name = ""
-                phone = ""
-            },
-            modifier = Modifier.fillMaxWidth(),
-            enabled = canWrite
-        ) { Text("$personLabel যোগ করুন") }
-
-        if (!canWrite) {
-            TrialLockedMessage()
+        Text(sectionTitle, style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.ExtraBold)
+        Text(
+            v15Text("নামগুলো সামনে থাকবে। যেকোনো নাম চাপলে আলাদা খাতা খুলবে; ফোনের Back দিলে আবার এই তালিকায় ফিরবেন।", "Names stay on this list. Tap a name to open its ledger; use the phone Back button to return here."),
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
+        Button(onClick = { showAdd = true }, enabled = canWrite, modifier = Modifier.fillMaxWidth()) {
+            Text(v15Text("＋ নতুন $personLabel যোগ করুন", "＋ Add $personLabel"))
         }
+        if (!canWrite) TrialLockedMessage()
 
-        Spacer(Modifier.height(4.dp))
-        Text(sectionTitle, fontWeight = FontWeight.Bold)
+        OutlinedTextField(
+            value = query,
+            onValueChange = { query = it },
+            label = { Text(v15Text("নাম বা ফোন দিয়ে খুঁজুন", "Search by name or phone")) },
+            singleLine = true,
+            modifier = Modifier.fillMaxWidth()
+        )
 
-        if (people.isNotEmpty()) {
-            OutlinedTextField(
-                value = query,
-                onValueChange = { query = it },
-                label = { Text("নাম বা ফোন দিয়ে খুঁজুন") },
-                singleLine = true,
-                modifier = Modifier.fillMaxWidth()
-            )
-        }
         val filteredPeople = people.filter { person ->
             query.isBlank() || person.name.contains(query, ignoreCase = true) || person.phone.contains(query)
         }
-
-        if (people.isEmpty()) {
-            Text("প্রথমে একজন $personLabel যোগ করুন।")
-        } else if (filteredPeople.isEmpty()) {
-            Text("এই নামে বা ফোন নম্বরে কাউকে পাওয়া যায়নি।")
+        if (filteredPeople.isEmpty()) {
+            Text(v15Text("কোনো $personLabel পাওয়া যায়নি।", "No $personLabel found."))
         } else {
             filteredPeople.forEach { person ->
                 val personTone = personAccent(person.id)
                 val balanceTone = balanceAccent(person.balance)
+                val nextDue = dueItems.filter { it.personId == person.id }.minByOrNull { it.dueAt }
                 Card(
                     onClick = { onSelect(person) },
                     modifier = Modifier.fillMaxWidth(),
-                    colors = CardDefaults.cardColors(
-                        containerColor = personTone.copy(alpha = 0.10f)
-                    ),
-                    border = BorderStroke(1.dp, personTone.copy(alpha = 0.24f))
+                    colors = CardDefaults.cardColors(containerColor = personTone.copy(alpha = 0.09f)),
+                    border = BorderStroke(1.dp, personTone.copy(alpha = 0.22f))
                 ) {
-                    Column(
-                        modifier = Modifier.padding(14.dp),
-                        verticalArrangement = Arrangement.spacedBy(3.dp)
-                    ) {
-                        Text(
-                            person.name,
-                            fontWeight = FontWeight.ExtraBold,
-                            style = MaterialTheme.typography.titleMedium,
-                            color = personTone
-                        )
+                    Column(modifier = Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                            Text(person.name, fontWeight = FontWeight.ExtraBold, style = MaterialTheme.typography.titleMedium, color = personTone)
+                            Text(
+                                when {
+                                    person.balance > 0 -> v15Text("পাবো", "Receivable")
+                                    person.balance < 0 -> v15Text("দেবো", "Payable")
+                                    else -> v15Text("সমান", "Settled")
+                                },
+                                fontWeight = FontWeight.Bold,
+                                color = balanceTone
+                            )
+                        }
+                        if (person.phone.isNotBlank()) Text(person.phone, style = MaterialTheme.typography.bodySmall)
                         Text(
                             when {
-                                person.balance > 0 -> "পাবো: ${V14DisplayState.currencySymbol} ${money(person.balance)}"
-                                person.balance < 0 -> "দেবো: ${V14DisplayState.currencySymbol} ${money(-person.balance)}"
-                                else -> "হিসাব সমান"
+                                person.balance > 0 -> "${V14DisplayState.currencySymbol} ${money(person.balance)}"
+                                person.balance < 0 -> "${V14DisplayState.currencySymbol} ${money(-person.balance)}"
+                                else -> "${V14DisplayState.currencySymbol} 0"
                             },
                             fontWeight = FontWeight.Bold,
                             color = balanceTone
                         )
-                        Text(
-                            if (workspace == "SHOP") "খাতা ও লেনদেন দেখতে চাপুন" else "হিসাব ও ইতিহাস দেখতে চাপুন",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
+                        nextDue?.let {
+                            Text(v15Text("পরবর্তী তারিখ: ${v13Date(it.dueAt)}", "Next due: ${v13Date(it.dueAt)}"), style = MaterialTheme.typography.bodySmall)
+                        }
                     }
                 }
             }
         }
+    }
+
+    if (showAdd) {
+        var name by remember { mutableStateOf("") }
+        var phone by remember { mutableStateOf("") }
+        var error by remember { mutableStateOf<String?>(null) }
+        AlertDialog(
+            onDismissRequest = { showAdd = false },
+            title = { Text(v15Text("নতুন $personLabel", "New $personLabel")) },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    OutlinedTextField(name, { name = it; error = null }, label = { Text(v15Text("নাম", "Name")) }, modifier = Modifier.fillMaxWidth(), singleLine = true)
+                    OutlinedTextField(phone, { phone = it }, label = { Text(v15Text("ফোন (ঐচ্ছিক)", "Phone (optional)")) }, modifier = Modifier.fillMaxWidth(), singleLine = true)
+                    error?.let { Text(it, color = MaterialTheme.colorScheme.error) }
+                }
+            },
+            confirmButton = {
+                TextButton(onClick = {
+                    if (name.isBlank()) error = v15Text("নাম লিখুন", "Enter a name")
+                    else {
+                        viewModel.addBakiPerson(name, phone)
+                        showAdd = false
+                    }
+                }) { Text(v15Text("যোগ করুন", "Add")) }
+            },
+            dismissButton = { TextButton(onClick = { showAdd = false }) { Text(v15Text("বাতিল", "Cancel")) } }
+        )
     }
 }
 
@@ -1109,10 +1150,6 @@ private fun BakiEntryScreen(
             .padding(bottom = 24.dp),
         verticalArrangement = Arrangement.spacedBy(10.dp)
     ) {
-        TextButton(onClick = onBack) {
-            Text(if (workspace == "SHOP") "← কাস্টমার/সাপ্লায়ার তালিকায় ফিরুন" else "← ব্যক্তি তালিকায় ফিরুন")
-        }
-
         Text(
             person.name,
             style = MaterialTheme.typography.headlineSmall,
@@ -1657,6 +1694,7 @@ private fun tabAccent(tab: Tab): Color = when (tab) {
     Tab.DASHBOARD -> Color(0xFF0B6B58)
     Tab.ADD -> IncomeAccent
     Tab.BAKI -> ReceivableAccent
+    Tab.PRODUCTS -> ShopAccent
     Tab.HISTORY -> Color(0xFF6C4CCF)
     Tab.MORE -> ShopAccent
 }
@@ -1673,21 +1711,20 @@ private fun workspaceSummary(workspace: String): String = when (workspace) {
     else -> "পরিবারের সার্বিক আয়-খরচ ও দেনা-পাওনা"
 }
 
-private fun tabLabel(tab: Tab, workspace: String): String {
-    if (workspace != "SHOP") return tab.label
-    return when (tab) {
-        Tab.DASHBOARD -> "হোম"
-        Tab.ADD -> "ক্যাশ"
-        Tab.BAKI -> "খাতা"
-        Tab.HISTORY -> "লেনদেন"
-        Tab.MORE -> "আরও"
-    }
+private fun tabLabel(tab: Tab, workspace: String): String = when (tab) {
+    Tab.DASHBOARD -> v15Text("হোম", "Home")
+    Tab.ADD -> if (workspace == "SHOP") v15Text("ক্যাশ", "Cash") else v15Text("নতুন", "Add")
+    Tab.BAKI -> if (workspace == "SHOP") v15Text("খাতা", "Ledger") else v15Text("বাকি", "Due")
+    Tab.PRODUCTS -> v15Text("পণ্য", "Products")
+    Tab.HISTORY -> if (workspace == "SHOP") v15Text("লেনদেন", "History") else v15Text("হিসাব", "History")
+    Tab.MORE -> v15Text("আরও", "More")
 }
 
 private fun tabSymbol(tab: Tab): String = when (tab) {
     Tab.DASHBOARD -> "⌂"
     Tab.ADD -> "＋"
     Tab.BAKI -> "৳"
+    Tab.PRODUCTS -> "▦"
     Tab.HISTORY -> "≡"
     Tab.MORE -> "⋯"
 }

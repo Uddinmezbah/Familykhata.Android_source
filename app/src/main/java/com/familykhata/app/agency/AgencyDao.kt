@@ -20,6 +20,11 @@ interface AgencyDao {
         item: AgencyProjectEntity
     ): Long
 
+    @Insert(onConflict = OnConflictStrategy.ABORT)
+    suspend fun insertCharge(
+        item: AgencyChargeEntity
+    ): Long
+
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertPayment(
         item: AgencyPaymentEntity
@@ -44,7 +49,16 @@ interface AgencyDao {
             c.company AS company,
             p.title AS title,
             p.serviceType AS serviceType,
-            p.totalPrice AS totalPrice,
+
+            COALESCE(
+                (
+                    SELECT SUM(ac.amount)
+                    FROM agency_charges ac
+                    WHERE ac.projectId = p.id
+                ),
+                0
+            ) AS totalPrice,
+
             COALESCE(
                 (
                     SELECT SUM(ap.amount)
@@ -53,7 +67,16 @@ interface AgencyDao {
                 ),
                 0
             ) AS totalPaid,
-            p.totalPrice -
+
+            COALESCE(
+                (
+                    SELECT SUM(ac.amount)
+                    FROM agency_charges ac
+                    WHERE ac.projectId = p.id
+                ),
+                0
+            )
+            -
             COALESCE(
                 (
                     SELECT SUM(ap.amount)
@@ -62,12 +85,17 @@ interface AgencyDao {
                 ),
                 0
             ) AS dueAmount,
+
             p.dueDate AS dueDate,
             p.status AS status
+
         FROM agency_projects p
+
         INNER JOIN agency_clients c
             ON c.id = p.clientId
+
         WHERE c.workspace = :workspace
+
         ORDER BY
             CASE
                 WHEN p.status = 'ACTIVE' THEN 0
@@ -92,6 +120,16 @@ interface AgencyDao {
 
     @Query("""
         SELECT *
+        FROM agency_charges
+        WHERE projectId = :projectId
+        ORDER BY createdAt DESC, id DESC
+    """)
+    fun observeCharges(
+        projectId: Long
+    ): Flow<List<AgencyChargeEntity>>
+
+    @Query("""
+        SELECT *
         FROM agency_payments
         WHERE projectId = :projectId
         ORDER BY paidAt DESC
@@ -99,6 +137,19 @@ interface AgencyDao {
     fun observePayments(
         projectId: Long
     ): Flow<List<AgencyPaymentEntity>>
+
+    @Query("""
+        SELECT COUNT(*)
+        FROM agency_charges
+        WHERE projectId = :projectId
+          AND chargeType = :chargeType
+          AND periodKey = :periodKey
+    """)
+    suspend fun countCharge(
+        projectId: Long,
+        chargeType: String,
+        periodKey: String
+    ): Int
 
     @Query("""
         UPDATE agency_projects
@@ -116,6 +167,11 @@ interface AgencyDao {
     )
 
     @Delete
+    suspend fun deleteCharge(
+        item: AgencyChargeEntity
+    )
+
+    @Delete
     suspend fun deletePayment(
         item: AgencyPaymentEntity
     )
@@ -127,6 +183,10 @@ interface AgencyDao {
     @Query("SELECT * FROM agency_projects ORDER BY id")
     suspend fun getAllProjects():
         List<AgencyProjectEntity>
+
+    @Query("SELECT * FROM agency_charges ORDER BY id")
+    suspend fun getAllCharges():
+        List<AgencyChargeEntity>
 
     @Query("SELECT * FROM agency_payments ORDER BY id")
     suspend fun getAllPayments():

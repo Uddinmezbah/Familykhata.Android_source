@@ -29,6 +29,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
+import com.familykhata.app.agency.AgencyChargeEntity
 import com.familykhata.app.agency.AgencyClientEntity
 import com.familykhata.app.agency.AgencyPaymentEntity
 import com.familykhata.app.agency.AgencyProjectSummary
@@ -765,12 +766,39 @@ private fun AgencyProjectLedger(
     canWrite: Boolean,
     onBack: () -> Unit
 ) {
+    val charges by
+        viewModel.observeCharges(
+            project.projectId
+        ).collectAsState(
+            initial = emptyList()
+        )
+
     val payments by
         viewModel.observePayments(
             project.projectId
         ).collectAsState(
             initial = emptyList()
         )
+
+    var chargeType by remember {
+        mutableStateOf("RECURRING")
+    }
+
+    var chargePeriod by remember {
+        mutableStateOf("")
+    }
+
+    var chargeAmount by remember {
+        mutableStateOf("")
+    }
+
+    var chargeNote by remember {
+        mutableStateOf("")
+    }
+
+    var chargeMessage by remember {
+        mutableStateOf("")
+    }
 
     var paymentAmount by remember {
         mutableStateOf("")
@@ -780,6 +808,11 @@ private fun AgencyProjectLedger(
         mutableStateOf("")
     }
 
+    val liveTotal =
+        charges.sumOf {
+            it.amount
+        }
+
     val livePaid =
         payments.sumOf {
             it.amount
@@ -787,9 +820,9 @@ private fun AgencyProjectLedger(
 
     val liveDue =
         (
-            project.totalPrice -
-            livePaid
-        ).coerceAtLeast(0.0)
+            liveTotal -
+                livePaid
+            ).coerceAtLeast(0.0)
 
     Column(
         modifier = Modifier
@@ -839,8 +872,8 @@ private fun AgencyProjectLedger(
 
         Text(
             v15Text(
-                "মোট মূল্য: ${agencyMoney(project.totalPrice)}",
-                "Total value: ${agencyMoney(project.totalPrice)}"
+                "মোট চার্জ: ${agencyMoney(liveTotal)}",
+                "Total charges: ${agencyMoney(liveTotal)}"
             )
         )
 
@@ -912,6 +945,164 @@ private fun AgencyProjectLedger(
                 }
             }
 
+            Text(
+                v15Text(
+                    "নতুন চার্জ",
+                    "Add charge"
+                ),
+                fontWeight = FontWeight.Bold
+            )
+
+            Row(
+                modifier =
+                    Modifier.fillMaxWidth(),
+                horizontalArrangement =
+                    Arrangement.spacedBy(6.dp)
+            ) {
+                listOf(
+                    "PACKAGE",
+                    "RECURRING",
+                    "OTHER"
+                ).forEach { type ->
+                    OutlinedButton(
+                        onClick = {
+                            chargeType = type
+                            chargeMessage = ""
+                        },
+                        modifier =
+                            Modifier.weight(1f)
+                    ) {
+                        Text(
+                            if (chargeType == type) {
+                                "✓ ${agencyChargeTypeLabel(type)}"
+                            } else {
+                                agencyChargeTypeLabel(type)
+                            }
+                        )
+                    }
+                }
+            }
+
+            if (
+                chargeType == "PACKAGE" ||
+                chargeType == "RECURRING"
+            ) {
+                AgencyField(
+                    value = chargePeriod,
+                    onChange = {
+                        chargePeriod = it
+                        chargeMessage = ""
+                    },
+                    label =
+                        v15Text(
+                            "পিরিয়ড (যেমন 2026-09)",
+                            "Period (e.g. 2026-09)"
+                        )
+                )
+            }
+
+            AgencyField(
+                value = chargeAmount,
+                onChange = {
+                    chargeAmount = it
+                    chargeMessage = ""
+                },
+                label =
+                    v15Text(
+                        "চার্জের পরিমাণ",
+                        "Charge amount"
+                    )
+            )
+
+            AgencyField(
+                value = chargeNote,
+                onChange = {
+                    chargeNote = it
+                },
+                label =
+                    v15Text(
+                        "চার্জ নোট",
+                        "Charge note"
+                    )
+            )
+
+            Button(
+                enabled =
+                    (chargeAmount.toDoubleOrNull() ?: 0.0) > 0 &&
+                    (
+                        chargeType == "OTHER" ||
+                        chargePeriod.isNotBlank()
+                    ),
+                onClick = {
+                    val amount =
+                        chargeAmount
+                            .toDoubleOrNull()
+                            ?: 0.0
+
+                    viewModel.addCharge(
+                        projectId = project.projectId,
+                        chargeType = chargeType,
+                        periodKey =
+                            if (chargeType == "OTHER") {
+                                ""
+                            } else {
+                                chargePeriod
+                            },
+                        amount = amount,
+                        dueDate = null,
+                        note = chargeNote
+                    ) { success ->
+                        chargeMessage =
+                            if (success) {
+                                chargeAmount = ""
+                                chargeNote = ""
+
+                                if (
+                                    chargeType != "OTHER"
+                                ) {
+                                    chargePeriod = ""
+                                }
+
+                                v15Text(
+                                    "চার্জ যোগ হয়েছে।",
+                                    "Charge added."
+                                )
+                            } else {
+                                v15Text(
+                                    "একই পিরিয়ডের চার্জ আগে আছে অথবা তথ্য সঠিক নয়।",
+                                    "This period already has a charge or the data is invalid."
+                                )
+                            }
+                    }
+                },
+                modifier =
+                    Modifier.fillMaxWidth()
+            ) {
+                Text(
+                    v15Text(
+                        "চার্জ যোগ করুন",
+                        "Add charge"
+                    )
+                )
+            }
+
+            if (chargeMessage.isNotBlank()) {
+                Text(
+                    chargeMessage,
+                    style =
+                        MaterialTheme.typography.bodySmall,
+                    fontWeight = FontWeight.SemiBold
+                )
+            }
+
+            Text(
+                v15Text(
+                    "পেমেন্ট",
+                    "Payment"
+                ),
+                fontWeight = FontWeight.Bold
+            )
+
             AgencyField(
                 value = paymentAmount,
                 onChange = {
@@ -969,6 +1160,27 @@ private fun AgencyProjectLedger(
 
         Text(
             v15Text(
+                "চার্জ ইতিহাস",
+                "Charge history"
+            ),
+            fontWeight = FontWeight.Bold
+        )
+
+        if (charges.isEmpty()) {
+            Text(
+                v15Text(
+                    "এখনো কোনো চার্জ নেই।",
+                    "No charges yet."
+                )
+            )
+        }
+
+        charges.forEach { charge ->
+            AgencyChargeCard(charge)
+        }
+
+        Text(
+            v15Text(
                 "পেমেন্ট ইতিহাস",
                 "Payment history"
             ),
@@ -989,6 +1201,76 @@ private fun AgencyProjectLedger(
         }
     }
 }
+
+@Composable
+private fun AgencyChargeCard(
+    charge: AgencyChargeEntity
+) {
+    Card(
+        modifier =
+            Modifier.fillMaxWidth()
+    ) {
+        Column(
+            modifier =
+                Modifier.padding(11.dp),
+            verticalArrangement =
+                Arrangement.spacedBy(3.dp)
+        ) {
+            Row(
+                modifier =
+                    Modifier.fillMaxWidth(),
+                horizontalArrangement =
+                    Arrangement.SpaceBetween
+            ) {
+                Text(
+                    agencyChargeTypeLabel(
+                        charge.chargeType
+                    )
+                )
+
+                Text(
+                    agencyMoney(
+                        charge.amount
+                    ),
+                    fontWeight =
+                        FontWeight.Bold
+                )
+            }
+
+            if (
+                charge.periodKey.isNotBlank()
+            ) {
+                Text(
+                    v15Text(
+                        "পিরিয়ড: ${charge.periodKey}",
+                        "Period: ${charge.periodKey}"
+                    ),
+                    style =
+                        MaterialTheme.typography.bodySmall
+                )
+            }
+
+            Text(
+                agencyDate(
+                    charge.createdAt
+                ),
+                style =
+                    MaterialTheme.typography.bodySmall
+            )
+
+            if (
+                charge.note.isNotBlank()
+            ) {
+                Text(
+                    charge.note,
+                    style =
+                        MaterialTheme.typography.bodySmall
+                )
+            }
+        }
+    }
+}
+
 
 @Composable
 private fun AgencyPaymentCard(
@@ -1055,6 +1337,29 @@ private fun AgencyField(
         singleLine = true
     )
 }
+
+private fun agencyChargeTypeLabel(
+    value: String
+): String =
+    when (value) {
+        "PACKAGE" ->
+            v15Text(
+                "প্যাকেজ",
+                "Package"
+            )
+
+        "RECURRING" ->
+            v15Text(
+                "মাসিক / নিয়মিত",
+                "Recurring"
+            )
+
+        else ->
+            v15Text(
+                "অন্যান্য",
+                "Other"
+            )
+    }
 
 private fun agencyStatusLabel(
     value: String

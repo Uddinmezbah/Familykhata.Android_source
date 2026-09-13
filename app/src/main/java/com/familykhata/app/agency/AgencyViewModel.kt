@@ -3,6 +3,7 @@ package com.familykhata.app.agency
 import android.app.Application
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
+import androidx.room.withTransaction
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -17,8 +18,11 @@ class AgencyViewModel(
     application: Application
 ) : AndroidViewModel(application) {
 
+    private val database =
+        AgencyDatabase.get(application)
+
     private val dao =
-        AgencyDatabase.get(application).dao()
+        database.dao()
 
     private val workspace =
         MutableStateFlow("SHOP")
@@ -86,29 +90,121 @@ class AgencyViewModel(
         ) return
 
         viewModelScope.launch {
-            val projectId =
-                dao.insertProject(
-                    AgencyProjectEntity(
-                        clientId = clientId,
-                        title = title.trim(),
-                        serviceType =
-                            serviceType.trim(),
-                        totalPrice =
-                            totalPrice.coerceAtLeast(0.0),
-                        note = note.trim()
-                    )
-                )
+            database.withTransaction {
 
-            if (advance > 0 && projectId > 0) {
-                dao.insertPayment(
-                    AgencyPaymentEntity(
-                        projectId = projectId,
-                        amount = advance
-                            .coerceAtMost(totalPrice),
-                        note = "Advance"
+                val projectId =
+                    dao.insertProject(
+                        AgencyProjectEntity(
+                            clientId = clientId,
+                            title = title.trim(),
+                            serviceType =
+                                serviceType.trim(),
+                            totalPrice =
+                                totalPrice.coerceAtLeast(0.0),
+                            note = note.trim()
+                        )
                     )
-                )
+
+                if (projectId > 0) {
+                    dao.insertCharge(
+                        AgencyChargeEntity(
+                            projectId = projectId,
+                            chargeType = "PACKAGE",
+                            periodKey = "INITIAL",
+                            amount =
+                                totalPrice.coerceAtLeast(0.0),
+                            note = "Initial package"
+                        )
+                    )
+                }
+
+                if (
+                    advance > 0 &&
+                    projectId > 0
+                ) {
+                    dao.insertPayment(
+                        AgencyPaymentEntity(
+                            projectId = projectId,
+                            amount = advance
+                                .coerceAtMost(totalPrice),
+                            note = "Advance"
+                        )
+                    )
+                }
             }
+        }
+    }
+
+    fun addCharge(
+        projectId: Long,
+        chargeType: String,
+        periodKey: String,
+        amount: Double,
+        dueDate: Long?,
+        note: String,
+        onDone: (Boolean) -> Unit = {}
+    ) {
+        if (
+            projectId <= 0 ||
+            amount <= 0
+        ) {
+            onDone(false)
+            return
+        }
+
+        viewModelScope.launch {
+
+            val type =
+                chargeType.trim()
+                    .uppercase()
+                    .ifBlank { "OTHER" }
+
+            val period =
+                periodKey.trim()
+                    .uppercase()
+
+            val needsDuplicateGuard =
+                type == "PACKAGE" ||
+                type == "RECURRING"
+
+            if (
+                needsDuplicateGuard &&
+                period.isBlank()
+            ) {
+                onDone(false)
+                return@launch
+            }
+
+            if (needsDuplicateGuard) {
+                val existing =
+                    dao.countCharge(
+                        projectId = projectId,
+                        chargeType = type,
+                        periodKey = period
+                    )
+
+                if (existing > 0) {
+                    onDone(false)
+                    return@launch
+                }
+            }
+
+            val result =
+                runCatching {
+                    dao.insertCharge(
+                        AgencyChargeEntity(
+                            projectId = projectId,
+                            chargeType = type,
+                            periodKey = period,
+                            amount =
+                                amount.coerceAtLeast(0.0),
+                            dueDate = dueDate,
+                            note = note.trim()
+                        )
+                    )
+                }.isSuccess
+
+            onDone(result)
         }
     }
 
@@ -146,6 +242,11 @@ class AgencyViewModel(
             )
         }
     }
+
+    fun observeCharges(
+        projectId: Long
+    ): Flow<List<AgencyChargeEntity>> =
+        dao.observeCharges(projectId)
 
     fun observePayments(
         projectId: Long

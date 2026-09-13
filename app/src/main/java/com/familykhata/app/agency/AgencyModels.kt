@@ -54,6 +54,34 @@ data class AgencyProjectEntity(
 )
 
 @Entity(
+    tableName = "agency_charges",
+    foreignKeys = [
+        ForeignKey(
+            entity = AgencyProjectEntity::class,
+            parentColumns = ["id"],
+            childColumns = ["projectId"],
+            onDelete = ForeignKey.CASCADE
+        )
+    ],
+    indices = [
+        Index("projectId"),
+        Index("dueDate"),
+        Index(value = ["projectId", "chargeType", "periodKey"])
+    ]
+)
+data class AgencyChargeEntity(
+    @PrimaryKey(autoGenerate = true)
+    val id: Long = 0,
+    val projectId: Long,
+    val chargeType: String = "OTHER",
+    val periodKey: String = "",
+    val amount: Double,
+    val dueDate: Long? = null,
+    val note: String = "",
+    val createdAt: Long = System.currentTimeMillis()
+)
+
+@Entity(
     tableName = "agency_payments",
     foreignKeys = [
         ForeignKey(

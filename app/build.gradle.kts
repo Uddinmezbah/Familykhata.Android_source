@@ -16,8 +16,8 @@ android {
         applicationId = "com.familykhata.app"
         minSdk = 24
         targetSdk = 36
-        versionCode = 13
-        versionName = "1.2.0"
+        versionCode = 15
+        versionName = "1.4.0"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         vectorDrawables.useSupportLibrary = true
@@ -85,4 +85,5 @@ dependencies {
     ksp("androidx.room:room-compiler:2.6.1")
 
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.8.1")
+    implementation("androidx.work:work-runtime-ktx:2.9.1")
 }

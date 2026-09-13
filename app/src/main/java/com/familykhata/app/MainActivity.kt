@@ -9,6 +9,7 @@ import com.familykhata.app.ui.FamilyKhataApp
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        DueReminderScheduler.schedule(applicationContext)
         setContent {
             val vm: FamilyKhataViewModel = viewModel()
             FamilyKhataApp(vm)

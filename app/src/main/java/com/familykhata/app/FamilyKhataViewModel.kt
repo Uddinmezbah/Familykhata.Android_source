@@ -10,6 +10,7 @@ import com.familykhata.app.data.BakiEntryEntity
 import com.familykhata.app.data.BakiPersonEntity
 import com.familykhata.app.data.BakiPersonSummary
 import com.familykhata.app.data.DashboardTotals
+import com.familykhata.app.data.DueReceivableItem
 import com.familykhata.app.data.TransactionEntity
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.Flow
@@ -17,6 +18,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
@@ -92,6 +94,19 @@ class FamilyKhataViewModel(application: Application) : AndroidViewModel(applicat
         .flatMapLatest { workspace -> dao.observeBakiSummaries(workspace) }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
 
+    private val workspacePeople = _selectedWorkspace
+        .flatMapLatest { workspace -> dao.observePeople(workspace) }
+
+    private val workspaceBakiEntries = _selectedWorkspace
+        .flatMapLatest { workspace -> dao.observeWorkspaceBakiEntries(workspace) }
+
+    val dueReceivables: StateFlow<List<DueReceivableItem>> = combine(
+        workspacePeople,
+        workspaceBakiEntries
+    ) { people, entries ->
+        calculateDueReceivables(people, entries)
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
+
     fun selectWorkspace(workspace: String) {
         if (workspace !in allowedWorkspaces || workspace == _selectedWorkspace.value) return
         _selectedWorkspace.value = workspace
@@ -115,6 +130,7 @@ class FamilyKhataViewModel(application: Application) : AndroidViewModel(applicat
     }
 
     fun deleteTransaction(item: TransactionEntity) {
+        if (!canWriteNow()) return
         viewModelScope.launch { dao.deleteTransaction(item) }
     }
 
@@ -141,18 +157,20 @@ class FamilyKhataViewModel(application: Application) : AndroidViewModel(applicat
     }
 
     fun deleteBakiPerson(personId: Long) {
+        if (!canWriteNow()) return
         viewModelScope.launch { dao.deletePersonById(personId) }
     }
 
-    fun addBakiEntry(personId: Long, action: String, amount: Double, note: String) {
+    fun addBakiEntry(
+        personId: Long,
+        action: String,
+        amount: Double,
+        note: String,
+        dueAt: Long? = null
+    ) {
         if (!canWriteNow() || amount <= 0) return
-        val delta = when (action) {
-            "GAVE" -> amount
-            "RECEIVED_BACK" -> -amount
-            "TOOK" -> -amount
-            "PAID_BACK" -> amount
-            else -> 0.0
-        }
+        val delta = balanceDelta(action, amount)
+        if (delta == null) return
         viewModelScope.launch {
             dao.insertBakiEntry(
                 BakiEntryEntity(
@@ -160,13 +178,42 @@ class FamilyKhataViewModel(application: Application) : AndroidViewModel(applicat
                     action = action,
                     amount = amount,
                     balanceDelta = delta,
-                    note = note.trim()
+                    note = note.trim(),
+                    dueAt = dueAt
                 )
             )
         }
     }
 
+    fun updateBakiEntry(
+        item: BakiEntryEntity,
+        amount: Double,
+        note: String,
+        dueAt: Long?
+    ) {
+        if (!canWriteNow() || amount <= 0) return
+        val delta = balanceDelta(item.action, amount) ?: return
+        viewModelScope.launch {
+            dao.updateBakiEntry(
+                entryId = item.id,
+                amount = amount,
+                balanceDelta = delta,
+                note = note.trim(),
+                dueAt = dueAt
+            )
+        }
+    }
+
+    private fun balanceDelta(action: String, amount: Double): Double? = when (action) {
+        "GAVE" -> amount
+        "RECEIVED_BACK" -> -amount
+        "TOOK" -> -amount
+        "PAID_BACK" -> amount
+        else -> null
+    }
+
     fun deleteBakiEntry(item: BakiEntryEntity) {
+        if (!canWriteNow()) return
         viewModelScope.launch { dao.deleteBakiEntry(item) }
     }
 
@@ -174,6 +221,53 @@ class FamilyKhataViewModel(application: Application) : AndroidViewModel(applicat
         dao.observeBakiEntries(personId)
 
 
+
+    private data class ReceivableLot(
+        val entry: BakiEntryEntity,
+        var remaining: Double
+    )
+
+    private fun calculateDueReceivables(
+        people: List<BakiPersonEntity>,
+        entries: List<BakiEntryEntity>
+    ): List<DueReceivableItem> {
+        val entriesByPerson = entries.groupBy { it.personId }
+        return people.flatMap { person ->
+            val lots = mutableListOf<ReceivableLot>()
+            entriesByPerson[person.id].orEmpty()
+                .sortedWith(compareBy<BakiEntryEntity> { it.createdAt }.thenBy { it.id })
+                .forEach { entry ->
+                    when (entry.action) {
+                        "GAVE" -> lots += ReceivableLot(entry, entry.amount)
+                        "RECEIVED_BACK" -> {
+                            var paymentLeft = entry.amount
+                            for (lot in lots) {
+                                if (paymentLeft <= 0.0) break
+                                if (lot.remaining <= 0.0) continue
+                                val applied = minOf(lot.remaining, paymentLeft)
+                                lot.remaining -= applied
+                                paymentLeft -= applied
+                            }
+                        }
+                    }
+                }
+            lots.asSequence()
+                .filter { it.remaining > 0.0001 && it.entry.dueAt != null }
+                .map { lot ->
+                    DueReceivableItem(
+                        entryId = lot.entry.id,
+                        personId = person.id,
+                        personName = person.name,
+                        phone = person.phone,
+                        originalAmount = lot.entry.amount,
+                        remainingAmount = lot.remaining,
+                        dueAt = lot.entry.dueAt!!,
+                        note = lot.entry.note
+                    )
+                }
+                .toList()
+        }.sortedWith(compareBy<DueReceivableItem> { it.dueAt }.thenBy { it.personName })
+    }
 
     fun refreshTrialStatus() {
         _trialStatus.value = calculateTrialStatus()
@@ -374,7 +468,7 @@ class FamilyKhataViewModel(application: Application) : AndroidViewModel(applicat
 
                 JSONObject().apply {
                     put("format", "hisabi-khata-backup")
-                    put("version", 1)
+                    put("version", 2)
                     put("createdAt", System.currentTimeMillis())
                     put("transactions", JSONArray().apply {
                         transactions.forEach { item ->
@@ -410,6 +504,7 @@ class FamilyKhataViewModel(application: Application) : AndroidViewModel(applicat
                                 put("amount", entry.amount)
                                 put("balanceDelta", entry.balanceDelta)
                                 put("note", entry.note)
+                                if (entry.dueAt != null) put("dueAt", entry.dueAt)
                                 put("createdAt", entry.createdAt)
                             })
                         }
@@ -432,7 +527,8 @@ class FamilyKhataViewModel(application: Application) : AndroidViewModel(applicat
                 require(root.optString("format") == "hisabi-khata-backup") {
                     "এটি হিসাবী খাতার সঠিক ব্যাকআপ ফাইল নয়"
                 }
-                require(root.optInt("version") == 1) {
+                val backupVersion = root.optInt("version")
+                require(backupVersion in 1..2) {
                     "এই ব্যাকআপ ভার্সনটি এখনো সমর্থিত নয়"
                 }
 
@@ -504,6 +600,7 @@ class FamilyKhataViewModel(application: Application) : AndroidViewModel(applicat
                         amount = amount,
                         balanceDelta = delta,
                         note = item.optString("note", ""),
+                        dueAt = item.optLong("dueAt", 0L).takeIf { it > 0L },
                         createdAt = item.optLong("createdAt", System.currentTimeMillis())
                     )
                 }

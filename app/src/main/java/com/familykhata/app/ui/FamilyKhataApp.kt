@@ -36,6 +36,7 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -87,10 +88,20 @@ fun FamilyKhataApp(viewModel: FamilyKhataViewModel) {
     val workspace by viewModel.selectedWorkspace.collectAsState()
     val trialStatus by viewModel.trialStatus.collectAsState()
     val isAppUnlocked by viewModel.isAppUnlocked.collectAsState()
+    val appContext = LocalContext.current
+    var showSettingsMenu by remember { mutableStateOf(false) }
+    LaunchedEffect(Unit) { V14DisplayState.initialize(appContext) }
 
     HisabiKhataTheme {
         if (!isAppUnlocked) {
             AppLockScreen(viewModel)
+        } else if (showSettingsMenu) {
+            V14SettingsScreen(
+                viewModel = viewModel,
+                onClose = { showSettingsMenu = false },
+                onOpenLedger = { showSettingsMenu = false; tab = Tab.BAKI },
+                onOpenMore = { showSettingsMenu = false; tab = Tab.MORE }
+            )
         } else {
             Scaffold(
             containerColor = MaterialTheme.colorScheme.background,
@@ -135,6 +146,8 @@ fun FamilyKhataApp(viewModel: FamilyKhataViewModel) {
                     .padding(padding)
                     .padding(16.dp)
             ) {
+                TopCornerMenuButton { showSettingsMenu = true }
+                Spacer(Modifier.height(6.dp))
                 BrandHeader(workspace)
                 Spacer(Modifier.height(10.dp))
                 WorkspaceSwitcher(
@@ -230,7 +243,7 @@ private fun BrandHeader(workspace: String) {
                 }
             }
             Text(
-                "v1.2 • Commercial Tools",
+                "v1.4 • Smart Due & Settings",
                 style = MaterialTheme.typography.labelSmall,
                 fontWeight = FontWeight.SemiBold,
                 color = accent
@@ -360,6 +373,7 @@ private fun DashboardScreen(
 
     if (workspace == "SHOP") {
         BusinessDashboard(
+            viewModel = viewModel,
             balance = balance,
             income = totals.income,
             expense = totals.expense,
@@ -395,7 +409,7 @@ private fun DashboardScreen(
                     color = Color.White
                 )
                 Text(
-                    "৳ ${money(balance)}",
+                    if (V14DisplayState.summaryVisible) "${V14DisplayState.currencySymbol} ${money(balance)}" else "••••",
                     style = MaterialTheme.typography.headlineLarge,
                     fontWeight = FontWeight.Bold,
                     color = Color.White
@@ -444,6 +458,11 @@ private fun DashboardScreen(
             )
         }
 
+        DueDashboardSection(
+            viewModel = viewModel,
+            onLedger = onLedger
+        )
+
         Surface(
             modifier = Modifier.fillMaxWidth(),
             shape = RoundedCornerShape(18.dp),
@@ -465,6 +484,7 @@ private fun DashboardScreen(
 
 @Composable
 private fun BusinessDashboard(
+    viewModel: FamilyKhataViewModel,
     balance: Double,
     income: Double,
     expense: Double,
@@ -498,7 +518,7 @@ private fun BusinessDashboard(
                     color = Color.White
                 )
                 Text(
-                    "৳ ${money(balance)}",
+                    if (V14DisplayState.summaryVisible) "${V14DisplayState.currencySymbol} ${money(balance)}" else "••••",
                     style = MaterialTheme.typography.headlineLarge,
                     fontWeight = FontWeight.Bold,
                     color = Color.White
@@ -546,6 +566,11 @@ private fun BusinessDashboard(
                 accentColor = PayableAccent
             )
         }
+
+        DueDashboardSection(
+            viewModel = viewModel,
+            onLedger = onLedger
+        )
 
         Text(
             "দ্রুত কাজ",
@@ -608,7 +633,7 @@ private fun BusinessDashboard(
             ) {
                 Text("ব্যবসার খাতা", fontWeight = FontWeight.Bold)
                 Text(
-                    "কাস্টমার/সাপ্লায়ার: $ledgerCount জন • পাবো ৳ ${money(receivable)} • দেবো ৳ ${money(payable)}",
+                    "কাস্টমার/সাপ্লায়ার: $ledgerCount জন • পাবো ${V14DisplayState.currencySymbol} ${money(receivable)} • দেবো ${V14DisplayState.currencySymbol} ${money(payable)}",
                     style = MaterialTheme.typography.bodySmall
                 )
                 Text(
@@ -708,7 +733,7 @@ private fun MetricCard(
                 )
             }
             Text(
-                "৳ ${money(amount)}",
+                if (V14DisplayState.summaryVisible) "${V14DisplayState.currencySymbol} ${money(amount)}" else "••••",
                 style = MaterialTheme.typography.titleLarge,
                 fontWeight = FontWeight.ExtraBold,
                 color = MaterialTheme.colorScheme.onSurface
@@ -909,7 +934,7 @@ private fun TransactionRow(
                     color = accent
                 )
                 Text(
-                    "৳ ${money(item.amount)}",
+                    "${V14DisplayState.currencySymbol} ${money(item.amount)}",
                     fontWeight = FontWeight.ExtraBold,
                     color = accent
                 )
@@ -1039,8 +1064,8 @@ private fun BakiPeopleScreen(
                         )
                         Text(
                             when {
-                                person.balance > 0 -> "পাবো: ৳ ${money(person.balance)}"
-                                person.balance < 0 -> "দেবো: ৳ ${money(-person.balance)}"
+                                person.balance > 0 -> "পাবো: ${V14DisplayState.currencySymbol} ${money(person.balance)}"
+                                person.balance < 0 -> "দেবো: ${V14DisplayState.currencySymbol} ${money(-person.balance)}"
                                 else -> "হিসাব সমান"
                             },
                             fontWeight = FontWeight.Bold,
@@ -1072,6 +1097,7 @@ private fun BakiEntryScreen(
     var action by remember { mutableStateOf("GAVE") }
     var amount by remember { mutableStateOf("") }
     var note by remember { mutableStateOf("") }
+    var dueAt by remember { mutableStateOf<Long?>(null) }
     var error by remember { mutableStateOf<String?>(null) }
     var pendingDelete by remember { mutableStateOf<BakiEntryEntity?>(null) }
     val balanceTone = balanceAccent(person.balance)
@@ -1101,8 +1127,8 @@ private fun BakiEntryScreen(
         ) {
             Text(
                 when {
-                    person.balance > 0 -> "বর্তমানে পাবো: ৳ ${money(person.balance)}"
-                    person.balance < 0 -> "বর্তমানে দেবো: ৳ ${money(-person.balance)}"
+                    person.balance > 0 -> "বর্তমানে পাবো: ${V14DisplayState.currencySymbol} ${money(person.balance)}"
+                    person.balance < 0 -> "বর্তমানে দেবো: ${V14DisplayState.currencySymbol} ${money(-person.balance)}"
                     else -> "বর্তমান হিসাব সমান"
                 },
                 modifier = Modifier.padding(horizontal = 14.dp, vertical = 12.dp),
@@ -1154,15 +1180,20 @@ private fun BakiEntryScreen(
             label = { Text("নোট") },
             modifier = Modifier.fillMaxWidth()
         )
+        DueDatePickerField(
+            value = dueAt,
+            onChange = { dueAt = it }
+        )
         Button(
             onClick = {
                 val value = parseAmount(amount)
                 if (value == null) {
                     error = "সঠিক টাকার পরিমাণ লিখুন"
                 } else {
-                    viewModel.addBakiEntry(person.id, action, value, note)
+                    viewModel.addBakiEntry(person.id, action, value, note, dueAt)
                     amount = ""
                     note = ""
+                    dueAt = null
                     error = null
                 }
             },
@@ -1184,6 +1215,9 @@ private fun BakiEntryScreen(
             entries.forEach { entry ->
                 BakiHistoryCard(
                     item = entry,
+                    person = person,
+                    canWrite = canWrite,
+                    viewModel = viewModel,
                     onDelete = { pendingDelete = entry }
                 )
             }
@@ -1196,7 +1230,7 @@ private fun BakiEntryScreen(
             title = { Text("এন্ট্রি মুছবেন?") },
             text = {
                 Text(
-                    "${actionLabel(entry.action)} — ৳ ${money(entry.amount)}\n" +
+                    "${actionLabel(entry.action)} — ${V14DisplayState.currencySymbol} ${money(entry.amount)}\n" +
                         "মুছে দিলে ব্যক্তির বর্তমান হিসাবও স্বয়ংক্রিয়ভাবে বদলে যাবে।"
                 )
             },
@@ -1216,7 +1250,13 @@ private fun BakiEntryScreen(
 }
 
 @Composable
-private fun BakiHistoryCard(item: BakiEntryEntity, onDelete: () -> Unit) {
+private fun BakiHistoryCard(
+    item: BakiEntryEntity,
+    person: BakiPersonSummary,
+    canWrite: Boolean,
+    viewModel: FamilyKhataViewModel,
+    onDelete: () -> Unit
+) {
     val accent = bakiActionAccent(item.action)
     Card(
         modifier = Modifier.fillMaxWidth(),
@@ -1227,7 +1267,7 @@ private fun BakiHistoryCard(item: BakiEntryEntity, onDelete: () -> Unit) {
     ) {
         Column(
             modifier = Modifier.padding(13.dp),
-            verticalArrangement = Arrangement.spacedBy(3.dp)
+            verticalArrangement = Arrangement.spacedBy(6.dp)
         ) {
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
                 Text(
@@ -1236,7 +1276,7 @@ private fun BakiHistoryCard(item: BakiEntryEntity, onDelete: () -> Unit) {
                     color = accent
                 )
                 Text(
-                    "৳ ${money(item.amount)}",
+                    "${V14DisplayState.currencySymbol} ${money(item.amount)}",
                     fontWeight = FontWeight.ExtraBold,
                     color = accent
                 )
@@ -1244,12 +1284,26 @@ private fun BakiHistoryCard(item: BakiEntryEntity, onDelete: () -> Unit) {
             if (item.note.isNotBlank()) {
                 Text(item.note)
             }
+            item.dueAt?.let {
+                Text(
+                    "পরিশোধের তারিখ: ${v13Date(it)}",
+                    style = MaterialTheme.typography.bodySmall,
+                    fontWeight = FontWeight.SemiBold,
+                    color = if (it < System.currentTimeMillis()) ExpenseAccent else ReceivableAccent
+                )
+            }
             Text(
                 formatDate(item.createdAt),
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
-            TextButton(onClick = onDelete) { Text("এন্ট্রি মুছুন") }
+            BakiEntryActionRow(
+                person = person,
+                item = item,
+                canWrite = canWrite,
+                viewModel = viewModel,
+                onDelete = onDelete
+            )
         }
     }
 }
@@ -1340,6 +1394,7 @@ private fun MoreScreen(viewModel: FamilyKhataViewModel) {
         )
 
         CommercialToolsSection(viewModel)
+        PurchaseAndTutorialSection()
 
         MoreSectionTitle("ডেটা নিরাপত্তা")
         MoreActionCard(
@@ -1419,7 +1474,7 @@ private fun MoreScreen(viewModel: FamilyKhataViewModel) {
                 modifier = Modifier.padding(16.dp),
                 verticalArrangement = Arrangement.spacedBy(4.dp)
             ) {
-                Text("হিসাবী খাতা v1.2", fontWeight = FontWeight.Bold)
+                Text("হিসাবী খাতা v1.4", fontWeight = FontWeight.Bold)
                 Text(
                     "আপনার টাকা-পয়সার সহজ হিসাব • ডেটা আপনার ডিভাইসে থাকে",
                     style = MaterialTheme.typography.bodySmall
@@ -1531,8 +1586,8 @@ private fun MoreActionCard(
 
 private fun sendLedgerSms(context: Context, person: BakiPersonSummary) {
     val balanceText = when {
-        person.balance > 0 -> "আপনার কাছে ৳ ${money(person.balance)} পাওনা আছে।"
-        person.balance < 0 -> "আপনাকে ৳ ${money(-person.balance)} পরিশোধযোগ্য আছে।"
+        person.balance > 0 -> "আপনার কাছে ${V14DisplayState.currencySymbol} ${money(person.balance)} পাওনা আছে।"
+        person.balance < 0 -> "আপনাকে ${V14DisplayState.currencySymbol} ${money(-person.balance)} পরিশোধযোগ্য আছে।"
         else -> "আপনার হিসাব বর্তমানে সমান আছে।"
     }
     val message = "হিসাবী খাতা: ${person.name}, $balanceText"

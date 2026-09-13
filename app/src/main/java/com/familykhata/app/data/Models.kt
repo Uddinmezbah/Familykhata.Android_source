@@ -46,6 +46,7 @@ data class BakiEntryEntity(
     val amount: Double,
     val balanceDelta: Double,
     val note: String = "",
+    val dueAt: Long? = null,
     val createdAt: Long = System.currentTimeMillis()
 )
 
@@ -59,4 +60,15 @@ data class BakiPersonSummary(
     val name: String,
     val phone: String,
     val balance: Double
+)
+
+data class DueReceivableItem(
+    val entryId: Long,
+    val personId: Long,
+    val personName: String,
+    val phone: String,
+    val originalAmount: Double,
+    val remainingAmount: Double,
+    val dueAt: Long,
+    val note: String
 )

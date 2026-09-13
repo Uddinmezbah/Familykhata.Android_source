@@ -38,11 +38,32 @@ interface FamilyKhataDao {
     @Query("DELETE FROM baki_people WHERE id = :personId")
     suspend fun deletePersonById(personId: Long)
 
+    @Query("SELECT * FROM baki_people WHERE workspace = :workspace ORDER BY name COLLATE NOCASE ASC")
+    fun observePeople(workspace: String): Flow<List<BakiPersonEntity>>
+
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertBakiEntry(entry: BakiEntryEntity)
 
     @Delete
     suspend fun deleteBakiEntry(entry: BakiEntryEntity)
+
+    @Query(
+        """
+        UPDATE baki_entries
+        SET amount = :amount,
+            balanceDelta = :balanceDelta,
+            note = :note,
+            dueAt = :dueAt
+        WHERE id = :entryId
+        """
+    )
+    suspend fun updateBakiEntry(
+        entryId: Long,
+        amount: Double,
+        balanceDelta: Double,
+        note: String,
+        dueAt: Long?
+    )
 
     @Query(
         """
@@ -60,6 +81,16 @@ interface FamilyKhataDao {
     @Query("SELECT * FROM baki_entries WHERE personId = :personId ORDER BY createdAt DESC")
     fun observeBakiEntries(personId: Long): Flow<List<BakiEntryEntity>>
 
+    @Query(
+        """
+        SELECT e.*
+        FROM baki_entries e
+        INNER JOIN baki_people p ON p.id = e.personId
+        WHERE p.workspace = :workspace
+        ORDER BY e.createdAt ASC, e.id ASC
+        """
+    )
+    fun observeWorkspaceBakiEntries(workspace: String): Flow<List<BakiEntryEntity>>
 
     @Query("SELECT * FROM transactions ORDER BY id ASC")
     suspend fun getAllTransactions(): List<TransactionEntity>
@@ -78,5 +109,4 @@ interface FamilyKhataDao {
 
     @Query("DELETE FROM transactions")
     suspend fun clearTransactions()
-
 }

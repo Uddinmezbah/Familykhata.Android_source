@@ -485,8 +485,8 @@ internal fun PersonManagementActions(
 
     if (showDelete) {
         val balanceWarning = when {
-            person.balance > 0 -> "এই $personLabel-এর কাছে আপনি ৳ ${commercialMoney(person.balance)} পাবেন।"
-            person.balance < 0 -> "এই $personLabel-কে আপনি ৳ ${commercialMoney(abs(person.balance))} দেবেন।"
+            person.balance > 0 -> "এই $personLabel-এর কাছে আপনি ${V14DisplayState.currencySymbol} ${commercialMoney(person.balance)} পাবেন।"
+            person.balance < 0 -> "এই $personLabel-কে আপনি ${V14DisplayState.currencySymbol} ${commercialMoney(abs(person.balance))} দেবেন।"
             else -> "এই $personLabel-এর বর্তমান হিসাব সমান।"
         }
         AlertDialog(

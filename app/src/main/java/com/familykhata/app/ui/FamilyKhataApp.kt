@@ -257,6 +257,15 @@ fun FamilyKhataApp(viewModel: FamilyKhataViewModel) {
                                         }
                                     )
 
+                                BusinessMode.MEMBERSHIP_SERVICE ->
+                                    V15MembershipScreen(
+                                        workspace = workspace,
+                                        canWrite = !trialStatus.expired,
+                                        onExit = {
+                                            tab = Tab.DASHBOARD
+                                        }
+                                    )
+
                                 else ->
                                     V15InventoryScreen(
                                         workspace = workspace,
@@ -1839,6 +1848,9 @@ private fun tabLabel(
 
             BusinessMode.SERVICE_JOB ->
                 v15Text("সার্ভিস", "Services")
+
+            BusinessMode.MEMBERSHIP_SERVICE ->
+                v15Text("মেম্বার", "Members")
 
             else ->
                 v15Text("পণ্য", "Products")

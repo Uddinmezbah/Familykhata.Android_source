@@ -137,7 +137,12 @@ internal fun V15CoachingScreen(
                     "শিক্ষার্থী",
                     "Students"
                 ),
-                value = summaries.size.toString(),
+                value =
+                    summaries
+                        .map { it.studentId }
+                        .distinct()
+                        .size
+                        .toString(),
                 modifier = Modifier.weight(1f)
             )
 

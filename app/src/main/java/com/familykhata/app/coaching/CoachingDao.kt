@@ -76,6 +76,21 @@ interface CoachingDao {
     @Query("SELECT * FROM coaching_payments WHERE enrollmentId = :enrollmentId ORDER BY paidAt DESC")
     fun observePayments(enrollmentId: Long): Flow<List<CoachingPaymentEntity>>
 
+    @Query(
+        """
+        SELECT COUNT(*)
+        FROM coaching_charges
+        WHERE enrollmentId = :enrollmentId
+          AND feeType = :feeType
+          AND periodKey = :periodKey
+        """
+    )
+    suspend fun countCharge(
+        enrollmentId: Long,
+        feeType: String,
+        periodKey: String
+    ): Int
+
     @Delete
     suspend fun deleteCharge(item: CoachingChargeEntity)
 

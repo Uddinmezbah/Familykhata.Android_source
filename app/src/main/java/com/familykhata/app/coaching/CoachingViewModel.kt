@@ -165,6 +165,21 @@ class CoachingViewModel(
         if (enrollmentId <= 0 || amount <= 0) return
 
         viewModelScope.launch {
+            val guardedType =
+                feeType == "ADMISSION" ||
+                feeType == "MONTHLY"
+
+            if (
+                guardedType &&
+                dao.countCharge(
+                    enrollmentId = enrollmentId,
+                    feeType = feeType,
+                    periodKey = periodKey
+                ) > 0
+            ) {
+                return@launch
+            }
+
             dao.insertCharge(
                 CoachingChargeEntity(
                     enrollmentId = enrollmentId,

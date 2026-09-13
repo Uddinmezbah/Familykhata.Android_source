@@ -95,6 +95,8 @@ internal fun V14SettingsScreen(
 
     var profileName by remember { mutableStateOf(prefs.getString("profile_name", "") ?: "") }
     var businessName by remember { mutableStateOf(prefs.getString("business_name", "") ?: "") }
+    var businessType by remember { mutableStateOf(prefs.getString("business_type", "") ?: "") }
+    var businessAddress by remember { mutableStateOf(prefs.getString("business_address", "") ?: "") }
     var profilePhone by remember { mutableStateOf(prefs.getString("profile_phone", "") ?: "") }
     var showProfile by remember { mutableStateOf(false) }
     var showLanguage by remember { mutableStateOf(false) }
@@ -136,8 +138,10 @@ internal fun V14SettingsScreen(
                 Column(modifier = Modifier.weight(1f)) {
                     Text(profileName.ifBlank { "আপনার প্রোফাইল" }, fontWeight = FontWeight.ExtraBold, style = MaterialTheme.typography.titleMedium)
                     if (businessName.isNotBlank()) Text(businessName, style = MaterialTheme.typography.bodySmall)
+                    if (businessType.isNotBlank()) Text("দোকানের ধরন: $businessType", style = MaterialTheme.typography.bodySmall)
+                    if (businessAddress.isNotBlank()) Text("ঠিকানা: $businessAddress", style = MaterialTheme.typography.bodySmall)
                     if (profilePhone.isNotBlank()) Text(profilePhone, style = MaterialTheme.typography.bodySmall)
-                    if (profileName.isBlank() && profilePhone.isBlank()) Text("নাম, প্রতিষ্ঠান ও ফোন যোগ করুন", style = MaterialTheme.typography.bodySmall)
+                    if (profileName.isBlank() && profilePhone.isBlank()) Text("নাম, দোকানের ধরন, ঠিকানা ও ফোন যোগ করুন", style = MaterialTheme.typography.bodySmall)
                 }
                 Text("›", style = MaterialTheme.typography.headlineSmall)
             }
@@ -203,11 +207,28 @@ internal fun V14SettingsScreen(
     }
 
     if (showProfile) {
-        ProfileDialog(profileName, businessName, profilePhone, { showProfile = false }) { name, business, phone ->
+        ProfileDialog(
+            initialName = profileName,
+            initialBusiness = businessName,
+            initialPhone = profilePhone,
+            initialBusinessType = businessType,
+            initialAddress = businessAddress,
+            onDismiss = { showProfile = false }
+        ) { name, business, phone, type, address ->
             profileName = name
             businessName = business
             profilePhone = phone
-            prefs.edit().putString("profile_name", name).putString("business_name", business).putString("profile_phone", phone).apply()
+            businessType = type
+            businessAddress = address
+
+            prefs.edit()
+                .putString("profile_name", name)
+                .putString("business_name", business)
+                .putString("profile_phone", phone)
+                .putString("business_type", type)
+                .putString("business_address", address)
+                .apply()
+
             showProfile = false
         }
     }
@@ -267,25 +288,162 @@ private fun ProfileDialog(
     initialName: String,
     initialBusiness: String,
     initialPhone: String,
+    initialBusinessType: String,
+    initialAddress: String,
     onDismiss: () -> Unit,
-    onSave: (String, String, String) -> Unit
+    onSave: (String, String, String, String, String) -> Unit
 ) {
     var name by remember { mutableStateOf(initialName) }
     var business by remember { mutableStateOf(initialBusiness) }
     var phone by remember { mutableStateOf(initialPhone) }
+    var businessType by remember { mutableStateOf(initialBusinessType) }
+    var address by remember { mutableStateOf(initialAddress) }
+
+    var showTypePicker by remember { mutableStateOf(false) }
+    var customType by remember { mutableStateOf("") }
+
+    val businessTypes = listOf(
+        "ফার্মেসি / Pharmacy",
+        "মুদি দোকান / Grocery",
+        "ইলেকট্রনিক্স / Electronics",
+        "মোবাইল ও এক্সেসরিজ",
+        "ফ্যাশন / Clothing",
+        "কসমেটিকস / Cosmetics",
+        "রেস্টুরেন্ট / Food",
+        "হার্ডওয়্যার / Hardware",
+        "স্টেশনারি / Stationery",
+        "E-commerce",
+        "Wholesale"
+    )
+
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text("প্রোফাইল") },
+        title = { Text("প্রোফাইল ও ব্যবসার তথ্য") },
         text = {
-            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                OutlinedTextField(name, { name = it }, label = { Text("নাম") }, singleLine = true)
-                OutlinedTextField(business, { business = it }, label = { Text("প্রতিষ্ঠান (ঐচ্ছিক)") }, singleLine = true)
-                OutlinedTextField(phone, { phone = it }, label = { Text("ফোন") }, singleLine = true)
+            Column(
+                modifier = Modifier
+                    .heightIn(max = 520.dp)
+                    .verticalScroll(rememberScrollState()),
+                verticalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                OutlinedTextField(
+                    value = name,
+                    onValueChange = { name = it },
+                    label = { Text("আপনার নাম") },
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth()
+                )
+
+                OutlinedTextField(
+                    value = business,
+                    onValueChange = { business = it },
+                    label = { Text("দোকান / প্রতিষ্ঠানের নাম") },
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth()
+                )
+
+                OutlinedButton(
+                    onClick = { showTypePicker = true },
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Text(
+                        if (businessType.isBlank())
+                            "দোকানের ধরন নির্বাচন করুন"
+                        else
+                            "দোকানের ধরন: $businessType"
+                    )
+                }
+
+                OutlinedTextField(
+                    value = address,
+                    onValueChange = { address = it },
+                    label = { Text("দোকানের ঠিকানা") },
+                    modifier = Modifier.fillMaxWidth()
+                )
+
+                OutlinedTextField(
+                    value = phone,
+                    onValueChange = { phone = it },
+                    label = { Text("ফোন") },
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth()
+                )
             }
         },
-        confirmButton = { TextButton(onClick = { onSave(name.trim(), business.trim(), phone.trim()) }) { Text("সেভ") } },
-        dismissButton = { TextButton(onClick = onDismiss) { Text("বাতিল") } }
+        confirmButton = {
+            TextButton(
+                onClick = {
+                    onSave(
+                        name.trim(),
+                        business.trim(),
+                        phone.trim(),
+                        businessType.trim(),
+                        address.trim()
+                    )
+                }
+            ) {
+                Text("সেভ")
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) {
+                Text("বাতিল")
+            }
+        }
     )
+
+    if (showTypePicker) {
+        AlertDialog(
+            onDismissRequest = { showTypePicker = false },
+            title = { Text("দোকানের ধরন নির্বাচন করুন") },
+            text = {
+                Column(
+                    modifier = Modifier
+                        .heightIn(max = 450.dp)
+                        .verticalScroll(rememberScrollState()),
+                    verticalArrangement = Arrangement.spacedBy(7.dp)
+                ) {
+                    businessTypes.forEach { type ->
+                        OutlinedButton(
+                            onClick = {
+                                businessType = type
+                                showTypePicker = false
+                            },
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Text(type)
+                        }
+                    }
+
+                    OutlinedTextField(
+                        value = customType,
+                        onValueChange = { customType = it },
+                        label = { Text("অন্যান্য / Custom type") },
+                        singleLine = true,
+                        modifier = Modifier.fillMaxWidth()
+                    )
+
+                    Button(
+                        onClick = {
+                            if (customType.isNotBlank()) {
+                                businessType = customType.trim()
+                                showTypePicker = false
+                            }
+                        },
+                        enabled = customType.isNotBlank(),
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Text("এই ধরন ব্যবহার করুন")
+                    }
+                }
+            },
+            confirmButton = {
+                TextButton(onClick = { showTypePicker = false }) {
+                    Text("বন্ধ")
+                }
+            }
+        )
+    }
 }
 
 @Composable

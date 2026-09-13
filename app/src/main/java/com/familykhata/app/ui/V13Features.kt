@@ -49,7 +49,7 @@ private val PlanAccent = Color(0xFF6C4CCF)
 internal fun DueDatePickerField(
     value: Long?,
     onChange: (Long?) -> Unit,
-    label: String = "পরিশোধের তারিখ"
+    label: String = v15Text("পরিশোধের তারিখ","Due date")
 ) {
     val context = LocalContext.current
     val calendar = remember(value) {
@@ -79,10 +79,10 @@ internal fun DueDatePickerField(
             },
             modifier = Modifier.weight(1f)
         ) {
-            Text(if (value == null) "$label নির্বাচন করুন" else "$label: ${v13Date(value)}")
+            Text(if (value == null) v15Text("$label নির্বাচন করুন","Select $label") else "$label: ${v13Date(value)}")
         }
         if (value != null) {
-            TextButton(onClick = { onChange(null) }) { Text("মুছুন") }
+            TextButton(onClick = { onChange(null) }) { Text(v15Text("মুছুন","Remove")) }
         }
     }
 }
@@ -105,7 +105,7 @@ internal fun DueDashboardSection(
         horizontalArrangement = Arrangement.spacedBy(10.dp)
     ) {
         DueMetricCard(
-            title = "আজকে পাবো",
+            title = v15Text("আজকে পাবো","Due today"),
             amount = todayAmount,
             count = today.size,
             accent = DueTodayAccent,
@@ -113,7 +113,7 @@ internal fun DueDashboardSection(
             onClick = onLedger
         )
         DueMetricCard(
-            title = "বকেয়া",
+            title = v15Text("বকেয়া","Overdue"),
             amount = overdueAmount,
             count = overdue.size,
             accent = OverdueAccent,
@@ -145,7 +145,7 @@ private fun DueMetricCard(
         ) {
             Text(title, fontWeight = FontWeight.Bold, color = accent)
             Text(if (V14DisplayState.summaryVisible) "${V14DisplayState.currencySymbol} ${v13Money(amount)}" else "••••", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.ExtraBold)
-            Text("$count টি এন্ট্রি", style = MaterialTheme.typography.bodySmall)
+            Text(v15Text("$count টি এন্ট্রি","$count entries"), style = MaterialTheme.typography.bodySmall)
         }
     }
 }
@@ -207,20 +207,20 @@ internal fun BakiEntryActionRow(
 
         AlertDialog(
             onDismissRequest = { showEdit = false },
-            title = { Text("এন্ট্রি সম্পাদনা") },
+            title = { Text(v15Text("এন্ট্রি সম্পাদনা","Edit entry")) },
             text = {
                 Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     OutlinedTextField(
                         value = amount,
                         onValueChange = { amount = it; error = null },
-                        label = { Text("টাকার পরিমাণ") },
+                        label = { Text(v15Text("টাকার পরিমাণ","Amount")) },
                         singleLine = true,
                         modifier = Modifier.fillMaxWidth()
                     )
                     OutlinedTextField(
                         value = note,
                         onValueChange = { note = it },
-                        label = { Text("নোট") },
+                        label = { Text(v15Text("নোট","Note")) },
                         modifier = Modifier.fillMaxWidth()
                     )
                     DueDatePickerField(value = dueAt, onChange = { dueAt = it })
@@ -231,15 +231,15 @@ internal fun BakiEntryActionRow(
                 TextButton(onClick = {
                     val parsed = v13ParseAmount(amount)
                     if (parsed == null) {
-                        error = "সঠিক টাকার পরিমাণ লিখুন"
+                        error = v15Text("সঠিক টাকার পরিমাণ লিখুন","Enter a valid amount")
                     } else {
                         viewModel.updateBakiEntry(item, parsed, note, dueAt)
                         showEdit = false
                     }
-                }) { Text("সেভ করুন") }
+                }) { Text(v15Text("সেভ করুন","Save")) }
             },
             dismissButton = {
-                TextButton(onClick = { showEdit = false }) { Text("বাতিল") }
+                TextButton(onClick = { showEdit = false }) { Text(v15Text("বাতিল","Cancel")) }
             }
         )
     }
@@ -248,15 +248,15 @@ internal fun BakiEntryActionRow(
 @Composable
 internal fun PurchaseAndTutorialSection() {
     val context = LocalContext.current
-    var selectedPlan by remember { mutableStateOf("মাসিক") }
+    var selectedPlan by remember { mutableStateOf(v15Text("মাসিক","Monthly")) }
 
     Text(
-        "প্ল্যান ও সহায়তা",
+        v15Text("প্ল্যান ও সহায়তা","Plans & support"),
         style = MaterialTheme.typography.titleMedium,
         fontWeight = FontWeight.Bold
     )
     Text(
-        "৩০ দিনের ট্রায়াল শেষে নতুন হিসাব যোগ/সম্পাদনার জন্য একটি প্ল্যান নিন। পুরনো ডেটা মুছে যাবে না।",
+        v15Text("৩০ দিনের ট্রায়াল শেষে নতুন হিসাব যোগ/সম্পাদনার জন্য একটি প্ল্যান নিন। পুরনো ডেটা মুছে যাবে না।","After the 30-day trial, choose a plan to add or edit records. Existing data will not be deleted."),
         style = MaterialTheme.typography.bodySmall,
         color = MaterialTheme.colorScheme.onSurfaceVariant
     )
@@ -265,7 +265,7 @@ internal fun PurchaseAndTutorialSection() {
         modifier = Modifier.fillMaxWidth(),
         horizontalArrangement = Arrangement.spacedBy(8.dp)
     ) {
-        listOf("মাসিক", "বার্ষিক", "Lifetime").forEach { plan ->
+        listOf(v15Text("মাসিক","Monthly"), v15Text("বার্ষিক","Yearly"), "Lifetime").forEach { plan ->
             val selected = selectedPlan == plan
             if (selected) {
                 Button(
@@ -290,9 +290,9 @@ internal fun PurchaseAndTutorialSection() {
             modifier = Modifier.padding(14.dp),
             verticalArrangement = Arrangement.spacedBy(8.dp)
         ) {
-            Text("$selectedPlan প্ল্যান কিনতে যোগাযোগ করুন", fontWeight = FontWeight.Bold)
+            Text(v15Text("$selectedPlan প্ল্যান কিনতে যোগাযোগ করুন","Contact us to get the $selectedPlan plan"), fontWeight = FontWeight.Bold)
             Text(
-                "দাম ও পেমেন্ট নির্দেশনা বিক্রয় চ্যানেলে জানানো হবে।",
+                v15Text("দাম ও পেমেন্ট নির্দেশনা বিক্রয় চ্যানেলে জানানো হবে।","Pricing and payment instructions will be provided through the sales channel."),
                 style = MaterialTheme.typography.bodySmall
             )
             Row(
@@ -334,9 +334,9 @@ internal fun PurchaseAndTutorialSection() {
             modifier = Modifier.padding(14.dp),
             verticalArrangement = Arrangement.spacedBy(4.dp)
         ) {
-            Text("▶ ব্যবহারের নিয়ম / ভিডিও", fontWeight = FontWeight.Bold)
+            Text(v15Text("▶ ব্যবহারের নিয়ম / ভিডিও","▶ Usage guide / video"), fontWeight = FontWeight.Bold)
             Text(
-                "নতুন খাতা, বাকি, পরিশোধ, ব্যাকআপ ও রিপোর্ট ব্যবহারের গাইড দেখুন।",
+                v15Text("নতুন খাতা, বাকি, পরিশোধ, ব্যাকআপ ও রিপোর্ট ব্যবহারের গাইড দেখুন।","See the guide for ledgers, dues, payments, backups and reports."),
                 style = MaterialTheme.typography.bodySmall
             )
         }
@@ -344,8 +344,8 @@ internal fun PurchaseAndTutorialSection() {
 }
 
 private fun sendEntrySms(context: Context, person: BakiPersonSummary, item: BakiEntryEntity) {
-    val dueText = item.dueAt?.let { " পরিশোধের তারিখ ${v13Date(it)}।" }.orEmpty()
-    val message = "আসসালামু আলাইকুম ${person.name}, হিসাবী খাতা অনুযায়ী ${V14DisplayState.currencySymbol} ${v13Money(item.amount)} টাকার একটি হিসাব আছে.$dueText সুবিধামতো পরিশোধ/যোগাযোগ করার অনুরোধ রইল।"
+    val dueText = item.dueAt?.let { v15Text(" পরিশোধের তারিখ ${v13Date(it)}।"," Due date: ${v13Date(it)}.") }.orEmpty()
+    val message = v15Text("আসসালামু আলাইকুম ${person.name}, হিসাবী খাতা অনুযায়ী ${V14DisplayState.currencySymbol} ${v13Money(item.amount)} টাকার একটি হিসাব আছে.$dueText সুবিধামতো পরিশোধ/যোগাযোগ করার অনুরোধ রইল।","Hello ${person.name}, according to Hisabi Khata there is an account of ${V14DisplayState.currencySymbol} ${v13Money(item.amount)}.$dueText Please make payment or contact us when convenient.")
     val intent = Intent(Intent.ACTION_SENDTO).apply {
         data = Uri.parse("smsto:${Uri.encode(person.phone)}")
         putExtra("sms_body", message)
@@ -354,8 +354,8 @@ private fun sendEntrySms(context: Context, person: BakiPersonSummary, item: Baki
 }
 
 private fun sendEntryWhatsApp(context: Context, person: BakiPersonSummary, item: BakiEntryEntity) {
-    val dueText = item.dueAt?.let { " পরিশোধের তারিখ ${v13Date(it)}।" }.orEmpty()
-    val message = "আসসালামু আলাইকুম ${person.name}, হিসাবী খাতা অনুযায়ী ${V14DisplayState.currencySymbol} ${v13Money(item.amount)} টাকার একটি হিসাব আছে.$dueText সুবিধামতো পরিশোধ/যোগাযোগ করার অনুরোধ রইল।"
+    val dueText = item.dueAt?.let { v15Text(" পরিশোধের তারিখ ${v13Date(it)}।"," Due date: ${v13Date(it)}.") }.orEmpty()
+    val message = v15Text("আসসালামু আলাইকুম ${person.name}, হিসাবী খাতা অনুযায়ী ${V14DisplayState.currencySymbol} ${v13Money(item.amount)} টাকার একটি হিসাব আছে.$dueText সুবিধামতো পরিশোধ/যোগাযোগ করার অনুরোধ রইল।","Hello ${person.name}, according to Hisabi Khata there is an account of ${V14DisplayState.currencySymbol} ${v13Money(item.amount)}.$dueText Please make payment or contact us when convenient.")
     val phone = person.phone.filter(Char::isDigit).let { digits -> if (digits.startsWith("0")) "88$digits" else digits }
     v13OpenUrl(context, "https://wa.me/$phone?text=${Uri.encode(message)}")
 }
@@ -366,7 +366,7 @@ private fun callPerson(context: Context, phone: String) {
 }
 
 private fun purchaseMessage(plan: String): String =
-    "আমি হিসাবী খাতা অ্যাপের $plan প্ল্যান নিতে চাই। পেমেন্ট ও অ্যাক্টিভেশন নির্দেশনা দিন।"
+    v15Text("আমি হিসাবী খাতা অ্যাপের $plan প্ল্যান নিতে চাই। পেমেন্ট ও অ্যাক্টিভেশন নির্দেশনা দিন।","I want the $plan plan for Hisabi Khata. Please send payment and activation instructions.")
 
 private fun purchaseWhatsApp(context: Context, plan: String) {
     val url = "https://wa.me/?text=${Uri.encode(purchaseMessage(plan))}"
@@ -384,7 +384,7 @@ private fun purchaseMessenger(context: Context, plan: String) {
             context.startActivity(Intent.createChooser(Intent(Intent.ACTION_SEND).apply {
                 type = "text/plain"
                 putExtra(Intent.EXTRA_TEXT, purchaseMessage(plan))
-            }, "যোগাযোগ করুন"))
+            }, v15Text("যোগাযোগ করুন","Contact")))
         }
 }
 

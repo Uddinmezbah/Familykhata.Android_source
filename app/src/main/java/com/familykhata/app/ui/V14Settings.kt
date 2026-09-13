@@ -76,7 +76,7 @@ internal fun TopCornerMenuButton(onClick: () -> Unit) {
             colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
             border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.22f))
         ) {
-            Text("☰  মেনু", modifier = Modifier.padding(horizontal = 14.dp, vertical = 9.dp), fontWeight = FontWeight.Bold)
+            Text(v15Text("☰  মেনু","☰  Menu"), modifier = Modifier.padding(horizontal = 14.dp, vertical = 9.dp), fontWeight = FontWeight.Bold)
         }
     }
 }
@@ -119,7 +119,7 @@ internal fun V14SettingsScreen(
             verticalAlignment = Alignment.CenterVertically
         ) {
             TextButton(onClick = onClose) { Text("✕") }
-            Text("সেটিংস", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.ExtraBold)
+            Text(v15Text("সেটিংস","Settings"), style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.ExtraBold)
             Text("v1.5", color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.Bold)
         }
 
@@ -138,24 +138,24 @@ internal fun V14SettingsScreen(
                     Text("👤", modifier = Modifier.padding(14.dp), style = MaterialTheme.typography.titleLarge)
                 }
                 Column(modifier = Modifier.weight(1f)) {
-                    Text(profileName.ifBlank { "আপনার প্রোফাইল" }, fontWeight = FontWeight.ExtraBold, style = MaterialTheme.typography.titleMedium)
+                    Text(profileName.ifBlank { v15Text("আপনার প্রোফাইল","Your profile") }, fontWeight = FontWeight.ExtraBold, style = MaterialTheme.typography.titleMedium)
                     if (businessName.isNotBlank()) Text(businessName, style = MaterialTheme.typography.bodySmall)
-                    if (businessType.isNotBlank()) Text("দোকানের ধরন: $businessType", style = MaterialTheme.typography.bodySmall)
-                    if (businessAddress.isNotBlank()) Text("ঠিকানা: $businessAddress", style = MaterialTheme.typography.bodySmall)
+                    if (businessType.isNotBlank()) Text(v15Text(v15Text("দোকানের ধরন: $businessType","Business type: $businessType"),"Business type: $businessType"), style = MaterialTheme.typography.bodySmall)
+                    if (businessAddress.isNotBlank()) Text(v15Text("ঠিকানা: $businessAddress","Address: $businessAddress"), style = MaterialTheme.typography.bodySmall)
                     if (profilePhone.isNotBlank()) Text(profilePhone, style = MaterialTheme.typography.bodySmall)
-                    if (profileName.isBlank() && profilePhone.isBlank()) Text("নাম, দোকানের ধরন, ঠিকানা ও ফোন যোগ করুন", style = MaterialTheme.typography.bodySmall)
+                    if (profileName.isBlank() && profilePhone.isBlank()) Text(v15Text("নাম, দোকানের ধরন, ঠিকানা ও ফোন যোগ করুন","Add name, business type, address and phone"), style = MaterialTheme.typography.bodySmall)
                 }
                 Text("›", style = MaterialTheme.typography.headlineSmall)
             }
         }
 
-        SettingsActionCard("🌐", "ভাষা পরিবর্তন", "বাংলা / English") { showLanguage = true }
-        SettingsActionCard("★", "প্রিমিয়াম হয়ে যান", "মাসিক • বার্ষিক • Lifetime") { showPlan = true }
-        SettingsActionCard("💬", "তাগাদা মেসেজ", "SMS/WhatsApp-এ প্রস্তুত বার্তা; আলাদা SMS প্যাক এখন লাগবে না") { showSmsInfo = true }
-        SettingsActionCard("🔒", "PIN / পাসওয়ার্ড পরিবর্তন", "অ্যাপ লক সেট, পরিবর্তন বা বন্ধ করুন") { showPin = true }
-        SettingsActionCard("🔔", "বাকি পরিশোধের নোটিফিকেশন", "৩০/১৫/৭/৩ দিন আগে এবং নির্ধারিত দিনে মনে করাবে") { showReminder = true }
-        SettingsActionCard("📦", "পণ্য ও Expiry নোটিফিকেশন", "Low stock, Out of stock এবং Expiry reminder") { showInventoryAlerts = true }
-        SettingsActionCard("💱", "মুদ্রা পরিবর্তন করুন", "প্রদর্শনের মুদ্রা বদলাবে; FX conversion হবে না") { showCurrency = true }
+        SettingsActionCard("🌐", v15Text("ভাষা পরিবর্তন","Change language"), v15Text("বাংলা / English","Bangla / English")) { showLanguage = true }
+        SettingsActionCard("★", v15Text("প্রিমিয়াম হয়ে যান","Go Premium"), v15Text("মাসিক • বার্ষিক • Lifetime","Monthly • Yearly • Lifetime")) { showPlan = true }
+        SettingsActionCard("💬", v15Text("তাগাদা মেসেজ","Reminder message"), v15Text("SMS/WhatsApp-এ প্রস্তুত বার্তা; আলাদা SMS প্যাক এখন লাগবে না","Ready message for SMS/WhatsApp; no separate SMS pack needed")) { showSmsInfo = true }
+        SettingsActionCard("🔒", v15Text("PIN / পাসওয়ার্ড পরিবর্তন","Change PIN / password"), v15Text("অ্যাপ লক সেট, পরিবর্তন বা বন্ধ করুন","Set, change or disable app lock")) { showPin = true }
+        SettingsActionCard("🔔", v15Text("বাকি পরিশোধের নোটিফিকেশন","Due payment notifications"), v15Text("৩০/১৫/৭/৩ দিন আগে এবং নির্ধারিত দিনে মনে করাবে","Remind 30/15/7/3 days before and on the due date")) { showReminder = true }
+        SettingsActionCard("📦", v15Text("পণ্য ও Expiry নোটিফিকেশন","Product & Expiry notifications"), v15Text("Low stock, Out of stock এবং Expiry reminder","Low stock, out-of-stock and expiry reminders")) { showInventoryAlerts = true }
+        SettingsActionCard("💱", v15Text("মুদ্রা পরিবর্তন করুন","Change currency"), v15Text("প্রদর্শনের মুদ্রা বদলাবে; FX conversion হবে না","Changes display currency only; no FX conversion")) { showCurrency = true }
 
         Card(
             modifier = Modifier.fillMaxWidth(),
@@ -168,8 +168,8 @@ internal fun V14SettingsScreen(
             ) {
                 Text("📄", style = MaterialTheme.typography.titleLarge)
                 Column(modifier = Modifier.weight(1f)) {
-                    Text("হোম সারাংশ", fontWeight = FontWeight.Bold)
-                    Text(if (summaryVisible) "টাকার সারাংশ দেখা যাচ্ছে" else "টাকার সারাংশ লুকানো আছে", style = MaterialTheme.typography.bodySmall)
+                    Text(v15Text("হোম সারাংশ","Home summary"), fontWeight = FontWeight.Bold)
+                    Text(if (summaryVisible) v15Text("টাকার সারাংশ দেখা যাচ্ছে","Money summary is visible") else v15Text("টাকার সারাংশ লুকানো আছে","Money summary is hidden"), style = MaterialTheme.typography.bodySmall)
                 }
                 Switch(
                     checked = summaryVisible,
@@ -182,26 +182,26 @@ internal fun V14SettingsScreen(
             }
         }
 
-        SettingsSectionTitle("দ্রুত কাজ")
-        SettingsActionCard("👥", "কাস্টমার / ব্যক্তি খাতা", "নাম বা ফোন দিয়ে খুঁজুন, বাকি ও লেনদেন দেখুন") { onOpenLedger() }
-        SettingsActionCard("📦", "পণ্য / স্টক / Expiry", "ব্যাচ, কেনার তারিখ, মেয়াদ ও low-stock দেখুন") { onOpenProducts() }
-        SettingsActionCard("↥", "ডাটা ব্যাকআপ ও রিপোর্ট", "JSON Backup/Restore এবং CSV রিপোর্ট") { onOpenMore() }
-        SettingsActionCard("▶", "কিভাবে ব্যবহার করব?", "ব্যবহারের নিয়ম ও ভিডিও টিউটোরিয়াল") { openUrlV14(context, TUTORIAL_URL_V14) }
-        SettingsActionCard("☏", "আমাদের সাথে যোগাযোগ করুন", "WhatsApp / SMS / Website") { openSupportChooser(context) }
+        SettingsSectionTitle(v15Text("দ্রুত কাজ","Quick actions"))
+        SettingsActionCard("👥", v15Text("কাস্টমার / ব্যক্তি খাতা","Customer / person ledger"), v15Text("নাম বা ফোন দিয়ে খুঁজুন, বাকি ও লেনদেন দেখুন","Search by name or phone and view dues and transactions")) { onOpenLedger() }
+        SettingsActionCard("📦", v15Text("পণ্য / স্টক / Expiry","Products / Stock / Expiry"), v15Text("ব্যাচ, কেনার তারিখ, মেয়াদ ও low-stock দেখুন","View batch, purchase date, expiry and low stock")) { onOpenProducts() }
+        SettingsActionCard("↥", v15Text("ডাটা ব্যাকআপ ও রিপোর্ট","Data backup & reports"), v15Text("JSON Backup/Restore এবং CSV রিপোর্ট","JSON backup/restore and CSV reports")) { onOpenMore() }
+        SettingsActionCard("▶", v15Text("কিভাবে ব্যবহার করব?","How to use?"), v15Text("ব্যবহারের নিয়ম ও ভিডিও টিউটোরিয়াল","Usage guide and video tutorial")) { openUrlV14(context, TUTORIAL_URL_V14) }
+        SettingsActionCard("☏", v15Text("আমাদের সাথে যোগাযোগ করুন","Contact us"), "WhatsApp / SMS / Website") { openSupportChooser(context) }
 
-        SettingsSectionTitle("শেয়ার ও তথ্য")
-        SettingsActionCard("↗", "অ্যাপ শেয়ার করুন", "পরিবার, বন্ধু বা ব্যবসায়িক পরিচিতদের পাঠান") { shareAppV14(context) }
-        SettingsActionCard("★", "রিভিউ দিন", "Play Store প্রকাশের পর রেটিং দিন") { openPlayStoreV14(context) }
-        SettingsActionCard("▦", "আরও অ্যাপ", "ডেভেলপারের অন্যান্য প্রজেক্ট দেখুন") { openUrlV14(context, MORE_APPS_URL_V14) }
-        SettingsActionCard("🌍", "ওয়েবসাইট", "হিসাবী খাতার অফিসিয়াল ওয়েব পেজ") { openUrlV14(context, WEBSITE_URL_V14) }
-        SettingsActionCard("✦", "ফিচার রিকোয়েস্ট", "যে নতুন সুবিধা চান তা জানান") { openUrlV14(context, FEATURE_URL_V14) }
-        SettingsActionCard("🔐", "এখনই অ্যাপ লক করুন", "PIN চালু থাকলে সঙ্গে সঙ্গে লক হবে") {
+        SettingsSectionTitle(v15Text("শেয়ার ও তথ্য","Share & information"))
+        SettingsActionCard("↗", v15Text(v15Text("অ্যাপ শেয়ার করুন","Share app"),"Share app"), v15Text("পরিবার, বন্ধু বা ব্যবসায়িক পরিচিতদের পাঠান","Share with family, friends or business contacts")) { shareAppV14(context) }
+        SettingsActionCard("★", v15Text("রিভিউ দিন","Write a review"), v15Text("Play Store প্রকাশের পর রেটিং দিন","Rate the app after it is published on Play Store")) { openPlayStoreV14(context) }
+        SettingsActionCard("▦", v15Text("আরও অ্যাপ","More apps"), v15Text("ডেভেলপারের অন্যান্য প্রজেক্ট দেখুন","View other developer projects")) { openUrlV14(context, MORE_APPS_URL_V14) }
+        SettingsActionCard("🌍", v15Text("ওয়েবসাইট","Website"), v15Text("হিসাবী খাতার অফিসিয়াল ওয়েব পেজ","Official Hisabi Khata web page")) { openUrlV14(context, WEBSITE_URL_V14) }
+        SettingsActionCard("✦", v15Text("ফিচার রিকোয়েস্ট","Feature request"), v15Text("যে নতুন সুবিধা চান তা জানান","Tell us which new feature you want")) { openUrlV14(context, FEATURE_URL_V14) }
+        SettingsActionCard("🔐", v15Text("এখনই অ্যাপ লক করুন","Lock app now"), v15Text("PIN চালু থাকলে সঙ্গে সঙ্গে লক হবে","Locks immediately when PIN is enabled")) {
             viewModel.lockApp()
             onClose()
         }
 
         Text(
-            "হিসাবী খাতা v1.5 • Offline-first • লোকাল ডেটা",
+            v15Text("হিসাবী খাতা v1.5 • Offline-first • লোকাল ডেটা","Hisabi Khata v1.5 • Offline-first • Local data"),
             modifier = Modifier.fillMaxWidth().padding(vertical = 10.dp),
             textAlign = TextAlign.Center,
             style = MaterialTheme.typography.bodySmall,
@@ -259,9 +259,9 @@ internal fun V14SettingsScreen(
     if (showSmsInfo) {
         AlertDialog(
             onDismissRequest = { showSmsInfo = false },
-            title = { Text("তাগাদা মেসেজ") },
-            text = { Text("প্রতিটি বাকি এন্ট্রির নিচে SMS, WhatsApp ও Call থাকবে। SMS/WhatsApp আপনার ফোনের অ্যাপ খুলে প্রস্তুত বার্তা দেবে। তাই v1.4-এ আলাদা SMS credit কেনার প্রয়োজন নেই।") },
-            confirmButton = { TextButton(onClick = { showSmsInfo = false }) { Text("ঠিক আছে") } }
+            title = { Text(v15Text("তাগাদা মেসেজ","Reminder message")) },
+            text = { Text(v15Text("প্রতিটি বাকি এন্ট্রির নিচে SMS, WhatsApp ও Call থাকবে। SMS/WhatsApp আপনার ফোনের অ্যাপ খুলে প্রস্তুত বার্তা দেবে। তাই আলাদা SMS credit কেনার প্রয়োজন নেই।","Each due entry includes SMS, WhatsApp and Call options. SMS/WhatsApp opens your phone app with a ready message.")) },
+            confirmButton = { TextButton(onClick = { showSmsInfo = false }) { Text(v15Text("ঠিক আছে","OK")) } }
         )
     }
 }
@@ -314,22 +314,22 @@ private fun ProfileDialog(
     var customType by remember { mutableStateOf("") }
 
     val businessTypes = listOf(
-        "ফার্মেসি / Pharmacy",
-        "মুদি দোকান / Grocery",
-        "ইলেকট্রনিক্স / Electronics",
-        "মোবাইল ও এক্সেসরিজ",
-        "ফ্যাশন / Clothing",
-        "কসমেটিকস / Cosmetics",
-        "রেস্টুরেন্ট / Food",
-        "হার্ডওয়্যার / Hardware",
-        "স্টেশনারি / Stationery",
+        v15Text("ফার্মেসি","Pharmacy"),
+        v15Text("মুদি দোকান","Grocery"),
+        v15Text("ইলেকট্রনিক্স","Electronics"),
+        v15Text("মোবাইল ও এক্সেসরিজ","Mobile & Accessories"),
+        v15Text("ফ্যাশন","Fashion / Clothing"),
+        v15Text("কসমেটিকস","Cosmetics"),
+        v15Text("রেস্টুরেন্ট","Restaurant / Food"),
+        v15Text("হার্ডওয়্যার","Hardware"),
+        v15Text("স্টেশনারি","Stationery"),
         "E-commerce",
         "Wholesale"
     )
 
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text("প্রোফাইল ও ব্যবসার তথ্য") },
+        title = { Text(v15Text("প্রোফাইল ও ব্যবসার তথ্য","Profile & business information")) },
         text = {
             Column(
                 modifier = Modifier
@@ -340,7 +340,7 @@ private fun ProfileDialog(
                 OutlinedTextField(
                     value = name,
                     onValueChange = { name = it },
-                    label = { Text("আপনার নাম") },
+                    label = { Text(v15Text("আপনার নাম","Your name")) },
                     singleLine = true,
                     modifier = Modifier.fillMaxWidth()
                 )
@@ -348,7 +348,7 @@ private fun ProfileDialog(
                 OutlinedTextField(
                     value = business,
                     onValueChange = { business = it },
-                    label = { Text("দোকান / প্রতিষ্ঠানের নাম") },
+                    label = { Text(v15Text("দোকান / প্রতিষ্ঠানের নাম","Business name")) },
                     singleLine = true,
                     modifier = Modifier.fillMaxWidth()
                 )
@@ -359,23 +359,23 @@ private fun ProfileDialog(
                 ) {
                     Text(
                         if (businessType.isBlank())
-                            "দোকানের ধরন নির্বাচন করুন"
+                            v15Text("দোকানের ধরন নির্বাচন করুন","Select business type")
                         else
-                            "দোকানের ধরন: $businessType"
+                            v15Text("দোকানের ধরন: $businessType","Business type: $businessType")
                     )
                 }
 
                 OutlinedTextField(
                     value = address,
                     onValueChange = { address = it },
-                    label = { Text("দোকানের ঠিকানা") },
+                    label = { Text(v15Text("দোকানের ঠিকানা","Business address")) },
                     modifier = Modifier.fillMaxWidth()
                 )
 
                 OutlinedTextField(
                     value = phone,
                     onValueChange = { phone = it },
-                    label = { Text("ফোন") },
+                    label = { Text(v15Text("ফোন","Phone")) },
                     singleLine = true,
                     modifier = Modifier.fillMaxWidth()
                 )
@@ -393,12 +393,12 @@ private fun ProfileDialog(
                     )
                 }
             ) {
-                Text("সেভ")
+                Text(v15Text("সেভ","Save"))
             }
         },
         dismissButton = {
             TextButton(onClick = onDismiss) {
-                Text("বাতিল")
+                Text(v15Text("বাতিল","Cancel"))
             }
         }
     )
@@ -406,7 +406,7 @@ private fun ProfileDialog(
     if (showTypePicker) {
         AlertDialog(
             onDismissRequest = { showTypePicker = false },
-            title = { Text("দোকানের ধরন নির্বাচন করুন") },
+            title = { Text(v15Text("দোকানের ধরন নির্বাচন করুন","Select business type")) },
             text = {
                 Column(
                     modifier = Modifier
@@ -429,7 +429,7 @@ private fun ProfileDialog(
                     OutlinedTextField(
                         value = customType,
                         onValueChange = { customType = it },
-                        label = { Text("অন্যান্য / Custom type") },
+                        label = { Text(v15Text("অন্যান্য / Custom type","Other / Custom type")) },
                         singleLine = true,
                         modifier = Modifier.fillMaxWidth()
                     )
@@ -444,13 +444,13 @@ private fun ProfileDialog(
                         enabled = customType.isNotBlank(),
                         modifier = Modifier.fillMaxWidth()
                     ) {
-                        Text("এই ধরন ব্যবহার করুন")
+                        Text(v15Text("এই ধরন ব্যবহার করুন","Use this type"))
                     }
                 }
             },
             confirmButton = {
                 TextButton(onClick = { showTypePicker = false }) {
-                    Text("বন্ধ")
+                    Text(v15Text("বন্ধ","Close"))
                 }
             }
         )
@@ -485,19 +485,19 @@ private data class CurrencyChoice(val country: String, val code: String, val sym
 private fun CurrencyDialog(currentCode: String, onDismiss: () -> Unit, onSelect: (String, String) -> Unit) {
     val choices = listOf(
         CurrencyChoice("বাংলাদেশ", "BDT", "৳"),
-        CurrencyChoice("ভারত", "INR", "₹"),
-        CurrencyChoice("পাকিস্তান", "PKR", "Rs"),
-        CurrencyChoice("শ্রীলঙ্কা", "LKR", "Rs"),
-        CurrencyChoice("নেপাল", "NPR", "रू"),
-        CurrencyChoice("সংযুক্ত আরব আমিরাত", "AED", "د.إ"),
-        CurrencyChoice("সৌদি আরব", "SAR", "ر.س"),
-        CurrencyChoice("কাতার", "QAR", "ر.ق"),
-        CurrencyChoice("কুয়েত", "KWD", "د.ك"),
-        CurrencyChoice("ইরাক", "IQD", "ع.د")
+        CurrencyChoice(v15Text("ভারত","India"), "INR", "₹"),
+        CurrencyChoice(v15Text("পাকিস্তান","Pakistan"), "PKR", "Rs"),
+        CurrencyChoice(v15Text("শ্রীলঙ্কা","Sri Lanka"), "LKR", "Rs"),
+        CurrencyChoice(v15Text("নেপাল","Nepal"), "NPR", "रू"),
+        CurrencyChoice(v15Text("সংযুক্ত আরব আমিরাত","United Arab Emirates"), "AED", "د.إ"),
+        CurrencyChoice(v15Text("সৌদি আরব","Saudi Arabia"), "SAR", "ر.س"),
+        CurrencyChoice(v15Text("কাতার","Qatar"), "QAR", "ر.ق"),
+        CurrencyChoice(v15Text("কুয়েত","Kuwait"), "KWD", "د.ك"),
+        CurrencyChoice(v15Text("ইরাক","Iraq"), "IQD", "ع.د")
     )
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text("মুদ্রা নির্বাচন করুন") },
+        title = { Text(v15Text("মুদ্রা নির্বাচন করুন","Select currency")) },
         text = {
             Column(modifier = Modifier.heightIn(max = 470.dp).verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(6.dp)) {
                 choices.forEach { item ->
@@ -507,10 +507,10 @@ private fun CurrencyDialog(currentCode: String, onDismiss: () -> Unit, onSelect:
                         OutlinedButton(onClick = { onSelect(item.code, item.symbol) }, modifier = Modifier.fillMaxWidth()) { Text("${item.country} — ${item.code}  ${item.symbol}") }
                     }
                 }
-                Text("এটি শুধু display symbol/unit বদলায়; টাকার মান convert করে না।", style = MaterialTheme.typography.bodySmall)
+                Text(v15Text("এটি শুধু display symbol/unit বদলায়; টাকার মান convert করে না।","This changes only the display currency; values are not converted."), style = MaterialTheme.typography.bodySmall)
             }
         },
-        confirmButton = { TextButton(onClick = onDismiss) { Text("বাতিল") } }
+        confirmButton = { TextButton(onClick = onDismiss) { Text(v15Text("বাতিল","Cancel")) } }
     )
 }
 
@@ -522,7 +522,7 @@ private fun ReminderSettingsDialog(context: Context, prefs: android.content.Shar
     var d3 by remember { mutableStateOf(prefs.getBoolean("reminder_3", true)) }
     var d0 by remember { mutableStateOf(prefs.getBoolean("reminder_0", true)) }
     val permissionLauncher = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
-        Toast.makeText(context, if (granted) "নোটিফিকেশন অনুমতি দেওয়া হয়েছে" else "নোটিফিকেশন অনুমতি দেওয়া হয়নি", Toast.LENGTH_SHORT).show()
+        Toast.makeText(context, if (granted) v15Text("নোটিফিকেশন অনুমতি দেওয়া হয়েছে","Notification permission granted") else v15Text("নোটিফিকেশন অনুমতি দেওয়া হয়নি","Notification permission denied"), Toast.LENGTH_SHORT).show()
     }
 
     fun save() {
@@ -532,22 +532,22 @@ private fun ReminderSettingsDialog(context: Context, prefs: android.content.Shar
 
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text("বাকি পরিশোধের নোটিফিকেশন") },
+        title = { Text(v15Text("বাকি পরিশোধের নোটিফিকেশন","Due payment notifications")) },
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                ReminderSwitch("৩০ দিন আগে", d30) { d30 = it }
-                ReminderSwitch("১৫ দিন আগে", d15) { d15 = it }
-                ReminderSwitch("৭ দিন আগে", d7) { d7 = it }
-                ReminderSwitch("৩ দিন আগে", d3) { d3 = it }
-                ReminderSwitch("নির্ধারিত দিনে", d0) { d0 = it }
+                ReminderSwitch(v15Text("৩০ দিন আগে","30 days before"), d30) { d30 = it }
+                ReminderSwitch(v15Text("১৫ দিন আগে","15 days before"), d15) { d15 = it }
+                ReminderSwitch(v15Text("৭ দিন আগে","7 days before"), d7) { d7 = it }
+                ReminderSwitch(v15Text("৩ দিন আগে","3 days before"), d3) { d3 = it }
+                ReminderSwitch(v15Text("নির্ধারিত দিনে","On due date"), d0) { d0 = it }
                 if (Build.VERSION.SDK_INT >= 33) {
-                    OutlinedButton(onClick = { permissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS) }, modifier = Modifier.fillMaxWidth()) { Text("নোটিফিকেশন অনুমতি দিন") }
+                    OutlinedButton(onClick = { permissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS) }, modifier = Modifier.fillMaxWidth()) { Text(v15Text("নোটিফিকেশন অনুমতি দিন","Allow notifications")) }
                 }
-                Text("রিমাইন্ডার লোকাল ডাটাবেস দেখে কাজ করবে; ইন্টারনেট প্রয়োজন নেই।", style = MaterialTheme.typography.bodySmall)
+                Text(v15Text("রিমাইন্ডার লোকাল ডাটাবেস দেখে কাজ করবে; ইন্টারনেট প্রয়োজন নেই।","Reminders use the local database; internet is not required."), style = MaterialTheme.typography.bodySmall)
             }
         },
-        confirmButton = { TextButton(onClick = { save(); onDismiss() }) { Text("সেভ") } },
-        dismissButton = { TextButton(onClick = onDismiss) { Text("বাতিল") } }
+        confirmButton = { TextButton(onClick = { save(); onDismiss() }) { Text(v15Text("সেভ","Save")) } },
+        dismissButton = { TextButton(onClick = onDismiss) { Text(v15Text("বাতিল","Cancel")) } }
     )
 }
 
@@ -561,17 +561,17 @@ private fun ReminderSwitch(label: String, checked: Boolean, onCheckedChange: (Bo
 
 @Composable
 private fun PlanPurchaseDialog(context: Context, onDismiss: () -> Unit) {
-    var plan by remember { mutableStateOf("মাসিক") }
+    var plan by remember { mutableStateOf(v15Text("মাসিক","Monthly")) }
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text("প্রিমিয়াম প্ল্যান") },
+        title = { Text(v15Text("প্রিমিয়াম প্ল্যান","Premium plan")) },
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                listOf("মাসিক", "বার্ষিক", "Lifetime").forEach { item ->
+                listOf(v15Text("মাসিক","Monthly"), v15Text("বার্ষিক","Yearly"), "Lifetime").forEach { item ->
                     if (plan == item) Button(onClick = { plan = item }, modifier = Modifier.fillMaxWidth()) { Text(item) }
                     else OutlinedButton(onClick = { plan = item }, modifier = Modifier.fillMaxWidth()) { Text(item) }
                 }
-                Text("৩০ দিনের trial শেষে পুরনো ডেটা থাকবে; নতুন Add/Edit সীমিত হবে। $plan প্ল্যানের দাম ও activation পেতে যোগাযোগ করুন।", style = MaterialTheme.typography.bodySmall)
+                Text(v15Text("৩০ দিনের trial শেষে পুরনো ডেটা থাকবে; নতুন Add/Edit সীমিত হবে। $plan প্ল্যানের দাম ও activation পেতে যোগাযোগ করুন।","After the 30-day trial, your existing data remains; new Add/Edit will be limited. Contact us for $plan pricing and activation."), style = MaterialTheme.typography.bodySmall)
                 Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                     OutlinedButton(onClick = { purchaseWhatsAppV14(context, plan) }, modifier = Modifier.weight(1f)) { Text("WhatsApp") }
                     OutlinedButton(onClick = { purchaseSmsV14(context, plan) }, modifier = Modifier.weight(1f)) { Text("SMS") }
@@ -582,7 +582,7 @@ private fun PlanPurchaseDialog(context: Context, onDismiss: () -> Unit) {
                 }
             }
         },
-        confirmButton = { TextButton(onClick = onDismiss) { Text("বন্ধ") } }
+        confirmButton = { TextButton(onClick = onDismiss) { Text(v15Text("বন্ধ","Close")) } }
     )
 }
 
@@ -595,37 +595,37 @@ private fun PinSettingsDialog(viewModel: FamilyKhataViewModel, onDismiss: () -> 
     var error by remember { mutableStateOf<String?>(null) }
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text(if (configured) "PIN পরিবর্তন" else "PIN সেট করুন") },
+        title = { Text(if (configured) v15Text("PIN পরিবর্তন","Change PIN") else v15Text("PIN সেট করুন","Set PIN")) },
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                if (configured) OutlinedTextField(current, { current = it.filter(Char::isDigit).take(6) }, label = { Text("বর্তমান PIN") }, visualTransformation = PasswordVisualTransformation())
-                OutlinedTextField(pin, { pin = it.filter(Char::isDigit).take(6) }, label = { Text("নতুন PIN") }, visualTransformation = PasswordVisualTransformation())
-                OutlinedTextField(confirm, { confirm = it.filter(Char::isDigit).take(6) }, label = { Text("নতুন PIN আবার") }, visualTransformation = PasswordVisualTransformation())
+                if (configured) OutlinedTextField(current, { current = it.filter(Char::isDigit).take(6) }, label = { Text(v15Text("বর্তমান PIN","Current PIN")) }, visualTransformation = PasswordVisualTransformation())
+                OutlinedTextField(pin, { pin = it.filter(Char::isDigit).take(6) }, label = { Text(v15Text("নতুন PIN","New PIN")) }, visualTransformation = PasswordVisualTransformation())
+                OutlinedTextField(confirm, { confirm = it.filter(Char::isDigit).take(6) }, label = { Text(v15Text("নতুন PIN আবার","Confirm new PIN")) }, visualTransformation = PasswordVisualTransformation())
                 error?.let { Text(it, color = MaterialTheme.colorScheme.error) }
                 if (configured) {
                     OutlinedButton(
-                        onClick = { if (viewModel.disablePin(current)) onDismiss() else error = "বর্তমান PIN সঠিক নয়" },
+                        onClick = { if (viewModel.disablePin(current)) onDismiss() else error = v15Text("বর্তমান PIN সঠিক নয়","Current PIN is incorrect") },
                         modifier = Modifier.fillMaxWidth()
-                    ) { Text("PIN বন্ধ করুন") }
+                    ) { Text(v15Text("PIN বন্ধ করুন","Disable PIN")) }
                 }
             }
         },
         confirmButton = {
             TextButton(onClick = {
                 error = when {
-                    pin.length !in 4..6 -> "PIN ৪–৬ সংখ্যার হতে হবে"
-                    pin != confirm -> "দুইটি PIN মিলছে না"
-                    configured && !viewModel.changePin(current, pin) -> "বর্তমান PIN সঠিক নয়"
-                    !configured && !viewModel.setPin(pin) -> "PIN সেট করা যায়নি"
+                    pin.length !in 4..6 -> v15Text("PIN ৪–৬ সংখ্যার হতে হবে","PIN must be 4–6 digits")
+                    pin != confirm -> v15Text("দুইটি PIN মিলছে না","PINs do not match")
+                    configured && !viewModel.changePin(current, pin) -> v15Text("বর্তমান PIN সঠিক নয়","Current PIN is incorrect")
+                    !configured && !viewModel.setPin(pin) -> v15Text("PIN সেট করা যায়নি","Unable to set PIN")
                     else -> { onDismiss(); null }
                 }
-            }) { Text("সেভ") }
+            }) { Text(v15Text("সেভ","Save")) }
         },
-        dismissButton = { TextButton(onClick = onDismiss) { Text("বাতিল") } }
+        dismissButton = { TextButton(onClick = onDismiss) { Text(v15Text("বাতিল","Cancel")) } }
     )
 }
 
-private fun purchaseMessageV14(plan: String) = "আমি হিসাবী খাতা অ্যাপের $plan প্ল্যান নিতে চাই। পেমেন্ট ও activation নির্দেশনা দিন।"
+private fun purchaseMessageV14(plan: String) = v15Text("আমি হিসাবী খাতা অ্যাপের $plan প্ল্যান নিতে চাই। পেমেন্ট ও activation নির্দেশনা দিন।","I want the $plan plan for Hisabi Khata. Please send payment and activation instructions.")
 
 private fun purchaseWhatsAppV14(context: Context, plan: String) {
     openUrlV14(context, "https://wa.me/$SUPPORT_PHONE?text=${Uri.encode(purchaseMessageV14(plan))}")
@@ -652,7 +652,7 @@ private fun purchaseMessengerV14(context: Context, plan: String) {
         context.startActivity(Intent.createChooser(Intent(Intent.ACTION_SEND).apply {
             type = "text/plain"
             putExtra(Intent.EXTRA_TEXT, message)
-        }, "যোগাযোগ করুন"))
+        }, v15Text("যোগাযোগ করুন","Contact")))
     }
 }
 
@@ -660,8 +660,8 @@ private fun openSupportChooser(context: Context) {
     runCatching {
         context.startActivity(Intent.createChooser(Intent(Intent.ACTION_SEND).apply {
             type = "text/plain"
-            putExtra(Intent.EXTRA_TEXT, "হিসাবী খাতা সাপোর্ট প্রয়োজন।")
-        }, "যোগাযোগের মাধ্যম বেছে নিন"))
+            putExtra(Intent.EXTRA_TEXT, v15Text("হিসাবী খাতা সাপোর্ট প্রয়োজন।","I need Hisabi Khata support."))
+        }, v15Text("যোগাযোগের মাধ্যম বেছে নিন","Choose contact method")))
     }
 }
 
@@ -669,8 +669,8 @@ private fun shareAppV14(context: Context) {
     runCatching {
         context.startActivity(Intent.createChooser(Intent(Intent.ACTION_SEND).apply {
             type = "text/plain"
-            putExtra(Intent.EXTRA_TEXT, "হিসাবী খাতা – আয়, খরচ ও বাকি হিসাব\n$WEBSITE_URL_V14")
-        }, "অ্যাপ শেয়ার করুন"))
+            putExtra(Intent.EXTRA_TEXT, v15Text("হিসাবী খাতা – আয়, খরচ ও বাকি হিসাব\n$WEBSITE_URL_V14","Hisabi Khata – income, expenses and dues\n$WEBSITE_URL_V14"))
+        }, v15Text("অ্যাপ শেয়ার করুন","Share app")))
     }
 }
 
@@ -682,5 +682,5 @@ private fun openPlayStoreV14(context: Context) {
 
 private fun openUrlV14(context: Context, url: String) {
     runCatching { context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(url))) }
-        .onFailure { Toast.makeText(context, "লিংক খোলা যায়নি", Toast.LENGTH_SHORT).show() }
+        .onFailure { Toast.makeText(context, v15Text("লিংক খোলা যায়নি","Unable to open link"), Toast.LENGTH_SHORT).show() }
 }

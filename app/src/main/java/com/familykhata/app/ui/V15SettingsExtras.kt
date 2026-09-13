@@ -155,7 +155,7 @@ internal fun V15BusinessProfileDialog(
                     Toast.makeText(
                         context,
                         v15Text(
-                            "লোগো সংরক্ষণ করা যায়নি",
+                            v15Text("লোগো সংরক্ষণ করা যায়নি","Unable to save logo"),
                             "Could not save logo"
                         ),
                         Toast.LENGTH_SHORT
@@ -169,7 +169,7 @@ internal fun V15BusinessProfileDialog(
         title = {
             Text(
                 v15Text(
-                    "প্রোফাইল ও ব্যবসার তথ্য",
+                    v15Text("প্রোফাইল ও ব্যবসার তথ্য","Profile & business information"),
                     "Profile & business"
                 )
             )
@@ -193,12 +193,12 @@ internal fun V15BusinessProfileDialog(
                     Text(
                         if (logoPath.isBlank()) {
                             v15Text(
-                                "＋ দোকানের লোগো যোগ করুন",
+                                v15Text("＋ দোকানের লোগো যোগ করুন","＋ Add business logo"),
                                 "＋ Add shop logo"
                             )
                         } else {
                             v15Text(
-                                "দোকানের লোগো পরিবর্তন করুন",
+                                v15Text("দোকানের লোগো পরিবর্তন করুন","Change business logo"),
                                 "Change shop logo"
                             )
                         }
@@ -216,7 +216,7 @@ internal fun V15BusinessProfileDialog(
                     ) {
                         Text(
                             v15Text(
-                                "লোগো সরান",
+                                v15Text("লোগো সরান","Remove logo"),
                                 "Remove logo"
                             )
                         )
@@ -239,7 +239,7 @@ internal fun V15BusinessProfileDialog(
                     label = {
                         Text(
                             v15Text(
-                                "দোকান / প্রতিষ্ঠানের নাম",
+                                v15Text("দোকান / প্রতিষ্ঠানের নাম","Business name"),
                                 "Shop / business name"
                             )
                         )
@@ -255,7 +255,7 @@ internal fun V15BusinessProfileDialog(
                     Text(
                         if (businessType.isBlank()) {
                             v15Text(
-                                "দোকানের ধরন নির্বাচন করুন",
+                                v15Text("দোকানের ধরন নির্বাচন করুন","Select business type"),
                                 "Select business type"
                             )
                         } else {
@@ -270,7 +270,7 @@ internal fun V15BusinessProfileDialog(
                     label = {
                         Text(
                             v15Text(
-                                "দোকানের ঠিকানা",
+                                v15Text("দোকানের ঠিকানা","Business address"),
                                 "Shop address"
                             )
                         )
@@ -367,7 +367,7 @@ private fun V15ShopTypePicker(
         title = {
             Text(
                 v15Text(
-                    "দোকানের ধরন নির্বাচন করুন",
+                    v15Text("দোকানের ধরন নির্বাচন করুন","Select business type"),
                     "Select business type"
                 )
             )
@@ -385,7 +385,7 @@ private fun V15ShopTypePicker(
                     label = {
                         Text(
                             v15Text(
-                                "দোকানের ধরন খুঁজুন",
+                                v15Text("দোকানের ধরন খুঁজুন","Search business type"),
                                 "Search business type"
                             )
                         )
@@ -420,7 +420,7 @@ private fun V15ShopTypePicker(
                     label = {
                         Text(
                             v15Text(
-                                "নিজের দোকানের ধরন লিখুন",
+                                v15Text("নিজের দোকানের ধরন লিখুন","Enter custom business type"),
                                 "Custom business type"
                             )
                         )
@@ -440,7 +440,7 @@ private fun V15ShopTypePicker(
                 ) {
                     Text(
                         v15Text(
-                            "এই ধরন ব্যবহার করুন",
+                            v15Text("এই ধরন ব্যবহার করুন","Use this type"),
                             "Use this type"
                         )
                     )
@@ -502,12 +502,12 @@ internal fun V15InventoryNotificationSettingsDialog(
                 context,
                 if (granted) {
                     v15Text(
-                        "নোটিফিকেশন অনুমতি দেওয়া হয়েছে",
+                        v15Text("নোটিফিকেশন অনুমতি দেওয়া হয়েছে","Notification permission granted"),
                         "Notification permission granted"
                     )
                 } else {
                     v15Text(
-                        "নোটিফিকেশন অনুমতি দেওয়া হয়নি",
+                        v15Text("নোটিফিকেশন অনুমতি দেওয়া হয়নি","Notification permission denied"),
                         "Notification permission denied"
                     )
                 },
@@ -520,7 +520,7 @@ internal fun V15InventoryNotificationSettingsDialog(
         title = {
             Text(
                 v15Text(
-                    "পণ্য ও Expiry নোটিফিকেশন",
+                    v15Text("পণ্য ও Expiry নোটিফিকেশন","Product & Expiry notifications"),
                     "Product & expiry alerts"
                 )
             )
@@ -583,7 +583,7 @@ internal fun V15InventoryNotificationSettingsDialog(
                     ) {
                         Text(
                             v15Text(
-                                "নোটিফিকেশন অনুমতি দিন",
+                                v15Text("নোটিফিকেশন অনুমতি দিন","Allow notifications"),
                                 "Allow notifications"
                             )
                         )
@@ -658,7 +658,7 @@ internal fun V15PremiumDialog(
         title = {
             Text(
                 v15Text(
-                    "হিসাবী খাতা Premium",
+                    v15Text("হিসাবী খাতা Premium","Hisabi Khata Premium"),
                     "Hisabi Khata Premium"
                 )
             )
@@ -680,7 +680,7 @@ internal fun V15PremiumDialog(
                     ) {
                         Text(
                             v15Text(
-                                "৩০ দিন Full Premium Trial",
+                                v15Text("৩০ দিন Full Premium Trial","30-day Full Premium Trial"),
                                 "30-day Full Premium Trial"
                             ),
                             fontWeight = FontWeight.ExtraBold
@@ -688,7 +688,7 @@ internal fun V15PremiumDialog(
 
                         Text(
                             v15Text(
-                                "Trial শেষে আপনার ডেটা থাকবে।",
+                                v15Text("Trial শেষে আপনার ডেটা থাকবে।","Your data remains after the trial."),
                                 "Your data remains after the trial."
                             ),
                             style = MaterialTheme.typography.bodySmall
@@ -701,7 +701,7 @@ internal fun V15PremiumDialog(
                     title = v15Text("মাসিক", "Monthly"),
                     price = "৳99",
                     subtitle = v15Text(
-                        "১ মাস Premium",
+                        v15Text("১ মাস Premium","1 month Premium"),
                         "1 month Premium"
                     )
                 ) {
@@ -711,12 +711,12 @@ internal fun V15PremiumDialog(
                 V15PlanCard(
                     selected = selectedPlan == "YEARLY",
                     title = v15Text(
-                        "বার্ষিক • Best Value",
+                        v15Text("বার্ষিক • Best Value","Yearly • Best Value"),
                         "Yearly • Best Value"
                     ),
                     price = "৳699",
                     subtitle = v15Text(
-                        "প্রায় ৪১% সাশ্রয়",
+                        v15Text("প্রায় ৪১% সাশ্রয়","Save about 41%"),
                         "Save about 41%"
                     )
                 ) {
@@ -740,7 +740,7 @@ internal fun V15PremiumDialog(
 
                 Text(
                     v15Text(
-                        "Premium সুবিধা",
+                        v15Text("Premium সুবিধা","Premium features"),
                         "Premium features"
                     ),
                     fontWeight = FontWeight.Bold
@@ -748,15 +748,15 @@ internal fun V15PremiumDialog(
 
                 listOf(
                     v15Text(
-                        "✓ Unlimited খাতা ও লেনদেন",
+                        v15Text("✓ Unlimited খাতা ও লেনদেন","✓ Unlimited ledgers & transactions"),
                         "✓ Unlimited ledgers & entries"
                     ),
                     v15Text(
-                        "✓ Product, stock ও expiry",
+                        v15Text("✓ Product, stock ও expiry","✓ Products, stock & expiry"),
                         "✓ Product, stock & expiry"
                     ),
                     v15Text(
-                        "✓ Low-stock ও expiry alerts",
+                        v15Text("✓ Low-stock ও expiry alerts","✓ Low-stock & expiry alerts"),
                         "✓ Low-stock & expiry alerts"
                     ),
                     v15Text(
@@ -768,7 +768,7 @@ internal fun V15PremiumDialog(
                         "✓ PIN lock"
                     ),
                     v15Text(
-                        "✓ বাংলা + English",
+                        v15Text("✓ বাংলা + English","✓ Bangla + English"),
                         "✓ Bangla + English"
                     )
                 ).forEach {
@@ -780,7 +780,7 @@ internal fun V15PremiumDialog(
 
                 Text(
                     v15Text(
-                        "কোনো auto-renewal নয়। Activation-এর জন্য যোগাযোগ করুন।",
+                        v15Text("কোনো auto-renewal নয়। Activation-এর জন্য যোগাযোগ করুন।","No auto-renewal. Contact us for activation."),
                         "No auto-renewal. Contact us for activation."
                     ),
                     style = MaterialTheme.typography.bodySmall,
@@ -903,7 +903,7 @@ private object V15PremiumContact {
         }.onFailure {
             Toast.makeText(
                 context,
-                "WhatsApp খোলা যায়নি",
+                v15Text("WhatsApp খোলা যায়নি","Unable to open WhatsApp"),
                 Toast.LENGTH_SHORT
             ).show()
         }
@@ -931,7 +931,7 @@ private object V15PremiumContact {
         }.onFailure {
             Toast.makeText(
                 context,
-                "SMS app খোলা যায়নি",
+                v15Text("SMS app খোলা যায়নি","Unable to open SMS app"),
                 Toast.LENGTH_SHORT
             ).show()
         }

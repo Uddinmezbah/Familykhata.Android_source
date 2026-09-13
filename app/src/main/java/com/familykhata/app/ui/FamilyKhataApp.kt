@@ -239,13 +239,13 @@ private fun BrandHeader(workspace: String) {
             ) {
                 Column(modifier = Modifier.weight(1f).padding(end = 8.dp)) {
                     Text(
-                        "হিসাবী খাতা",
+                        v15Text("হিসাবী খাতা", "Hisabi Khata"),
                         style = MaterialTheme.typography.headlineSmall,
                         fontWeight = FontWeight.ExtraBold,
                         color = MaterialTheme.colorScheme.onSurface
                     )
                     Text(
-                        "নিজের, পরিবারের ও দোকান/প্রতিষ্ঠানের হিসাব এক জায়গায়",
+                        v15Text("নিজের, পরিবারের ও দোকান/প্রতিষ্ঠানের হিসাব এক জায়গায়", "Personal, family and business accounts in one place"),
                         style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
@@ -289,7 +289,7 @@ private fun WorkspaceSwitcher(
             verticalArrangement = Arrangement.spacedBy(10.dp)
         ) {
             Text(
-                "কোন হিসাব দেখবেন?",
+                v15Text("কোন হিসাব দেখবেন?", "Which account do you want to view?"),
                 style = MaterialTheme.typography.titleSmall,
                 fontWeight = FontWeight.Bold,
                 color = MaterialTheme.colorScheme.onSurface
@@ -300,7 +300,7 @@ private fun WorkspaceSwitcher(
             ) {
                 WorkspaceCard(
                     symbol = "●",
-                    label = "নিজের",
+                    label = v15Text("নিজের", "Personal"),
                     value = "PERSONAL",
                     selected = selected,
                     modifier = Modifier.weight(1f),
@@ -308,7 +308,7 @@ private fun WorkspaceSwitcher(
                 )
                 WorkspaceCard(
                     symbol = "⌂",
-                    label = "পরিবার",
+                    label = v15Text("পরিবার", "Family"),
                     value = "FAMILY",
                     selected = selected,
                     modifier = Modifier.weight(1f),
@@ -316,7 +316,7 @@ private fun WorkspaceSwitcher(
                 )
                 WorkspaceCard(
                     symbol = "▦",
-                    label = "দোকান/\nপ্রতিষ্ঠান",
+                    label = v15Text("দোকান/\nপ্রতিষ্ঠান","Business"),
                     value = "SHOP",
                     selected = selected,
                     modifier = Modifier.weight(1f),
@@ -425,7 +425,7 @@ private fun DashboardScreen(
                 verticalArrangement = Arrangement.spacedBy(4.dp)
             ) {
                 Text(
-                    "বর্তমান ব্যালেন্স",
+                    v15Text("বর্তমান ব্যালেন্স", "Current balance"),
                     style = MaterialTheme.typography.labelLarge,
                     color = Color.White
                 )
@@ -448,13 +448,13 @@ private fun DashboardScreen(
             horizontalArrangement = Arrangement.spacedBy(10.dp)
         ) {
             MetricCard(
-                title = "মোট আয়",
+                title = v15Text("মোট আয়", "Total income"),
                 amount = totals.income,
                 modifier = Modifier.weight(1f),
                 accentColor = IncomeAccent
             )
             MetricCard(
-                title = "মোট খরচ",
+                title = v15Text("মোট খরচ", "Total expense"),
                 amount = totals.expense,
                 modifier = Modifier.weight(1f),
                 accentColor = ExpenseAccent
@@ -466,13 +466,13 @@ private fun DashboardScreen(
             horizontalArrangement = Arrangement.spacedBy(10.dp)
         ) {
             MetricCard(
-                title = "পাবো",
+                title = v15Text("পাবো", "Receivable"),
                 amount = receivable,
                 modifier = Modifier.weight(1f),
                 accentColor = ReceivableAccent
             )
             MetricCard(
-                title = "দেবো",
+                title = v15Text("দেবো", "Payable"),
                 amount = payable,
                 modifier = Modifier.weight(1f),
                 accentColor = PayableAccent
@@ -493,9 +493,9 @@ private fun DashboardScreen(
                 modifier = Modifier.padding(16.dp),
                 verticalArrangement = Arrangement.spacedBy(3.dp)
             ) {
-                Text("হিসাব গুছিয়ে রাখুন", fontWeight = FontWeight.Bold)
+                Text(v15Text("হিসাব গুছিয়ে রাখুন", "Keep your accounts organized"), fontWeight = FontWeight.Bold)
                 Text(
-                    "নিচের “নতুন” থেকে আয়-খরচ এবং “বাকি” থেকে দেনা-পাওনা যোগ করুন।",
+                    v15Text("নিচের “নতুন” থেকে আয়-খরচ এবং “বাকি” থেকে দেনা-পাওনা যোগ করুন।", "Use Add for income/expense and Due for receivables/payables."),
                     style = MaterialTheme.typography.bodySmall
                 )
             }
@@ -534,7 +534,7 @@ private fun BusinessDashboard(
                 verticalArrangement = Arrangement.spacedBy(5.dp)
             ) {
                 Text(
-                    "ব্যবসার ক্যাশ ব্যালেন্স",
+                    v15Text("ব্যবসার ক্যাশ ব্যালেন্স", "Business cash balance"),
                     style = MaterialTheme.typography.labelLarge,
                     color = Color.White
                 )
@@ -545,7 +545,7 @@ private fun BusinessDashboard(
                     color = Color.White
                 )
                 Text(
-                    "দোকান/প্রতিষ্ঠানের আয়-খরচের বর্তমান হিসাব",
+                    v15Text("দোকান/প্রতিষ্ঠানের আয়-খরচের বর্তমান হিসাব", "Current business cash-flow summary"),
                     style = MaterialTheme.typography.bodySmall,
                     color = Color.White
                 )
@@ -557,13 +557,13 @@ private fun BusinessDashboard(
             horizontalArrangement = Arrangement.spacedBy(10.dp)
         ) {
             MetricCard(
-                title = "মোট ক্যাশ ইন",
+                title = v15Text("মোট ক্যাশ ইন", "Total cash in"),
                 amount = income,
                 modifier = Modifier.weight(1f),
                 accentColor = IncomeAccent
             )
             MetricCard(
-                title = "মোট ক্যাশ আউট",
+                title = v15Text("মোট ক্যাশ আউট", "Total cash out"),
                 amount = expense,
                 modifier = Modifier.weight(1f),
                 accentColor = ExpenseAccent
@@ -575,13 +575,13 @@ private fun BusinessDashboard(
             horizontalArrangement = Arrangement.spacedBy(10.dp)
         ) {
             MetricCard(
-                title = "পাবো",
+                title = v15Text("পাবো", "Receivable"),
                 amount = receivable,
                 modifier = Modifier.weight(1f),
                 accentColor = ReceivableAccent
             )
             MetricCard(
-                title = "দেবো",
+                title = v15Text("দেবো", "Payable"),
                 amount = payable,
                 modifier = Modifier.weight(1f),
                 accentColor = PayableAccent
@@ -594,7 +594,7 @@ private fun BusinessDashboard(
         )
 
         Text(
-            "দ্রুত কাজ",
+            v15Text("দ্রুত কাজ", "Quick actions"),
             style = MaterialTheme.typography.titleMedium,
             fontWeight = FontWeight.Bold
         )
@@ -605,16 +605,16 @@ private fun BusinessDashboard(
         ) {
             BusinessActionCard(
                 symbol = "＋",
-                title = "ক্যাশ ইন",
-                subtitle = "আয় বা টাকা জমা",
+                title = v15Text("ক্যাশ ইন", "Cash in"),
+                subtitle = v15Text("আয় বা টাকা জমা", "Income or money received"),
                 accentColor = IncomeAccent,
                 modifier = Modifier.weight(1f),
                 onClick = onCashIn
             )
             BusinessActionCard(
                 symbol = "−",
-                title = "ক্যাশ আউট",
-                subtitle = "খরচ বা টাকা বের",
+                title = v15Text("ক্যাশ আউট", "Cash out"),
+                subtitle = v15Text("খরচ বা টাকা বের", "Expense or money paid"),
                 accentColor = ExpenseAccent,
                 modifier = Modifier.weight(1f),
                 onClick = onCashOut
@@ -627,16 +627,16 @@ private fun BusinessDashboard(
         ) {
             BusinessActionCard(
                 symbol = "৳",
-                title = "খাতা",
-                subtitle = "কাস্টমার/সাপ্লায়ার",
+                title = v15Text("খাতা", "Ledger"),
+                subtitle = v15Text("কাস্টমার/সাপ্লায়ার", "Customer/Supplier"),
                 accentColor = ReceivableAccent,
                 modifier = Modifier.weight(1f),
                 onClick = onLedger
             )
             BusinessActionCard(
                 symbol = "≡",
-                title = "লেনদেন",
-                subtitle = "সব ক্যাশ ইতিহাস",
+                title = v15Text("লেনদেন", "Transactions"),
+                subtitle = v15Text("সব ক্যাশ ইতিহাস", "All cash history"),
                 accentColor = ShopAccent,
                 modifier = Modifier.weight(1f),
                 onClick = onHistory
@@ -652,13 +652,13 @@ private fun BusinessDashboard(
                 modifier = Modifier.padding(16.dp),
                 verticalArrangement = Arrangement.spacedBy(4.dp)
             ) {
-                Text("ব্যবসার খাতা", fontWeight = FontWeight.Bold)
+                Text(v15Text("ব্যবসার খাতা", "Business ledger"), fontWeight = FontWeight.Bold)
                 Text(
-                    "কাস্টমার/সাপ্লায়ার: $ledgerCount জন • পাবো ${V14DisplayState.currencySymbol} ${money(receivable)} • দেবো ${V14DisplayState.currencySymbol} ${money(payable)}",
+                    v15Text("কাস্টমার/সাপ্লায়ার: $ledgerCount জন • পাবো ${V14DisplayState.currencySymbol} ${money(receivable)} • দেবো ${V14DisplayState.currencySymbol} ${money(payable)}", "Customers/Suppliers: $ledgerCount • Receivable ${V14DisplayState.currencySymbol} ${money(receivable)} • Payable ${V14DisplayState.currencySymbol} ${money(payable)}"),
                     style = MaterialTheme.typography.bodySmall
                 )
                 Text(
-                    "পরবর্তী ধাপে পণ্য-স্টক, ক্রয়-বিক্রি, ইনভয়েস/চালান ও রিপোর্ট যোগ হবে।",
+                    v15Text("পরবর্তী ধাপে পণ্য-স্টক, ক্রয়-বিক্রি, ইনভয়েস/চালান ও রিপোর্ট যোগ হবে।", "Manage products, stock, purchases, sales and reports from the business tools."),
                     style = MaterialTheme.typography.bodySmall
                 )
             }
@@ -784,13 +784,13 @@ private fun AddTransactionScreen(
         verticalArrangement = Arrangement.spacedBy(10.dp)
     ) {
         Text(
-            if (isBusiness) "ক্যাশ লেনদেন" else "নতুন আয়/খরচ",
+            if (isBusiness) v15Text("ক্যাশ লেনদেন", "Cash transaction") else v15Text("নতুন আয়/খরচ", "New income/expense"),
             style = MaterialTheme.typography.titleMedium,
             fontWeight = FontWeight.Bold
         )
         if (isBusiness) {
             Text(
-                "দোকান/প্রতিষ্ঠানের টাকা আসা বা বের হওয়ার হিসাব যোগ করুন।",
+                v15Text("দোকান/প্রতিষ্ঠানের টাকা আসা বা বের হওয়ার হিসাব যোগ করুন।", "Record money received or paid by the business."),
                 style = MaterialTheme.typography.bodySmall
             )
         }
@@ -802,8 +802,8 @@ private fun AddTransactionScreen(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.spacedBy(8.dp)
         ) {
-            val expenseLabel = if (isBusiness) "ক্যাশ আউট" else "খরচ"
-            val incomeLabel = if (isBusiness) "ক্যাশ ইন" else "আয়"
+            val expenseLabel = if (isBusiness) v15Text("ক্যাশ আউট", "Cash out") else v15Text("খরচ", "Expense")
+            val incomeLabel = if (isBusiness) v15Text("ক্যাশ ইন", "Cash in") else v15Text("আয়", "Income")
             TransactionTypeCard(
                 label = expenseLabel,
                 selected = type == "EXPENSE",
@@ -823,26 +823,26 @@ private fun AddTransactionScreen(
         OutlinedTextField(
             amount,
             { amount = it },
-            label = { Text("টাকার পরিমাণ") },
+            label = { Text(v15Text("টাকার পরিমাণ", "Amount")) },
             modifier = Modifier.fillMaxWidth()
         )
         OutlinedTextField(
             category,
             { category = it },
-            label = { Text(if (isBusiness) "ক্যাটাগরি / খাত" else "ক্যাটাগরি") },
+            label = { Text(if (isBusiness) v15Text("ক্যাটাগরি / খাত", "Category / Account") else v15Text("ক্যাটাগরি", "Category")) },
             modifier = Modifier.fillMaxWidth()
         )
         OutlinedTextField(
             note,
             { note = it },
-            label = { Text("নোট") },
+            label = { Text(v15Text("নোট", "Note")) },
             modifier = Modifier.fillMaxWidth()
         )
         Button(
             onClick = {
                 val value = parseAmount(amount)
                 if (value == null) {
-                    error = "সঠিক টাকার পরিমাণ লিখুন"
+                    error = v15Text("সঠিক টাকার পরিমাণ লিখুন", "Enter a valid amount")
                 } else {
                     viewModel.addTransaction(type, value, category, note)
                     amount = ""
@@ -853,7 +853,7 @@ private fun AddTransactionScreen(
             },
             modifier = Modifier.fillMaxWidth(),
             enabled = canWrite
-        ) { Text(if (isBusiness) "ক্যাশ লেনদেন সেভ করুন" else "সেভ করুন") }
+        ) { Text(if (isBusiness) v15Text("ক্যাশ লেনদেন সেভ করুন", "Save cash transaction") else v15Text("সেভ করুন", "Save")) }
         error?.let { Text(it, color = MaterialTheme.colorScheme.error) }
     }
 }
@@ -899,11 +899,11 @@ private fun HistoryScreen(viewModel: FamilyKhataViewModel, workspace: String) {
     if (transactions.isEmpty()) {
         Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
             Text(
-                if (isBusiness) "ব্যবসার লেনদেন" else "আয়-খরচের ইতিহাস",
+                if (isBusiness) v15Text("ব্যবসার লেনদেন", "Business transactions") else v15Text("আয়-খরচের ইতিহাস", "Income & expense history"),
                 style = MaterialTheme.typography.titleMedium,
                 fontWeight = FontWeight.Bold
             )
-            Text(if (isBusiness) "এখনও কোনো ক্যাশ লেনদেন যোগ করা হয়নি।" else "এখনও কোনো আয়/খরচ যোগ করা হয়নি।")
+            Text(if (isBusiness) v15Text("এখনও কোনো ক্যাশ লেনদেন যোগ করা হয়নি।", "No cash transaction has been added yet.") else v15Text("এখনও কোনো আয়/খরচ যোগ করা হয়নি।", "No income or expense has been added yet."))
         }
         return
     }
@@ -911,7 +911,7 @@ private fun HistoryScreen(viewModel: FamilyKhataViewModel, workspace: String) {
     LazyColumn(verticalArrangement = Arrangement.spacedBy(8.dp)) {
         item {
             Text(
-                if (isBusiness) "ব্যবসার লেনদেন" else "আয়-খরচের ইতিহাস",
+                if (isBusiness) v15Text("ব্যবসার লেনদেন", "Business transactions") else v15Text("আয়-খরচের ইতিহাস", "Income & expense history"),
                 style = MaterialTheme.typography.titleMedium,
                 fontWeight = FontWeight.Bold
             )
@@ -947,9 +947,9 @@ private fun TransactionRow(
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
                 Text(
                     if (isBusiness) {
-                        if (item.type == "INCOME") "ক্যাশ ইন" else "ক্যাশ আউট"
+                        if (item.type == "INCOME") v15Text("ক্যাশ ইন", "Cash in") else v15Text("ক্যাশ আউট", "Cash out")
                     } else {
-                        if (item.type == "INCOME") "আয়" else "খরচ"
+                        if (item.type == "INCOME") v15Text("আয়", "Income") else v15Text("খরচ", "Expense")
                     },
                     fontWeight = FontWeight.Bold,
                     color = accent
@@ -973,7 +973,7 @@ private fun TransactionRow(
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
-            TextButton(onClick = onDelete) { Text("মুছুন") }
+            TextButton(onClick = onDelete) { Text(v15Text("মুছুন", "Delete")) }
         }
     }
 }
@@ -1164,9 +1164,9 @@ private fun BakiEntryScreen(
         ) {
             Text(
                 when {
-                    person.balance > 0 -> "বর্তমানে পাবো: ${V14DisplayState.currencySymbol} ${money(person.balance)}"
-                    person.balance < 0 -> "বর্তমানে দেবো: ${V14DisplayState.currencySymbol} ${money(-person.balance)}"
-                    else -> "বর্তমান হিসাব সমান"
+                    person.balance > 0 -> v15Text("বর্তমানে পাবো: ${V14DisplayState.currencySymbol} ${money(person.balance)}", "Receivable now: ${V14DisplayState.currencySymbol} ${money(person.balance)}")
+                    person.balance < 0 -> v15Text("বর্তমানে দেবো: ${V14DisplayState.currencySymbol} ${money(-person.balance)}", "Payable now: ${V14DisplayState.currencySymbol} ${money(-person.balance)}")
+                    else -> v15Text("বর্তমান হিসাব সমান", "Account is settled")
                 },
                 modifier = Modifier.padding(horizontal = 14.dp, vertical = 12.dp),
                 style = MaterialTheme.typography.titleMedium,
@@ -1177,7 +1177,7 @@ private fun BakiEntryScreen(
 
         PersonManagementActions(
             person = person,
-            personLabel = if (workspace == "SHOP") "কাস্টমার/সাপ্লায়ার" else "ব্যক্তি",
+            personLabel = if (workspace == "SHOP") v15Text("কাস্টমার/সাপ্লায়ার", "Customer/Supplier") else v15Text("ব্যক্তি", "Person"),
             canWrite = canWrite,
             viewModel = viewModel,
             onDeleted = onBack
@@ -1188,33 +1188,33 @@ private fun BakiEntryScreen(
                 onClick = { sendLedgerSms(context, person) },
                 modifier = Modifier.fillMaxWidth()
             ) {
-                Text("SMS-এ হিসাব পাঠান")
+                Text(v15Text("SMS-এ হিসাব পাঠান", "Send account by SMS"))
             }
         }
 
         if (!canWrite) {
             TrialLockedMessage()
         }
-        Text("নতুন এন্ট্রি", fontWeight = FontWeight.Bold)
+        Text(v15Text("নতুন এন্ট্রি", "New entry"), fontWeight = FontWeight.Bold)
         Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-            ActionButton("দিলাম", "GAVE", action) { action = "GAVE" }
-            ActionButton("ফেরত পেলাম", "RECEIVED_BACK", action) { action = "RECEIVED_BACK" }
+            ActionButton(v15Text("দিলাম", "Gave"), "GAVE", action) { action = "GAVE" }
+            ActionButton(v15Text("ফেরত পেলাম", "Received back"), "RECEIVED_BACK", action) { action = "RECEIVED_BACK" }
         }
         Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-            ActionButton("নিলাম", "TOOK", action) { action = "TOOK" }
-            ActionButton("ফেরত দিলাম", "PAID_BACK", action) { action = "PAID_BACK" }
+            ActionButton(v15Text("নিলাম", "Took"), "TOOK", action) { action = "TOOK" }
+            ActionButton(v15Text("ফেরত দিলাম", "Paid back"), "PAID_BACK", action) { action = "PAID_BACK" }
         }
 
         OutlinedTextField(
             amount,
             { amount = it },
-            label = { Text("টাকার পরিমাণ") },
+            label = { Text(v15Text("টাকার পরিমাণ", "Amount")) },
             modifier = Modifier.fillMaxWidth()
         )
         OutlinedTextField(
             note,
             { note = it },
-            label = { Text("নোট") },
+            label = { Text(v15Text("নোট", "Note")) },
             modifier = Modifier.fillMaxWidth()
         )
         DueDatePickerField(
@@ -1225,7 +1225,7 @@ private fun BakiEntryScreen(
             onClick = {
                 val value = parseAmount(amount)
                 if (value == null) {
-                    error = "সঠিক টাকার পরিমাণ লিখুন"
+                    error = v15Text("সঠিক টাকার পরিমাণ লিখুন", "Enter a valid amount")
                 } else {
                     viewModel.addBakiEntry(person.id, action, value, note, dueAt)
                     amount = ""
@@ -1236,17 +1236,17 @@ private fun BakiEntryScreen(
             },
             modifier = Modifier.fillMaxWidth(),
             enabled = canWrite
-        ) { Text(if (workspace == "SHOP") "খাতার এন্ট্রি সেভ করুন" else "বাকি এন্ট্রি সেভ করুন") }
+        ) { Text(if (workspace == "SHOP") v15Text("খাতার এন্ট্রি সেভ করুন", "Save ledger entry") else v15Text("বাকি এন্ট্রি সেভ করুন", "Save due entry")) }
 
         error?.let { Text(it, color = MaterialTheme.colorScheme.error) }
 
         Spacer(Modifier.height(8.dp))
-        Text("লেনদেনের ইতিহাস (${entries.size})", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+        Text(v15Text("লেনদেনের ইতিহাস (${entries.size})", "Transaction history (${entries.size})"), style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
 
         if (entries.isEmpty()) {
             Text(
-                if (workspace == "SHOP") "এই খাতায় এখনো কোনো লেনদেন নেই।"
-                else "এই ব্যক্তির কোনো বাকি লেনদেন এখনো নেই।"
+                if (workspace == "SHOP") v15Text("এই খাতায় এখনো কোনো লেনদেন নেই।", "There are no transactions in this ledger yet.")
+                else v15Text("এই ব্যক্তির কোনো বাকি লেনদেন এখনো নেই।", "This person has no due transactions yet.")
             )
         } else {
             entries.forEach { entry ->
@@ -1264,11 +1264,11 @@ private fun BakiEntryScreen(
     pendingDelete?.let { entry ->
         AlertDialog(
             onDismissRequest = { pendingDelete = null },
-            title = { Text("এন্ট্রি মুছবেন?") },
+            title = { Text(v15Text("এন্ট্রি মুছবেন?", "Delete entry?")) },
             text = {
                 Text(
                     "${actionLabel(entry.action)} — ${V14DisplayState.currencySymbol} ${money(entry.amount)}\n" +
-                        "মুছে দিলে ব্যক্তির বর্তমান হিসাবও স্বয়ংক্রিয়ভাবে বদলে যাবে।"
+                        v15Text("মুছে দিলে ব্যক্তির বর্তমান হিসাবও স্বয়ংক্রিয়ভাবে বদলে যাবে।", "Deleting this entry will automatically update the current balance.")
                 )
             },
             confirmButton = {
@@ -1277,10 +1277,10 @@ private fun BakiEntryScreen(
                         viewModel.deleteBakiEntry(entry)
                         pendingDelete = null
                     }
-                ) { Text("মুছুন") }
+                ) { Text(v15Text("মুছুন", "Delete")) }
             },
             dismissButton = {
-                TextButton(onClick = { pendingDelete = null }) { Text("বাতিল") }
+                TextButton(onClick = { pendingDelete = null }) { Text(v15Text("বাতিল", "Cancel")) }
             }
         )
     }
@@ -1323,7 +1323,7 @@ private fun BakiHistoryCard(
             }
             item.dueAt?.let {
                 Text(
-                    "পরিশোধের তারিখ: ${v13Date(it)}",
+                    v15Text("পরিশোধের তারিখ: ${v13Date(it)}", "Due date: ${v13Date(it)}"),
                     style = MaterialTheme.typography.bodySmall,
                     fontWeight = FontWeight.SemiBold,
                     color = if (it < System.currentTimeMillis()) ExpenseAccent else ReceivableAccent
@@ -1388,11 +1388,11 @@ private fun MoreScreen(viewModel: FamilyKhataViewModel) {
             runCatching {
                 context.contentResolver.openOutputStream(uri)?.bufferedWriter()?.use { writer ->
                     writer.write(json)
-                } ?: error("ফাইল লেখা যায়নি")
+                } ?: error(v15Text("ফাইল লেখা যায়নি", "Unable to write file"))
             }.onSuccess {
-                toast(context, "ব্যাকআপ সেভ হয়েছে")
+                toast(context, v15Text("ব্যাকআপ সেভ হয়েছে", "Backup saved"))
             }.onFailure {
-                toast(context, it.message ?: "ব্যাকআপ সেভ করা যায়নি")
+                toast(context, it.message ?: v15Text("ব্যাকআপ সেভ করা যায়নি", "Unable to save backup"))
             }
         }
     }
@@ -1404,11 +1404,11 @@ private fun MoreScreen(viewModel: FamilyKhataViewModel) {
             runCatching {
                 context.contentResolver.openInputStream(uri)?.bufferedReader()?.use { reader ->
                     reader.readText()
-                } ?: error("ফাইল পড়া যায়নি")
+                } ?: error(v15Text("ফাইল পড়া যায়নি", "Unable to read file"))
             }.onSuccess { json ->
                 pendingRestoreJson = json
             }.onFailure {
-                toast(context, it.message ?: "ব্যাকআপ ফাইল পড়া যায়নি")
+                toast(context, it.message ?: v15Text("ব্যাকআপ ফাইল পড়া যায়নি", "Unable to read backup file"))
             }
         }
     }
@@ -1421,23 +1421,23 @@ private fun MoreScreen(viewModel: FamilyKhataViewModel) {
         verticalArrangement = Arrangement.spacedBy(12.dp)
     ) {
         Text(
-            "আরও",
+            v15Text("আরও","More"),
             style = MaterialTheme.typography.headlineSmall,
             fontWeight = FontWeight.Bold
         )
         Text(
-            "ডেটা নিরাপত্তা, শেয়ার, সাপোর্ট ও অ্যাপ সম্পর্কিত প্রয়োজনীয় অপশন।",
+            v15Text("ডেটা নিরাপত্তা, শেয়ার, সাপোর্ট ও অ্যাপ সম্পর্কিত প্রয়োজনীয় অপশন।","Data safety, sharing, support and app options."),
             style = MaterialTheme.typography.bodyMedium
         )
 
         CommercialToolsSection(viewModel)
         PurchaseAndTutorialSection()
 
-        MoreSectionTitle("ডেটা নিরাপত্তা")
+        MoreSectionTitle(v15Text("ডেটা নিরাপত্তা","Data safety"))
         MoreActionCard(
             symbol = "⇩",
-            title = "ব্যাকআপ তৈরি করুন",
-            subtitle = "সব ওয়ার্কস্পেসের আয়-খরচ ও বাকি হিসাব একটি JSON ফাইলে রাখুন"
+            title = v15Text("ব্যাকআপ তৈরি করুন","Create backup"),
+            subtitle = v15Text("সব ওয়ার্কস্পেসের আয়-খরচ ও বাকি হিসাব একটি JSON ফাইলে রাখুন","Save all workspace accounts in one JSON backup file")
         ) {
             viewModel.createBackup(
                 onReady = { json ->
@@ -1450,54 +1450,54 @@ private fun MoreScreen(viewModel: FamilyKhataViewModel) {
         }
         MoreActionCard(
             symbol = "⇧",
-            title = "ব্যাকআপ রিস্টোর করুন",
-            subtitle = "আগের হিসাবী খাতা ব্যাকআপ থেকে সব ডেটা ফিরিয়ে আনুন"
+            title = v15Text("ব্যাকআপ রিস্টোর করুন","Restore backup"),
+            subtitle = v15Text("আগের হিসাবী খাতা ব্যাকআপ থেকে সব ডেটা ফিরিয়ে আনুন","Restore all data from a previous Hisabi Khata backup")
         ) {
             openBackupFile.launch(arrayOf("application/json", "text/plain"))
         }
 
-        MoreSectionTitle("শেয়ার ও মতামত")
+        MoreSectionTitle(v15Text("শেয়ার ও মতামত","Share & feedback"))
         MoreActionCard(
             symbol = "↗",
-            title = "অ্যাপ শেয়ার করুন",
-            subtitle = "পরিবার, বন্ধু বা ব্যবসায়িক পরিচিতদের হিসাবী খাতা জানান"
+            title = v15Text("অ্যাপ শেয়ার করুন","Share app"),
+            subtitle = v15Text("পরিবার, বন্ধু বা ব্যবসায়িক পরিচিতদের হিসাবী খাতা জানান","Share Hisabi Khata with family, friends or business contacts")
         ) {
             shareApp(context)
         }
         MoreActionCard(
             symbol = "★",
-            title = "রিভিউ দিন",
-            subtitle = "Play Store-এ প্রকাশের পর এখান থেকে রেটিং ও রিভিউ দেওয়া যাবে"
+            title = v15Text("রিভিউ দিন","Write a review"),
+            subtitle = v15Text("Play Store-এ প্রকাশের পর এখান থেকে রেটিং ও রিভিউ দেওয়া যাবে","Rate and review the app after it is published on Play Store")
         ) {
             openPlayStore(context)
         }
         MoreActionCard(
             symbol = "✦",
-            title = "ফিচার রিকোয়েস্ট",
-            subtitle = "কোন নতুন সুবিধা চান তা আমাদের জানান"
+            title = v15Text("ফিচার রিকোয়েস্ট","Feature request"),
+            subtitle = v15Text("কোন নতুন সুবিধা চান তা আমাদের জানান","Tell us which new feature you want")
         ) {
             openUrl(context, FEATURE_REQUEST_URL)
         }
 
-        MoreSectionTitle("সাপোর্ট ও তথ্য")
+        MoreSectionTitle(v15Text("সাপোর্ট ও তথ্য","Support & information"))
         MoreActionCard(
             symbol = "?",
-            title = "আমাদের সাথে যোগাযোগ",
-            subtitle = "সাপোর্ট প্রশ্ন বা সমস্যার জন্য যোগাযোগ করুন"
+            title = v15Text("আমাদের সাথে যোগাযোগ","Contact us"),
+            subtitle = v15Text("সাপোর্ট প্রশ্ন বা সমস্যার জন্য যোগাযোগ করুন","Contact us for support or issues")
         ) {
             openUrl(context, SUPPORT_URL)
         }
         MoreActionCard(
             symbol = "⌂",
-            title = "ওয়েবসাইট",
-            subtitle = "হিসাবী খাতার অফিসিয়াল ওয়েবসাইট"
+            title = v15Text("ওয়েবসাইট","Website"),
+            subtitle = v15Text("হিসাবী খাতার অফিসিয়াল ওয়েবসাইট","Official Hisabi Khata website")
         ) {
             openUrl(context, WEBSITE_URL)
         }
         MoreActionCard(
             symbol = "ⓘ",
             title = "Privacy Policy",
-            subtitle = "আপনার ডেটা কীভাবে সংরক্ষণ ও ব্যবহার করা হয়"
+            subtitle = v15Text("আপনার ডেটা কীভাবে সংরক্ষণ ও ব্যবহার করা হয়","How your data is stored and used")
         ) {
             openUrl(context, PRIVACY_URL)
         }
@@ -1511,9 +1511,9 @@ private fun MoreScreen(viewModel: FamilyKhataViewModel) {
                 modifier = Modifier.padding(16.dp),
                 verticalArrangement = Arrangement.spacedBy(4.dp)
             ) {
-                Text("হিসাবী খাতা v1.4", fontWeight = FontWeight.Bold)
+                Text(v15Text("হিসাবী খাতা v1.5","Hisabi Khata v1.5"), fontWeight = FontWeight.Bold)
                 Text(
-                    "আপনার টাকা-পয়সার সহজ হিসাব • ডেটা আপনার ডিভাইসে থাকে",
+                    v15Text("আপনার টাকা-পয়সার সহজ হিসাব • ডেটা আপনার ডিভাইসে থাকে","Simple money tracking • Your data stays on your device"),
                     style = MaterialTheme.typography.bodySmall
                 )
             }
@@ -1523,11 +1523,11 @@ private fun MoreScreen(viewModel: FamilyKhataViewModel) {
     pendingRestoreJson?.let { json ->
         AlertDialog(
             onDismissRequest = { pendingRestoreJson = null },
-            title = { Text("ব্যাকআপ রিস্টোর করবেন?") },
+            title = { Text(v15Text("ব্যাকআপ রিস্টোর করবেন?","Restore backup?")) },
             text = {
                 Text(
-                    "বর্তমান অ্যাপের সব হিসাব মুছে ব্যাকআপ ফাইলের ডেটা বসবে। " +
-                        "নিশ্চিত হওয়ার আগে চাইলে বর্তমান ডেটার একটি ব্যাকআপ তৈরি করুন।"
+                    v15Text("বর্তমান অ্যাপের সব হিসাব মুছে ব্যাকআপ ফাইলের ডেটা বসবে। ","All current app data will be replaced by the backup data. ") +
+                        v15Text("নিশ্চিত হওয়ার আগে চাইলে বর্তমান ডেটার একটি ব্যাকআপ তৈরি করুন।","Create a backup of your current data first if needed.")
                 )
             },
             confirmButton = {
@@ -1537,15 +1537,55 @@ private fun MoreScreen(viewModel: FamilyKhataViewModel) {
                         viewModel.restoreBackup(
                             json = json,
                             onDone = { count ->
-                                toast(context, "রিস্টোর সম্পন্ন: $count টি রেকর্ড")
+                                val settingsPrefs =
+                                    context.getSharedPreferences(
+                                        "hisabi_khata_v14_settings",
+                                        Context.MODE_PRIVATE
+                                    )
+
+                                V14DisplayState.currencySymbol =
+                                    settingsPrefs.getString(
+                                        "currency_symbol",
+                                        "৳"
+                                    ) ?: "৳"
+
+                                V14DisplayState.summaryVisible =
+                                    settingsPrefs.getBoolean(
+                                        "summary_visible",
+                                        true
+                                    )
+
+                                val restoredLanguage =
+                                    context.getSharedPreferences(
+                                        "hisabi_khata_v15_language",
+                                        Context.MODE_PRIVATE
+                                    ).getString(
+                                        "language",
+                                        "bn"
+                                    )
+
+                                if (
+                                    restoredLanguage == "bn" ||
+                                    restoredLanguage == "en"
+                                ) {
+                                    V15LanguageState.setLanguage(
+                                        context,
+                                        restoredLanguage
+                                    )
+                                }
+
+                                toast(
+                                    context,
+                                    v15Text("রিস্টোর সম্পন্ন: $count টি রেকর্ড","Restore complete: $count records")
+                                )
                             },
                             onError = { toast(context, it) }
                         )
                     }
-                ) { Text("রিস্টোর করুন") }
+                ) { Text(v15Text("রিস্টোর করুন","Restore")) }
             },
             dismissButton = {
-                TextButton(onClick = { pendingRestoreJson = null }) { Text("বাতিল") }
+                TextButton(onClick = { pendingRestoreJson = null }) { Text(v15Text("বাতিল","Cancel")) }
             }
         )
     }
@@ -1623,30 +1663,30 @@ private fun MoreActionCard(
 
 private fun sendLedgerSms(context: Context, person: BakiPersonSummary) {
     val balanceText = when {
-        person.balance > 0 -> "আপনার কাছে ${V14DisplayState.currencySymbol} ${money(person.balance)} পাওনা আছে।"
-        person.balance < 0 -> "আপনাকে ${V14DisplayState.currencySymbol} ${money(-person.balance)} পরিশোধযোগ্য আছে।"
-        else -> "আপনার হিসাব বর্তমানে সমান আছে।"
+        person.balance > 0 -> v15Text("আপনার কাছে ${V14DisplayState.currencySymbol} ${money(person.balance)} পাওনা আছে।","You are owed ${V14DisplayState.currencySymbol} ${money(person.balance)}.")
+        person.balance < 0 -> v15Text("আপনাকে ${V14DisplayState.currencySymbol} ${money(-person.balance)} পরিশোধযোগ্য আছে।","You owe ${V14DisplayState.currencySymbol} ${money(-person.balance)}.")
+        else -> v15Text("আপনার হিসাব বর্তমানে সমান আছে।","Your account is currently settled.")
     }
-    val message = "হিসাবী খাতা: ${person.name}, $balanceText"
+    val message = v15Text("হিসাবী খাতা: ${person.name}, $balanceText","Hisabi Khata: ${person.name}, $balanceText")
     val intent = Intent(Intent.ACTION_SENDTO).apply {
         data = Uri.parse("smsto:${Uri.encode(person.phone)}")
         putExtra("sms_body", message)
     }
     runCatching { context.startActivity(intent) }
-        .onFailure { toast(context, "SMS অ্যাপ খোলা যায়নি") }
+        .onFailure { toast(context, v15Text("SMS অ্যাপ খোলা যায়নি","Unable to open SMS app")) }
 }
 
 private fun shareApp(context: Context) {
-    val text = "হিসাবী খাতা – আয় ব্যয় ও বাকি\n$PLAY_STORE_URL"
+    val text = v15Text("হিসাবী খাতা – আয় ব্যয় ও বাকি\n$PLAY_STORE_URL","Hisabi Khata – income, expense and dues\n$PLAY_STORE_URL")
     val intent = Intent(Intent.ACTION_SEND).apply {
         type = "text/plain"
-        putExtra(Intent.EXTRA_SUBJECT, "হিসাবী খাতা")
+        putExtra(Intent.EXTRA_SUBJECT, v15Text("হিসাবী খাতা","Hisabi Khata"))
         putExtra(Intent.EXTRA_TEXT, text)
     }
     runCatching {
-        context.startActivity(Intent.createChooser(intent, "অ্যাপ শেয়ার করুন"))
+        context.startActivity(Intent.createChooser(intent, v15Text("অ্যাপ শেয়ার করুন","Share app")))
     }.onFailure {
-        toast(context, "শেয়ার অপশন খোলা যায়নি")
+        toast(context, v15Text("শেয়ার অপশন খোলা যায়নি","Unable to open share options"))
     }
 }
 
@@ -1657,14 +1697,14 @@ private fun openPlayStore(context: Context) {
     )
     runCatching { context.startActivity(marketIntent) }
         .recoverCatching { openUrl(context, PLAY_STORE_URL) }
-        .onFailure { toast(context, "Play Store খোলা যায়নি") }
+        .onFailure { toast(context, v15Text("Play Store খোলা যায়নি","Unable to open Play Store")) }
 }
 
 private fun openUrl(context: Context, url: String) {
     runCatching {
         context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(url)))
     }.onFailure {
-        toast(context, "লিংক খোলা যায়নি")
+        toast(context, v15Text("লিংক খোলা যায়নি","Unable to open link"))
     }
 }
 
@@ -1700,15 +1740,15 @@ private fun tabAccent(tab: Tab): Color = when (tab) {
 }
 
 private fun workspaceLabel(workspace: String): String = when (workspace) {
-    "PERSONAL" -> "নিজের"
-    "SHOP" -> "দোকান/প্রতিষ্ঠান"
-    else -> "পরিবার"
+    "PERSONAL" -> v15Text("নিজের", "Personal")
+    "SHOP" -> v15Text("দোকান/প্রতিষ্ঠান", "Business")
+    else -> v15Text("পরিবার", "Family")
 }
 
 private fun workspaceSummary(workspace: String): String = when (workspace) {
-    "PERSONAL" -> "আপনার ব্যক্তিগত আয়-খরচ ও দেনা-পাওনা"
-    "SHOP" -> "দোকান/প্রতিষ্ঠানের আয়-খরচ ও দেনা-পাওনার হিসাব"
-    else -> "পরিবারের সার্বিক আয়-খরচ ও দেনা-পাওনা"
+    "PERSONAL" -> v15Text("আপনার ব্যক্তিগত আয়-খরচ ও দেনা-পাওনা", "Your personal income, expenses and dues")
+    "SHOP" -> v15Text("দোকান/প্রতিষ্ঠানের আয়-খরচ ও দেনা-পাওনার হিসাব", "Business income, expenses and dues")
+    else -> v15Text("পরিবারের সার্বিক আয়-খরচ ও দেনা-পাওনা", "Family income, expenses and dues")
 }
 
 private fun tabLabel(tab: Tab, workspace: String): String = when (tab) {
@@ -1730,10 +1770,10 @@ private fun tabSymbol(tab: Tab): String = when (tab) {
 }
 
 private fun actionLabel(action: String): String = when (action) {
-    "GAVE" -> "দিলাম"
-    "RECEIVED_BACK" -> "ফেরত পেলাম"
-    "TOOK" -> "নিলাম"
-    "PAID_BACK" -> "ফেরত দিলাম"
+    "GAVE" -> v15Text("দিলাম", "Gave")
+    "RECEIVED_BACK" -> v15Text("ফেরত পেলাম", "Received back")
+    "TOOK" -> v15Text("নিলাম", "Took")
+    "PAID_BACK" -> v15Text("ফেরত দিলাম", "Paid back")
     else -> action
 }
 

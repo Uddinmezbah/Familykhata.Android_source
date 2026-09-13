@@ -70,9 +70,9 @@ internal fun personAccent(id: Long): Color {
 internal fun TrialNotice(status: TrialStatus) {
     val accent = if (status.expired) MaterialTheme.colorScheme.error else Color(0xFFB85C00)
     val message = when {
-        status.premiumUnlocked -> "Premium সক্রিয়"
-        status.expired -> "৩০ দিনের ট্রায়াল শেষ • পুরনো হিসাব দেখা, ব্যাকআপ ও রিপোর্ট ডাউনলোড করা যাবে"
-        else -> "৩০ দিনের ট্রায়াল • ${status.daysRemaining} দিন বাকি"
+        status.premiumUnlocked -> v15Text("Premium সক্রিয়","Premium active")
+        status.expired -> v15Text("৩০ দিনের ট্রায়াল শেষ • পুরনো হিসাব দেখা, ব্যাকআপ ও রিপোর্ট ডাউনলোড করা যাবে","30-day trial ended • You can still view old records, backups and reports")
+        else -> v15Text("৩০ দিনের ট্রায়াল • ${status.daysRemaining} দিন বাকি","30-day trial • ${status.daysRemaining} days left")
     }
 
     Surface(
@@ -100,7 +100,7 @@ internal fun TrialLockedMessage() {
         color = MaterialTheme.colorScheme.errorContainer
     ) {
         Text(
-            "ট্রায়াল শেষ হয়েছে। নতুন হিসাব যোগ বা সম্পাদনা বন্ধ আছে। আপনার পুরনো হিসাব, ব্যাকআপ ও রিপোর্ট নিরাপদে ব্যবহার করতে পারবেন।",
+            v15Text("ট্রায়াল শেষ হয়েছে। নতুন হিসাব যোগ বা সম্পাদনা বন্ধ আছে। আপনার পুরনো হিসাব, ব্যাকআপ ও রিপোর্ট নিরাপদে ব্যবহার করতে পারবেন।","Trial ended. Adding or editing new records is disabled, but your existing records, backups and reports remain available."),
             modifier = Modifier.padding(12.dp),
             style = MaterialTheme.typography.bodySmall,
             fontWeight = FontWeight.SemiBold,
@@ -139,12 +139,12 @@ internal fun AppLockScreen(viewModel: FamilyKhataViewModel) {
             }
             Spacer(Modifier.height(18.dp))
             Text(
-                "হিসাবী খাতা লক করা আছে",
+                v15Text("হিসাবী খাতা লক করা আছে","Hisabi Khata is locked"),
                 style = MaterialTheme.typography.headlineSmall,
                 fontWeight = FontWeight.ExtraBold
             )
             Text(
-                "আপনার ৪–৬ সংখ্যার PIN লিখুন",
+                v15Text("আপনার ৪–৬ সংখ্যার PIN লিখুন","Enter your 4–6 digit PIN"),
                 modifier = Modifier.padding(top = 6.dp, bottom = 14.dp),
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
@@ -172,7 +172,7 @@ internal fun AppLockScreen(viewModel: FamilyKhataViewModel) {
             Button(
                 onClick = {
                     if (!viewModel.verifyPin(pin)) {
-                        error = "PIN সঠিক নয়"
+                        error = v15Text("PIN সঠিক নয়","Incorrect PIN")
                         pin = ""
                     }
                 },
@@ -181,10 +181,10 @@ internal fun AppLockScreen(viewModel: FamilyKhataViewModel) {
                     .padding(top = 12.dp),
                 enabled = pin.length in 4..6
             ) {
-                Text("আনলক করুন")
+                Text(v15Text("আনলক করুন","Unlock"))
             }
             Text(
-                "PIN আপনার ডিভাইসেই সুরক্ষিতভাবে hash আকারে রাখা হয়। PIN মনে রাখুন।",
+                v15Text("PIN আপনার ডিভাইসেই সুরক্ষিতভাবে hash আকারে রাখা হয়। PIN মনে রাখুন।","Your PIN is stored securely on this device as a hash. Please remember it."),
                 modifier = Modifier.padding(top = 12.dp),
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
@@ -218,30 +218,30 @@ internal fun CommercialToolsSection(viewModel: FamilyKhataViewModel) {
             runCatching {
                 context.contentResolver.openOutputStream(uri)?.bufferedWriter(Charsets.UTF_8)?.use { writer ->
                     writer.write(csv)
-                } ?: error("রিপোর্ট ফাইল লেখা যায়নি")
+                } ?: error(v15Text("রিপোর্ট ফাইল লেখা যায়নি","Unable to write report file"))
             }.onSuccess {
-                commercialToast(context, "রিপোর্ট সেভ হয়েছে")
+                commercialToast(context, v15Text("রিপোর্ট সেভ হয়েছে","Report saved"))
             }.onFailure {
-                commercialToast(context, it.message ?: "রিপোর্ট সেভ করা যায়নি")
+                commercialToast(context, it.message ?: v15Text("রিপোর্ট সেভ করা যায়নি","Unable to save report"))
             }
         }
     }
 
     Text(
-        "ব্যবহারের মেয়াদ",
+        v15Text("ব্যবহারের মেয়াদ","Usage period"),
         style = MaterialTheme.typography.titleMedium,
         fontWeight = FontWeight.Bold
     )
     TrialNotice(trialStatus)
 
     Text(
-        "সময় অনুযায়ী রিপোর্ট",
+        v15Text("সময় অনুযায়ী রিপোর্ট","Reports by period"),
         modifier = Modifier.padding(top = 4.dp),
         style = MaterialTheme.typography.titleMedium,
         fontWeight = FontWeight.Bold
     )
     Text(
-        "বর্তমান ওয়ার্কস্পেসের হিসাব CSV ফাইলে নামান। Excel/Google Sheets-এ খোলা যাবে।",
+        v15Text("বর্তমান ওয়ার্কস্পেসের হিসাব CSV ফাইলে নামান। Excel/Google Sheets-এ খোলা যাবে।","Export the current workspace as CSV for Excel or Google Sheets."),
         style = MaterialTheme.typography.bodySmall,
         color = MaterialTheme.colorScheme.onSurfaceVariant
     )
@@ -250,20 +250,20 @@ internal fun CommercialToolsSection(viewModel: FamilyKhataViewModel) {
         horizontalArrangement = Arrangement.spacedBy(8.dp)
     ) {
         ReportPeriodButton(
-            label = "এই মাস",
+            label = v15Text("এই মাস","This month"),
             value = "MONTH",
             selected = reportPeriod,
             modifier = Modifier.weight(1f)
         ) { reportPeriod = it }
         ReportPeriodButton(
-            label = "এই বছর",
+            label = v15Text("এই বছর","This year"),
             value = "YEAR",
             selected = reportPeriod,
             modifier = Modifier.weight(1f)
         ) { reportPeriod = it }
     }
     ReportPeriodButton(
-        label = "শুরু থেকে আজ পর্যন্ত",
+        label = v15Text("শুরু থেকে আজ পর্যন্ত","All time"),
         value = "ALL",
         selected = reportPeriod,
         modifier = Modifier.fillMaxWidth()
@@ -295,11 +295,11 @@ internal fun CommercialToolsSection(viewModel: FamilyKhataViewModel) {
         },
         modifier = Modifier.fillMaxWidth()
     ) {
-        Text("CSV রিপোর্ট ডাউনলোড করুন")
+        Text(v15Text("CSV রিপোর্ট ডাউনলোড করুন","Download CSV report"))
     }
 
     Text(
-        "অ্যাপ নিরাপত্তা",
+        v15Text("অ্যাপ নিরাপত্তা","App security"),
         modifier = Modifier.padding(top = 4.dp),
         style = MaterialTheme.typography.titleMedium,
         fontWeight = FontWeight.Bold
@@ -316,12 +316,12 @@ internal fun CommercialToolsSection(viewModel: FamilyKhataViewModel) {
             verticalArrangement = Arrangement.spacedBy(8.dp)
         ) {
             Text(
-                if (pinConfigured) "PIN App Lock চালু আছে" else "PIN App Lock বন্ধ আছে",
+                if (pinConfigured) v15Text("PIN App Lock চালু আছে","PIN App Lock is enabled") else v15Text("PIN App Lock বন্ধ আছে","PIN App Lock is disabled"),
                 fontWeight = FontWeight.Bold
             )
             Text(
-                if (pinConfigured) "অ্যাপ পুনরায় চালু হলে PIN দিয়ে খুলতে হবে। চাইলে এখনই লক করতে পারেন।"
-                else "৪–৬ সংখ্যার PIN দিয়ে আপনার হিসাব অন্যের কাছ থেকে সুরক্ষিত রাখুন।",
+                if (pinConfigured) v15Text("অ্যাপ পুনরায় চালু হলে PIN দিয়ে খুলতে হবে। চাইলে এখনই লক করতে পারেন।","You will need the PIN when reopening the app. You can lock it now.")
+                else v15Text("৪–৬ সংখ্যার PIN দিয়ে আপনার হিসাব অন্যের কাছ থেকে সুরক্ষিত রাখুন।","Protect your accounts with a 4–6 digit PIN."),
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
@@ -329,12 +329,12 @@ internal fun CommercialToolsSection(viewModel: FamilyKhataViewModel) {
                 Button(
                     onClick = { showSetPin = true },
                     modifier = Modifier.fillMaxWidth()
-                ) { Text("PIN সেট করুন") }
+                ) { Text(v15Text("PIN সেট করুন","Set PIN")) }
             } else {
                 Button(
                     onClick = { viewModel.lockApp() },
                     modifier = Modifier.fillMaxWidth()
-                ) { Text("এখনই অ্যাপ লক করুন") }
+                ) { Text(v15Text("এখনই অ্যাপ লক করুন","Lock app now")) }
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.spacedBy(8.dp)
@@ -342,11 +342,11 @@ internal fun CommercialToolsSection(viewModel: FamilyKhataViewModel) {
                     OutlinedButton(
                         onClick = { showChangePin = true },
                         modifier = Modifier.weight(1f)
-                    ) { Text("PIN বদলান") }
+                    ) { Text(v15Text("PIN বদলান","Change PIN")) }
                     OutlinedButton(
                         onClick = { showDisablePin = true },
                         modifier = Modifier.weight(1f)
-                    ) { Text("PIN বন্ধ") }
+                    ) { Text(v15Text("PIN বন্ধ","Disable PIN")) }
                 }
             }
         }
@@ -354,13 +354,13 @@ internal fun CommercialToolsSection(viewModel: FamilyKhataViewModel) {
 
     if (showSetPin) {
         CreatePinDialog(
-            title = "নতুন PIN সেট করুন",
+            title = v15Text("নতুন PIN সেট করুন","Set new PIN"),
             onDismiss = { showSetPin = false },
             onSave = { pin ->
                 val ok = viewModel.setPin(pin)
                 if (ok) {
                     showSetPin = false
-                    commercialToast(context, "PIN App Lock চালু হয়েছে")
+                    commercialToast(context, v15Text("PIN App Lock চালু হয়েছে","PIN App Lock enabled"))
                 }
                 ok
             }
@@ -374,7 +374,7 @@ internal fun CommercialToolsSection(viewModel: FamilyKhataViewModel) {
                 val ok = viewModel.changePin(currentPin, newPin)
                 if (ok) {
                     showChangePin = false
-                    commercialToast(context, "PIN পরিবর্তন হয়েছে")
+                    commercialToast(context, v15Text("PIN পরিবর্তন হয়েছে","PIN changed"))
                 }
                 ok
             }
@@ -383,14 +383,14 @@ internal fun CommercialToolsSection(viewModel: FamilyKhataViewModel) {
 
     if (showDisablePin) {
         CurrentPinDialog(
-            title = "PIN App Lock বন্ধ করবেন?",
-            actionLabel = "PIN বন্ধ করুন",
+            title = v15Text("PIN App Lock বন্ধ করবেন?","Disable PIN App Lock?"),
+            actionLabel = v15Text("PIN বন্ধ করুন","Disable PIN"),
             onDismiss = { showDisablePin = false },
             onConfirm = { currentPin ->
                 val ok = viewModel.disablePin(currentPin)
                 if (ok) {
                     showDisablePin = false
-                    commercialToast(context, "PIN App Lock বন্ধ হয়েছে")
+                    commercialToast(context, v15Text("PIN App Lock বন্ধ হয়েছে","PIN App Lock disabled"))
                 }
                 ok
             }
@@ -432,11 +432,11 @@ internal fun PersonManagementActions(
             onClick = { showEdit = true },
             enabled = canWrite,
             modifier = Modifier.weight(1f)
-        ) { Text("তথ্য সম্পাদনা") }
+        ) { Text(v15Text("তথ্য সম্পাদনা","Edit information")) }
         OutlinedButton(
             onClick = { showDelete = true },
             modifier = Modifier.weight(1f)
-        ) { Text("$personLabel ডিলিট") }
+        ) { Text(v15Text("$personLabel ডিলিট","Delete $personLabel")) }
     }
 
     if (showEdit) {
@@ -445,20 +445,20 @@ internal fun PersonManagementActions(
         var error by remember { mutableStateOf<String?>(null) }
         AlertDialog(
             onDismissRequest = { showEdit = false },
-            title = { Text("$personLabel তথ্য সম্পাদনা") },
+            title = { Text(v15Text("$personLabel তথ্য সম্পাদনা","Edit $personLabel information")) },
             text = {
                 Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     OutlinedTextField(
                         value = name,
                         onValueChange = { name = it },
-                        label = { Text("নাম") },
+                        label = { Text(v15Text("নাম","Name")) },
                         singleLine = true,
                         modifier = Modifier.fillMaxWidth()
                     )
                     OutlinedTextField(
                         value = phone,
                         onValueChange = { phone = it },
-                        label = { Text("ফোন") },
+                        label = { Text(v15Text("ফোন","Phone")) },
                         singleLine = true,
                         modifier = Modifier.fillMaxWidth()
                     )
@@ -469,32 +469,32 @@ internal fun PersonManagementActions(
                 TextButton(
                     onClick = {
                         if (name.isBlank()) {
-                            error = "নাম খালি রাখা যাবে না"
+                            error = v15Text("নাম খালি রাখা যাবে না","Name cannot be empty")
                         } else {
                             viewModel.updateBakiPerson(person.id, name, phone)
                             showEdit = false
                         }
                     }
-                ) { Text("সেভ করুন") }
+                ) { Text(v15Text("সেভ করুন","Save")) }
             },
             dismissButton = {
-                TextButton(onClick = { showEdit = false }) { Text("বাতিল") }
+                TextButton(onClick = { showEdit = false }) { Text(v15Text("বাতিল","Cancel")) }
             }
         )
     }
 
     if (showDelete) {
         val balanceWarning = when {
-            person.balance > 0 -> "এই $personLabel-এর কাছে আপনি ${V14DisplayState.currencySymbol} ${commercialMoney(person.balance)} পাবেন।"
-            person.balance < 0 -> "এই $personLabel-কে আপনি ${V14DisplayState.currencySymbol} ${commercialMoney(abs(person.balance))} দেবেন।"
-            else -> "এই $personLabel-এর বর্তমান হিসাব সমান।"
+            person.balance > 0 -> v15Text("এই $personLabel-এর কাছে আপনি ${V14DisplayState.currencySymbol} ${commercialMoney(person.balance)} পাবেন।","You will receive ${V14DisplayState.currencySymbol} ${commercialMoney(person.balance)} from this $personLabel.")
+            person.balance < 0 -> v15Text("এই $personLabel-কে আপনি ${V14DisplayState.currencySymbol} ${commercialMoney(abs(person.balance))} দেবেন।","You owe this $personLabel ${V14DisplayState.currencySymbol} ${commercialMoney(abs(person.balance))}.")
+            else -> v15Text("এই $personLabel-এর বর্তমান হিসাব সমান।","This $personLabel account is settled.")
         }
         AlertDialog(
             onDismissRequest = { showDelete = false },
-            title = { Text("$personLabel ডিলিট করবেন?") },
+            title = { Text(v15Text("$personLabel ডিলিট করবেন?","Delete $personLabel?")) },
             text = {
                 Text(
-                    "$balanceWarning\n\n${person.name}-এর সব বাকি/পাওনা এন্ট্রিও স্থায়ীভাবে মুছে যাবে। আগে প্রয়োজন হলে ব্যাকআপ তৈরি করুন।"
+                    v15Text("$balanceWarning\n\n${person.name}-এর সব বাকি/পাওনা এন্ট্রিও স্থায়ীভাবে মুছে যাবে। আগে প্রয়োজন হলে ব্যাকআপ তৈরি করুন।","$balanceWarning\n\nAll due entries for ${person.name} will also be permanently deleted. Create a backup first if needed.")
                 )
             },
             confirmButton = {
@@ -504,10 +504,10 @@ internal fun PersonManagementActions(
                         showDelete = false
                         onDeleted()
                     }
-                ) { Text("স্থায়ীভাবে ডিলিট") }
+                ) { Text(v15Text("স্থায়ীভাবে ডিলিট","Delete permanently")) }
             },
             dismissButton = {
-                TextButton(onClick = { showDelete = false }) { Text("বাতিল") }
+                TextButton(onClick = { showDelete = false }) { Text(v15Text("বাতিল","Cancel")) }
             }
         )
     }
@@ -528,22 +528,22 @@ private fun CreatePinDialog(
         title = { Text(title) },
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                PinField("নতুন PIN", pin) { pin = it; error = null }
-                PinField("PIN আবার লিখুন", confirmPin) { confirmPin = it; error = null }
+                PinField(v15Text("নতুন PIN","New PIN"), pin) { pin = it; error = null }
+                PinField(v15Text("PIN আবার লিখুন","Confirm PIN"), confirmPin) { confirmPin = it; error = null }
                 error?.let { Text(it, color = MaterialTheme.colorScheme.error) }
             }
         },
         confirmButton = {
             TextButton(onClick = {
                 error = when {
-                    pin.length !in 4..6 -> "PIN ৪–৬ সংখ্যার হতে হবে"
-                    pin != confirmPin -> "দুইটি PIN মিলছে না"
-                    !onSave(pin) -> "PIN সেট করা যায়নি"
+                    pin.length !in 4..6 -> v15Text("PIN ৪–৬ সংখ্যার হতে হবে","PIN must be 4–6 digits")
+                    pin != confirmPin -> v15Text("দুইটি PIN মিলছে না","PINs do not match")
+                    !onSave(pin) -> v15Text("PIN সেট করা যায়নি","Unable to set PIN")
                     else -> null
                 }
-            }) { Text("সেভ করুন") }
+            }) { Text(v15Text("সেভ করুন","Save")) }
         },
-        dismissButton = { TextButton(onClick = onDismiss) { Text("বাতিল") } }
+        dismissButton = { TextButton(onClick = onDismiss) { Text(v15Text("বাতিল","Cancel")) } }
     )
 }
 
@@ -559,26 +559,26 @@ private fun ChangePinDialog(
 
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text("PIN পরিবর্তন করুন") },
+        title = { Text(v15Text("PIN পরিবর্তন করুন","Change PIN")) },
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                PinField("বর্তমান PIN", currentPin) { currentPin = it; error = null }
-                PinField("নতুন PIN", newPin) { newPin = it; error = null }
-                PinField("নতুন PIN আবার লিখুন", confirmPin) { confirmPin = it; error = null }
+                PinField(v15Text("বর্তমান PIN","Current PIN"), currentPin) { currentPin = it; error = null }
+                PinField(v15Text("নতুন PIN","New PIN"), newPin) { newPin = it; error = null }
+                PinField(v15Text("নতুন PIN আবার লিখুন","Confirm new PIN"), confirmPin) { confirmPin = it; error = null }
                 error?.let { Text(it, color = MaterialTheme.colorScheme.error) }
             }
         },
         confirmButton = {
             TextButton(onClick = {
                 error = when {
-                    newPin.length !in 4..6 -> "নতুন PIN ৪–৬ সংখ্যার হতে হবে"
-                    newPin != confirmPin -> "দুইটি নতুন PIN মিলছে না"
-                    !onSave(currentPin, newPin) -> "বর্তমান PIN সঠিক নয়"
+                    newPin.length !in 4..6 -> v15Text("নতুন PIN ৪–৬ সংখ্যার হতে হবে","New PIN must be 4–6 digits")
+                    newPin != confirmPin -> v15Text("দুইটি নতুন PIN মিলছে না","New PINs do not match")
+                    !onSave(currentPin, newPin) -> v15Text("বর্তমান PIN সঠিক নয়","Current PIN is incorrect")
                     else -> null
                 }
-            }) { Text("পরিবর্তন করুন") }
+            }) { Text(v15Text("পরিবর্তন করুন","Change")) }
         },
-        dismissButton = { TextButton(onClick = onDismiss) { Text("বাতিল") } }
+        dismissButton = { TextButton(onClick = onDismiss) { Text(v15Text("বাতিল","Cancel")) } }
     )
 }
 
@@ -597,16 +597,16 @@ private fun CurrentPinDialog(
         title = { Text(title) },
         text = {
             Column {
-                PinField("বর্তমান PIN", pin) { pin = it; error = null }
+                PinField(v15Text("বর্তমান PIN","Current PIN"), pin) { pin = it; error = null }
                 error?.let { Text(it, color = MaterialTheme.colorScheme.error) }
             }
         },
         confirmButton = {
             TextButton(onClick = {
-                if (!onConfirm(pin)) error = "বর্তমান PIN সঠিক নয়"
+                if (!onConfirm(pin)) error = v15Text("বর্তমান PIN সঠিক নয়","Current PIN is incorrect")
             }) { Text(actionLabel) }
         },
-        dismissButton = { TextButton(onClick = onDismiss) { Text("বাতিল") } }
+        dismissButton = { TextButton(onClick = onDismiss) { Text(v15Text("বাতিল","Cancel")) } }
     )
 }
 

@@ -321,7 +321,7 @@ private fun ProductCard(item: ProductStockSummary, onSelect: (ProductStockSummar
             val unitProfit = item.sellingPrice - item.avgPurchasePrice
             Text(
                 v15Text(
-                    "কেনা ${V14DisplayState.currencySymbol} ${v15Money(item.avgPurchasePrice)} • বিক্রি ${V14DisplayState.currencySymbol} ${v15Money(item.sellingPrice)}",
+                    v15Text("কেনা ${V14DisplayState.currencySymbol} ${v15Money(item.avgPurchasePrice)} • বিক্রি ${V14DisplayState.currencySymbol} ${v15Money(item.sellingPrice)}","Buy ${V14DisplayState.currencySymbol} ${v15Money(item.avgPurchasePrice)} • Sell ${V14DisplayState.currencySymbol} ${v15Money(item.sellingPrice)}"),
                     "Buy ${V14DisplayState.currencySymbol} ${v15Money(item.avgPurchasePrice)} • Sell ${V14DisplayState.currencySymbol} ${v15Money(item.sellingPrice)}"
                 ),
                 style = MaterialTheme.typography.bodySmall,
@@ -329,7 +329,7 @@ private fun ProductCard(item: ProductStockSummary, onSelect: (ProductStockSummar
             )
             Text(
                 v15Text(
-                    "লাভ/ইউনিট: ${V14DisplayState.currencySymbol} ${v15Money(unitProfit)}",
+                    v15Text("লাভ/ইউনিট: ${V14DisplayState.currencySymbol} ${v15Money(unitProfit)}","Profit/unit: ${V14DisplayState.currencySymbol} ${v15Money(unitProfit)}"),
                     "Profit/unit: ${V14DisplayState.currencySymbol} ${v15Money(unitProfit)}"
                 ),
                 style = MaterialTheme.typography.bodySmall,
@@ -366,7 +366,7 @@ private fun ProductDetailScreen(
             Column(modifier = Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(3.dp)) {
                 Text(
                     v15Text(
-                        "বর্তমান স্টক: ${product.totalStock} ${product.unit}",
+                        v15Text("বর্তমান স্টক: ${product.totalStock} ${product.unit}","Current stock: ${product.totalStock} ${product.unit}"),
                         "Current stock: ${product.totalStock} ${product.unit}"
                     ),
                     fontWeight = FontWeight.ExtraBold
@@ -393,7 +393,7 @@ private fun ProductDetailScreen(
                 if (product.warrantyMonths > 0) {
                     Text(
                         v15Text(
-                            "ওয়ারেন্টি: ${product.warrantyMonths} মাস",
+                            v15Text("ওয়ারেন্টি: ${product.warrantyMonths} মাস","Warranty: ${product.warrantyMonths} months"),
                             "Warranty: ${product.warrantyMonths} months"
                         )
                     )
@@ -401,21 +401,21 @@ private fun ProductDetailScreen(
 
                 Text(
                     v15Text(
-                        "গড় কেনা দাম: ${V14DisplayState.currencySymbol} ${v15Money(product.avgPurchasePrice)}",
+                        v15Text("গড় কেনা দাম: ${V14DisplayState.currencySymbol} ${v15Money(product.avgPurchasePrice)}","Average purchase price: ${V14DisplayState.currencySymbol} ${v15Money(product.avgPurchasePrice)}"),
                         "Average purchase price: ${V14DisplayState.currencySymbol} ${v15Money(product.avgPurchasePrice)}"
                     )
                 )
 
                 Text(
                     v15Text(
-                        "বিক্রয় দাম: ${V14DisplayState.currencySymbol} ${v15Money(product.sellingPrice)}",
+                        v15Text("বিক্রয় দাম: ${V14DisplayState.currencySymbol} ${v15Money(product.sellingPrice)}","Selling price: ${V14DisplayState.currencySymbol} ${v15Money(product.sellingPrice)}"),
                         "Selling price: ${V14DisplayState.currencySymbol} ${v15Money(product.sellingPrice)}"
                     )
                 )
 
                 Text(
                     v15Text(
-                        "প্রতি ইউনিট লাভ: ${V14DisplayState.currencySymbol} ${v15Money(product.sellingPrice - product.avgPurchasePrice)}",
+                        v15Text("প্রতি ইউনিট লাভ: ${V14DisplayState.currencySymbol} ${v15Money(product.sellingPrice - product.avgPurchasePrice)}","Profit per unit: ${V14DisplayState.currencySymbol} ${v15Money(product.sellingPrice - product.avgPurchasePrice)}"),
                         "Profit per unit: ${V14DisplayState.currencySymbol} ${v15Money(product.sellingPrice - product.avgPurchasePrice)}"
                     ),
                     color = if (product.sellingPrice >= product.avgPurchasePrice) InventoryGreen else InventoryRed,
@@ -424,21 +424,21 @@ private fun ProductDetailScreen(
 
                 Text(
                     v15Text(
-                        "বর্তমান ক্রয় মূল্য: ${V14DisplayState.currencySymbol} ${v15Money(product.stockValue)}",
+                        v15Text("বর্তমান ক্রয় মূল্য: ${V14DisplayState.currencySymbol} ${v15Money(product.stockValue)}","Current purchase value: ${V14DisplayState.currencySymbol} ${v15Money(product.stockValue)}"),
                         "Current purchase value: ${V14DisplayState.currencySymbol} ${v15Money(product.stockValue)}"
                     )
                 )
 
                 Text(
                     v15Text(
-                        "সম্ভাব্য বিক্রয় মূল্য: ${V14DisplayState.currencySymbol} ${v15Money(product.saleValue)}",
+                        v15Text("সম্ভাব্য বিক্রয় মূল্য: ${V14DisplayState.currencySymbol} ${v15Money(product.saleValue)}","Potential sales value: ${V14DisplayState.currencySymbol} ${v15Money(product.saleValue)}"),
                         "Potential sale value: ${V14DisplayState.currencySymbol} ${v15Money(product.saleValue)}"
                     )
                 )
 
                 Text(
                     v15Text(
-                        "সম্ভাব্য লাভ: ${V14DisplayState.currencySymbol} ${v15Money(product.potentialProfit)}",
+                        v15Text("সম্ভাব্য লাভ: ${V14DisplayState.currencySymbol} ${v15Money(product.potentialProfit)}","Potential profit: ${V14DisplayState.currencySymbol} ${v15Money(product.potentialProfit)}"),
                         "Potential profit: ${V14DisplayState.currencySymbol} ${v15Money(product.potentialProfit)}"
                     ),
                     fontWeight = FontWeight.Bold,
@@ -605,7 +605,7 @@ private fun AddProductDialog(
                 if (shopType.isNotBlank()) {
                     Text(
                         v15Text(
-                            "দোকানের ধরন: $shopType",
+                            v15Text("দোকানের ধরন: $shopType","Business type: $shopType"),
                             "Business type: $shopType"
                         ),
                         style = MaterialTheme.typography.bodySmall,
@@ -665,7 +665,7 @@ private fun AddProductDialog(
                 ) {
                     Text(
                         v15Text(
-                            "ইউনিট: $unit",
+                            v15Text("ইউনিট: $unit","Unit: $unit"),
                             "Unit: $unit"
                         )
                     )
@@ -714,7 +714,7 @@ private fun AddProductDialog(
                         label = {
                             Text(
                                 v15Text(
-                                    "ওয়ারেন্টি (মাস)",
+                                    v15Text("ওয়ারেন্টি (মাস)","Warranty (months)"),
                                     "Warranty (months)"
                                 )
                             )
@@ -835,7 +835,7 @@ private fun AddProductDialog(
                     when {
                         name.isBlank() ->
                             error = v15Text(
-                                "পণ্যের নাম লিখুন",
+                                v15Text("পণ্যের নাম লিখুন","Enter product name"),
                                 "Enter product name"
                             )
 
@@ -845,7 +845,7 @@ private fun AddProductDialog(
                             lowValue < 0 ||
                             warrantyMonths < 0 ->
                             error = v15Text(
-                                "সংখ্যাগুলো সঠিক নয়",
+                                v15Text("সংখ্যাগুলো সঠিক নয়","Enter valid numbers"),
                                 "Check numeric values"
                             )
 
@@ -978,7 +978,7 @@ private fun AddBatchDialog(
 
                     if (q == null || q <= 0 || p < 0) {
                         error = v15Text(
-                            "সঠিক তথ্য দিন",
+                            v15Text("সঠিক তথ্য দিন","Enter valid information"),
                             "Enter valid values"
                         )
                     } else {
@@ -1097,7 +1097,7 @@ private fun EditProductDialog(
                     onClick = { showUnitPicker = true },
                     modifier = Modifier.fillMaxWidth()
                 ) {
-                    Text(v15Text("ইউনিট: $unit", "Unit: $unit"))
+                    Text(v15Text(v15Text("ইউনিট: $unit","Unit: $unit"), "Unit: $unit"))
                 }
 
                 OutlinedTextField(
@@ -1131,7 +1131,7 @@ private fun EditProductDialog(
                         warranty,
                         { warranty = it },
                         label = {
-                            Text(v15Text("ওয়ারেন্টি (মাস)", "Warranty (months)"))
+                            Text(v15Text(v15Text("ওয়ারেন্টি (মাস)","Warranty (months)"), "Warranty (months)"))
                         }
                     )
                 }

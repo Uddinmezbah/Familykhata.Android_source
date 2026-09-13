@@ -472,7 +472,7 @@ class FamilyKhataViewModel(application: Application) : AndroidViewModel(applicat
 
                 JSONObject().apply {
                     put("format", "hisabi-khata-backup")
-                    put("version", 3)
+                    put("version", 4)
                     put("createdAt", System.currentTimeMillis())
                     put("transactions", JSONArray().apply {
                         transactions.forEach { item ->
@@ -513,6 +513,14 @@ class FamilyKhataViewModel(application: Application) : AndroidViewModel(applicat
                             })
                         }
                     })
+                    put(
+                        "settings",
+                        V15SettingsBackupBridge.export(
+                            getApplication(),
+                            _selectedWorkspace.value
+                        )
+                    )
+
                     put("inventoryProducts", JSONArray().apply {
                         inventory.products.forEach { product ->
                             put(JSONObject().apply {
@@ -520,6 +528,14 @@ class FamilyKhataViewModel(application: Application) : AndroidViewModel(applicat
                                 put("name", product.name)
                                 put("category", product.category)
                                 put("sku", product.sku)
+                                put("unit", product.unit)
+                                put("brand", product.brand)
+                                put("genericName", product.genericName)
+                                put("modelName", product.modelName)
+                                put("serialOrImei", product.serialOrImei)
+                                put("size", product.size)
+                                put("color", product.color)
+                                put("warrantyMonths", product.warrantyMonths)
                                 put("sellingPrice", product.sellingPrice)
                                 put("lowStockLevel", product.lowStockLevel)
                                 put("note", product.note)
@@ -533,6 +549,7 @@ class FamilyKhataViewModel(application: Application) : AndroidViewModel(applicat
                             put(JSONObject().apply {
                                 put("id", batch.id)
                                 put("productId", batch.productId)
+                                put("batchNo", batch.batchNo)
                                 put("quantity", batch.quantity)
                                 put("purchasePrice", batch.purchasePrice)
                                 put("purchaseDate", batch.purchaseDate)
@@ -560,7 +577,7 @@ class FamilyKhataViewModel(application: Application) : AndroidViewModel(applicat
                     "এটি হিসাবী খাতার সঠিক ব্যাকআপ ফাইল নয়"
                 }
                 val backupVersion = root.optInt("version")
-                require(backupVersion in 1..3) {
+                require(backupVersion in 1..4) {
                     "এই ব্যাকআপ ভার্সনটি এখনো সমর্থিত নয়"
                 }
 
@@ -652,6 +669,14 @@ class FamilyKhataViewModel(application: Application) : AndroidViewModel(applicat
                             name = name,
                             category = item.optString("category", ""),
                             sku = item.optString("sku", ""),
+                            unit = item.optString("unit", "pcs").ifBlank { "pcs" },
+                            brand = item.optString("brand", ""),
+                            genericName = item.optString("genericName", ""),
+                            modelName = item.optString("modelName", ""),
+                            serialOrImei = item.optString("serialOrImei", ""),
+                            size = item.optString("size", ""),
+                            color = item.optString("color", ""),
+                            warrantyMonths = item.optInt("warrantyMonths", 0).coerceAtLeast(0),
                             sellingPrice = item.optDouble("sellingPrice", 0.0).coerceAtLeast(0.0),
                             lowStockLevel = item.optInt("lowStockLevel", 0).coerceAtLeast(0),
                             note = item.optString("note", ""),
@@ -668,6 +693,7 @@ class FamilyKhataViewModel(application: Application) : AndroidViewModel(applicat
                         inventoryBatches += StockBatchEntity(
                             id = item.getLong("id"),
                             productId = productId,
+                            batchNo = item.optString("batchNo", ""),
                             quantity = item.optInt("quantity", 0).coerceAtLeast(0),
                             purchasePrice = item.optDouble("purchasePrice", 0.0).coerceAtLeast(0.0),
                             purchaseDate = item.optLong("purchaseDate", System.currentTimeMillis()),
@@ -688,10 +714,27 @@ class FamilyKhataViewModel(application: Application) : AndroidViewModel(applicat
                 }
 
                 if (backupVersion >= 3) {
-                    InventoryBackupBridge.restore(getApplication(), inventoryProducts, inventoryBatches)
+                    InventoryBackupBridge.restore(
+                        getApplication(),
+                        inventoryProducts,
+                        inventoryBatches
+                    )
                 }
 
-                transactions.size + people.size + entries.size + inventoryProducts.size + inventoryBatches.size
+                if (backupVersion >= 4) {
+                    V15SettingsBackupBridge.restore(
+                        getApplication(),
+                        root.optJSONObject("settings")
+                    )?.let { restoredWorkspace ->
+                        selectWorkspace(restoredWorkspace)
+                    }
+                }
+
+                transactions.size +
+                    people.size +
+                    entries.size +
+                    inventoryProducts.size +
+                    inventoryBatches.size
             }.onSuccess(onDone).onFailure {
                 onError(it.message ?: "ব্যাকআপ রিস্টোর করা যায়নি")
             }

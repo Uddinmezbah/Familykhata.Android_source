@@ -96,6 +96,9 @@ interface InventoryDao {
     @Query("SELECT * FROM inventory_products WHERE workspace = :workspace ORDER BY name COLLATE NOCASE ASC")
     fun observeProducts(workspace: String): Flow<List<ProductEntity>>
 
+    @Query("SELECT * FROM inventory_products WHERE id = :productId LIMIT 1")
+    suspend fun getProductOnce(productId: Long): ProductEntity?
+
     @Query("SELECT * FROM inventory_batches WHERE productId = :productId ORDER BY purchaseDate ASC, id ASC")
     fun observeBatches(productId: Long): Flow<List<StockBatchEntity>>
 

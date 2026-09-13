@@ -7,6 +7,11 @@ import androidx.room.RoomDatabase
 import androidx.room.migration.Migration
 import androidx.room.withTransaction
 import androidx.sqlite.db.SupportSQLiteDatabase
+import com.familykhata.app.agro.AgroCostEntity
+import com.familykhata.app.agro.AgroCycleEntity
+import com.familykhata.app.agro.AgroDao
+import com.familykhata.app.agro.AgroHarvestEntity
+import com.familykhata.app.agro.AgroLossEntity
 import com.familykhata.app.dealership.DealershipDao
 import com.familykhata.app.dealership.DealershipDealerEntity
 import com.familykhata.app.dealership.DealershipInvoiceEntity
@@ -39,15 +44,20 @@ import com.familykhata.app.production.ProductionItemRoleEntity
         DealershipInvoiceEntity::class,
         DealershipInvoiceLineEntity::class,
         DealershipStockAllocationEntity::class,
-        DealershipPaymentEntity::class
+        DealershipPaymentEntity::class,
+        AgroCycleEntity::class,
+        AgroCostEntity::class,
+        AgroLossEntity::class,
+        AgroHarvestEntity::class
     ],
-    version = 4,
+    version = 5,
     exportSchema = false
 )
 abstract class InventoryDatabase : RoomDatabase() {
     abstract fun dao(): InventoryDao
     abstract fun productionDao(): ProductionDao
     abstract fun dealershipDao(): DealershipDao
+    abstract fun agroDao(): AgroDao
 
     companion object {
         @Volatile private var INSTANCE: InventoryDatabase? = null
@@ -572,6 +582,214 @@ abstract class InventoryDatabase : RoomDatabase() {
             }
         }
 
+        private val MIGRATION_4_5 =
+            object : Migration(4, 5) {
+
+                override fun migrate(
+                    db: SupportSQLiteDatabase
+                ) {
+
+                    db.execSQL(
+                        """
+                        CREATE TABLE IF NOT EXISTS `agro_cycles` (
+                            `id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+                            `cycleType` TEXT NOT NULL,
+                            `name` TEXT NOT NULL,
+                            `breedOrVariety` TEXT NOT NULL,
+                            `location` TEXT NOT NULL,
+                            `startingAmount` REAL NOT NULL,
+                            `startingUnit` TEXT NOT NULL,
+                            `startDate` INTEGER NOT NULL,
+                            `expectedEndDate` INTEGER,
+                            `status` TEXT NOT NULL,
+                            `note` TEXT NOT NULL,
+                            `workspace` TEXT NOT NULL,
+                            `createdAt` INTEGER NOT NULL
+                        )
+                        """.trimIndent()
+                    )
+
+                    db.execSQL(
+                        """
+                        CREATE INDEX IF NOT EXISTS
+                        `index_agro_cycles_workspace_status`
+                        ON `agro_cycles`
+                        (`workspace`, `status`)
+                        """.trimIndent()
+                    )
+
+                    db.execSQL(
+                        """
+                        CREATE INDEX IF NOT EXISTS
+                        `index_agro_cycles_startDate`
+                        ON `agro_cycles`
+                        (`startDate`)
+                        """.trimIndent()
+                    )
+
+                    db.execSQL(
+                        """
+                        CREATE TABLE IF NOT EXISTS `agro_costs` (
+                            `id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+                            `cycleId` INTEGER NOT NULL,
+                            `costType` TEXT NOT NULL,
+                            `quantity` REAL NOT NULL,
+                            `unit` TEXT NOT NULL,
+                            `amount` REAL NOT NULL,
+                            `note` TEXT NOT NULL,
+                            `occurredAt` INTEGER NOT NULL,
+                            `createdAt` INTEGER NOT NULL,
+                            FOREIGN KEY(`cycleId`)
+                                REFERENCES `agro_cycles`(`id`)
+                                ON UPDATE NO ACTION
+                                ON DELETE CASCADE
+                        )
+                        """.trimIndent()
+                    )
+
+                    db.execSQL(
+                        """
+                        CREATE INDEX IF NOT EXISTS
+                        `index_agro_costs_cycleId`
+                        ON `agro_costs`
+                        (`cycleId`)
+                        """.trimIndent()
+                    )
+
+                    db.execSQL(
+                        """
+                        CREATE INDEX IF NOT EXISTS
+                        `index_agro_costs_costType`
+                        ON `agro_costs`
+                        (`costType`)
+                        """.trimIndent()
+                    )
+
+                    db.execSQL(
+                        """
+                        CREATE INDEX IF NOT EXISTS
+                        `index_agro_costs_occurredAt`
+                        ON `agro_costs`
+                        (`occurredAt`)
+                        """.trimIndent()
+                    )
+
+                    db.execSQL(
+                        """
+                        CREATE TABLE IF NOT EXISTS `agro_losses` (
+                            `id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+                            `cycleId` INTEGER NOT NULL,
+                            `lossType` TEXT NOT NULL,
+                            `quantity` REAL NOT NULL,
+                            `unit` TEXT NOT NULL,
+                            `reason` TEXT NOT NULL,
+                            `occurredAt` INTEGER NOT NULL,
+                            `createdAt` INTEGER NOT NULL,
+                            FOREIGN KEY(`cycleId`)
+                                REFERENCES `agro_cycles`(`id`)
+                                ON UPDATE NO ACTION
+                                ON DELETE CASCADE
+                        )
+                        """.trimIndent()
+                    )
+
+                    db.execSQL(
+                        """
+                        CREATE INDEX IF NOT EXISTS
+                        `index_agro_losses_cycleId`
+                        ON `agro_losses`
+                        (`cycleId`)
+                        """.trimIndent()
+                    )
+
+                    db.execSQL(
+                        """
+                        CREATE INDEX IF NOT EXISTS
+                        `index_agro_losses_lossType`
+                        ON `agro_losses`
+                        (`lossType`)
+                        """.trimIndent()
+                    )
+
+                    db.execSQL(
+                        """
+                        CREATE INDEX IF NOT EXISTS
+                        `index_agro_losses_occurredAt`
+                        ON `agro_losses`
+                        (`occurredAt`)
+                        """.trimIndent()
+                    )
+
+                    db.execSQL(
+                        """
+                        CREATE TABLE IF NOT EXISTS `agro_harvests` (
+                            `id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+                            `cycleId` INTEGER NOT NULL,
+                            `productId` INTEGER,
+                            `inventoryBatchId` INTEGER,
+                            `productNameSnapshot` TEXT NOT NULL,
+                            `quantity` INTEGER NOT NULL,
+                            `unitSnapshot` TEXT NOT NULL,
+                            `allocatedCost` REAL NOT NULL,
+                            `unitCost` REAL NOT NULL,
+                            `batchNo` TEXT NOT NULL,
+                            `harvestedAt` INTEGER NOT NULL,
+                            `note` TEXT NOT NULL,
+                            `createdAt` INTEGER NOT NULL,
+                            FOREIGN KEY(`cycleId`)
+                                REFERENCES `agro_cycles`(`id`)
+                                ON UPDATE NO ACTION
+                                ON DELETE CASCADE,
+                            FOREIGN KEY(`productId`)
+                                REFERENCES `inventory_products`(`id`)
+                                ON UPDATE NO ACTION
+                                ON DELETE SET NULL,
+                            FOREIGN KEY(`inventoryBatchId`)
+                                REFERENCES `inventory_batches`(`id`)
+                                ON UPDATE NO ACTION
+                                ON DELETE SET NULL
+                        )
+                        """.trimIndent()
+                    )
+
+                    db.execSQL(
+                        """
+                        CREATE INDEX IF NOT EXISTS
+                        `index_agro_harvests_cycleId`
+                        ON `agro_harvests`
+                        (`cycleId`)
+                        """.trimIndent()
+                    )
+
+                    db.execSQL(
+                        """
+                        CREATE INDEX IF NOT EXISTS
+                        `index_agro_harvests_productId`
+                        ON `agro_harvests`
+                        (`productId`)
+                        """.trimIndent()
+                    )
+
+                    db.execSQL(
+                        """
+                        CREATE INDEX IF NOT EXISTS
+                        `index_agro_harvests_inventoryBatchId`
+                        ON `agro_harvests`
+                        (`inventoryBatchId`)
+                        """.trimIndent()
+                    )
+
+                    db.execSQL(
+                        """
+                        CREATE INDEX IF NOT EXISTS
+                        `index_agro_harvests_harvestedAt`
+                        ON `agro_harvests`
+                        (`harvestedAt`)
+                        """.trimIndent()
+                    )
+                }
+            }
+
         fun get(context: Context): InventoryDatabase = INSTANCE ?: synchronized(this) {
             INSTANCE ?: Room.databaseBuilder(
                 context.applicationContext,
@@ -581,7 +799,8 @@ abstract class InventoryDatabase : RoomDatabase() {
                 .addMigrations(
                     MIGRATION_1_2,
                     MIGRATION_2_3,
-                    MIGRATION_3_4
+                    MIGRATION_3_4,
+                    MIGRATION_4_5
                 )
                 .build()
                 .also { INSTANCE = it }

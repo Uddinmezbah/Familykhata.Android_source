@@ -266,6 +266,16 @@ fun FamilyKhataApp(viewModel: FamilyKhataViewModel) {
                                         }
                                     )
 
+                                BusinessMode.BOOKING_RENTAL ->
+                                    V15BookingScreen(
+                                        workspace = workspace,
+                                        shopType = businessType,
+                                        canWrite = !trialStatus.expired,
+                                        onExit = {
+                                            tab = Tab.DASHBOARD
+                                        }
+                                    )
+
                                 else ->
                                     V15InventoryScreen(
                                         workspace = workspace,
@@ -1851,6 +1861,9 @@ private fun tabLabel(
 
             BusinessMode.MEMBERSHIP_SERVICE ->
                 v15Text("মেম্বার", "Members")
+
+            BusinessMode.BOOKING_RENTAL ->
+                v15Text("বুকিং", "Bookings")
 
             else ->
                 v15Text("পণ্য", "Products")

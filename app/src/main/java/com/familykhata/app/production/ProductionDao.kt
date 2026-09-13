@@ -37,6 +37,18 @@ interface ProductionDao {
         workspace: String
     ): Flow<List<ProductionItemRoleEntity>>
 
+    @Query(
+        """
+        SELECT *
+        FROM production_item_roles
+        WHERE productId = :productId
+        LIMIT 1
+        """
+    )
+    suspend fun getItemRoleOnce(
+        productId: Long
+    ): ProductionItemRoleEntity?
+
     @Insert(onConflict = OnConflictStrategy.ABORT)
     suspend fun insertProductionBatch(
         item: ProductionBatchEntity

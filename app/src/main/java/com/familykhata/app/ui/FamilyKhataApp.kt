@@ -247,6 +247,16 @@ fun FamilyKhataApp(viewModel: FamilyKhataViewModel) {
                                         }
                                     )
 
+                                BusinessMode.FOOD_SERVICE ->
+                                    V15FoodServiceScreen(
+                                        workspace = workspace,
+                                        shopType = businessType,
+                                        canWrite = !trialStatus.expired,
+                                        onExit = {
+                                            tab = Tab.DASHBOARD
+                                        }
+                                    )
+
                                 BusinessMode.AGRO ->
                                     V15AgroScreen(
                                         workspace = workspace,
@@ -1883,6 +1893,9 @@ private fun tabLabel(
 
             BusinessMode.DIGITAL_AGENCY ->
                 v15Text("ক্লায়েন্ট", "Clients")
+
+            BusinessMode.FOOD_SERVICE ->
+                v15Text("অর্ডার", "Orders")
 
             BusinessMode.AGRO ->
                 v15Text("খামার", "Agro")

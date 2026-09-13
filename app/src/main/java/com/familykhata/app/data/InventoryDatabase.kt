@@ -12,6 +12,13 @@ import com.familykhata.app.agro.AgroCycleEntity
 import com.familykhata.app.agro.AgroDao
 import com.familykhata.app.agro.AgroHarvestEntity
 import com.familykhata.app.agro.AgroLossEntity
+import com.familykhata.app.foodservice.FoodMenuItemEntity
+import com.familykhata.app.foodservice.FoodOrderEntity
+import com.familykhata.app.foodservice.FoodOrderLineEntity
+import com.familykhata.app.foodservice.FoodPaymentEntity
+import com.familykhata.app.foodservice.FoodRecipeIngredientEntity
+import com.familykhata.app.foodservice.FoodServiceDao
+import com.familykhata.app.foodservice.FoodStockAllocationEntity
 import com.familykhata.app.dealership.DealershipDao
 import com.familykhata.app.dealership.DealershipDealerEntity
 import com.familykhata.app.dealership.DealershipInvoiceEntity
@@ -48,9 +55,15 @@ import com.familykhata.app.production.ProductionItemRoleEntity
         AgroCycleEntity::class,
         AgroCostEntity::class,
         AgroLossEntity::class,
-        AgroHarvestEntity::class
+        AgroHarvestEntity::class,
+        FoodMenuItemEntity::class,
+        FoodRecipeIngredientEntity::class,
+        FoodOrderEntity::class,
+        FoodOrderLineEntity::class,
+        FoodStockAllocationEntity::class,
+        FoodPaymentEntity::class
     ],
-    version = 5,
+    version = 6,
     exportSchema = false
 )
 abstract class InventoryDatabase : RoomDatabase() {
@@ -58,6 +71,7 @@ abstract class InventoryDatabase : RoomDatabase() {
     abstract fun productionDao(): ProductionDao
     abstract fun dealershipDao(): DealershipDao
     abstract fun agroDao(): AgroDao
+    abstract fun foodServiceDao(): FoodServiceDao
 
     companion object {
         @Volatile private var INSTANCE: InventoryDatabase? = null
@@ -790,6 +804,258 @@ abstract class InventoryDatabase : RoomDatabase() {
                 }
             }
 
+        private val MIGRATION_5_6 =
+            object : Migration(5, 6) {
+
+                override fun migrate(
+                    db: SupportSQLiteDatabase
+                ) {
+
+                    db.execSQL(
+                        """
+                        CREATE TABLE IF NOT EXISTS `food_menu_items` (
+                            `id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+                            `name` TEXT NOT NULL,
+                            `category` TEXT NOT NULL,
+                            `sellingPrice` REAL NOT NULL,
+                            `active` INTEGER NOT NULL,
+                            `note` TEXT NOT NULL,
+                            `workspace` TEXT NOT NULL,
+                            `createdAt` INTEGER NOT NULL
+                        )
+                        """.trimIndent()
+                    )
+
+                    db.execSQL(
+                        """
+                        CREATE INDEX IF NOT EXISTS
+                        `index_food_menu_items_workspace_name`
+                        ON `food_menu_items`
+                        (`workspace`, `name`)
+                        """.trimIndent()
+                    )
+
+                    db.execSQL(
+                        """
+                        CREATE TABLE IF NOT EXISTS `food_recipe_ingredients` (
+                            `id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+                            `menuItemId` INTEGER NOT NULL,
+                            `ingredientProductId` INTEGER,
+                            `ingredientNameSnapshot` TEXT NOT NULL,
+                            `quantityPerItem` INTEGER NOT NULL,
+                            `unitSnapshot` TEXT NOT NULL,
+                            `createdAt` INTEGER NOT NULL,
+                            FOREIGN KEY(`menuItemId`)
+                                REFERENCES `food_menu_items`(`id`)
+                                ON UPDATE NO ACTION
+                                ON DELETE CASCADE,
+                            FOREIGN KEY(`ingredientProductId`)
+                                REFERENCES `inventory_products`(`id`)
+                                ON UPDATE NO ACTION
+                                ON DELETE SET NULL
+                        )
+                        """.trimIndent()
+                    )
+
+                    db.execSQL(
+                        """
+                        CREATE INDEX IF NOT EXISTS
+                        `index_food_recipe_ingredients_menuItemId`
+                        ON `food_recipe_ingredients`
+                        (`menuItemId`)
+                        """.trimIndent()
+                    )
+
+                    db.execSQL(
+                        """
+                        CREATE INDEX IF NOT EXISTS
+                        `index_food_recipe_ingredients_ingredientProductId`
+                        ON `food_recipe_ingredients`
+                        (`ingredientProductId`)
+                        """.trimIndent()
+                    )
+
+                    db.execSQL(
+                        """
+                        CREATE TABLE IF NOT EXISTS `food_orders` (
+                            `id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+                            `orderNo` TEXT NOT NULL,
+                            `orderType` TEXT NOT NULL,
+                            `customerName` TEXT NOT NULL,
+                            `phone` TEXT NOT NULL,
+                            `tableOrReference` TEXT NOT NULL,
+                            `eventDate` INTEGER,
+                            `guestCount` INTEGER NOT NULL,
+                            `status` TEXT NOT NULL,
+                            `orderedAt` INTEGER NOT NULL,
+                            `note` TEXT NOT NULL,
+                            `workspace` TEXT NOT NULL,
+                            `createdAt` INTEGER NOT NULL
+                        )
+                        """.trimIndent()
+                    )
+
+                    db.execSQL(
+                        """
+                        CREATE INDEX IF NOT EXISTS
+                        `index_food_orders_workspace_status`
+                        ON `food_orders`
+                        (`workspace`, `status`)
+                        """.trimIndent()
+                    )
+
+                    db.execSQL(
+                        """
+                        CREATE INDEX IF NOT EXISTS
+                        `index_food_orders_orderedAt`
+                        ON `food_orders`
+                        (`orderedAt`)
+                        """.trimIndent()
+                    )
+
+                    db.execSQL(
+                        """
+                        CREATE INDEX IF NOT EXISTS
+                        `index_food_orders_eventDate`
+                        ON `food_orders`
+                        (`eventDate`)
+                        """.trimIndent()
+                    )
+
+                    db.execSQL(
+                        """
+                        CREATE TABLE IF NOT EXISTS `food_order_lines` (
+                            `id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+                            `orderId` INTEGER NOT NULL,
+                            `menuItemId` INTEGER,
+                            `menuItemNameSnapshot` TEXT NOT NULL,
+                            `quantity` INTEGER NOT NULL,
+                            `unitPrice` REAL NOT NULL,
+                            `lineTotal` REAL NOT NULL,
+                            `createdAt` INTEGER NOT NULL,
+                            FOREIGN KEY(`orderId`)
+                                REFERENCES `food_orders`(`id`)
+                                ON UPDATE NO ACTION
+                                ON DELETE CASCADE,
+                            FOREIGN KEY(`menuItemId`)
+                                REFERENCES `food_menu_items`(`id`)
+                                ON UPDATE NO ACTION
+                                ON DELETE SET NULL
+                        )
+                        """.trimIndent()
+                    )
+
+                    db.execSQL(
+                        """
+                        CREATE INDEX IF NOT EXISTS
+                        `index_food_order_lines_orderId`
+                        ON `food_order_lines`
+                        (`orderId`)
+                        """.trimIndent()
+                    )
+
+                    db.execSQL(
+                        """
+                        CREATE INDEX IF NOT EXISTS
+                        `index_food_order_lines_menuItemId`
+                        ON `food_order_lines`
+                        (`menuItemId`)
+                        """.trimIndent()
+                    )
+
+                    db.execSQL(
+                        """
+                        CREATE TABLE IF NOT EXISTS `food_stock_allocations` (
+                            `id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+                            `orderLineId` INTEGER NOT NULL,
+                            `ingredientProductId` INTEGER,
+                            `ingredientNameSnapshot` TEXT NOT NULL,
+                            `sourceStockBatchId` INTEGER,
+                            `sourceBatchNoSnapshot` TEXT NOT NULL,
+                            `quantity` INTEGER NOT NULL,
+                            `unitCost` REAL NOT NULL,
+                            `totalCost` REAL NOT NULL,
+                            `createdAt` INTEGER NOT NULL,
+                            FOREIGN KEY(`orderLineId`)
+                                REFERENCES `food_order_lines`(`id`)
+                                ON UPDATE NO ACTION
+                                ON DELETE CASCADE,
+                            FOREIGN KEY(`ingredientProductId`)
+                                REFERENCES `inventory_products`(`id`)
+                                ON UPDATE NO ACTION
+                                ON DELETE SET NULL,
+                            FOREIGN KEY(`sourceStockBatchId`)
+                                REFERENCES `inventory_batches`(`id`)
+                                ON UPDATE NO ACTION
+                                ON DELETE SET NULL
+                        )
+                        """.trimIndent()
+                    )
+
+                    db.execSQL(
+                        """
+                        CREATE INDEX IF NOT EXISTS
+                        `index_food_stock_allocations_orderLineId`
+                        ON `food_stock_allocations`
+                        (`orderLineId`)
+                        """.trimIndent()
+                    )
+
+                    db.execSQL(
+                        """
+                        CREATE INDEX IF NOT EXISTS
+                        `index_food_stock_allocations_ingredientProductId`
+                        ON `food_stock_allocations`
+                        (`ingredientProductId`)
+                        """.trimIndent()
+                    )
+
+                    db.execSQL(
+                        """
+                        CREATE INDEX IF NOT EXISTS
+                        `index_food_stock_allocations_sourceStockBatchId`
+                        ON `food_stock_allocations`
+                        (`sourceStockBatchId`)
+                        """.trimIndent()
+                    )
+
+                    db.execSQL(
+                        """
+                        CREATE TABLE IF NOT EXISTS `food_payments` (
+                            `id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+                            `orderId` INTEGER NOT NULL,
+                            `amount` REAL NOT NULL,
+                            `paidAt` INTEGER NOT NULL,
+                            `note` TEXT NOT NULL,
+                            `createdAt` INTEGER NOT NULL,
+                            FOREIGN KEY(`orderId`)
+                                REFERENCES `food_orders`(`id`)
+                                ON UPDATE NO ACTION
+                                ON DELETE CASCADE
+                        )
+                        """.trimIndent()
+                    )
+
+                    db.execSQL(
+                        """
+                        CREATE INDEX IF NOT EXISTS
+                        `index_food_payments_orderId`
+                        ON `food_payments`
+                        (`orderId`)
+                        """.trimIndent()
+                    )
+
+                    db.execSQL(
+                        """
+                        CREATE INDEX IF NOT EXISTS
+                        `index_food_payments_paidAt`
+                        ON `food_payments`
+                        (`paidAt`)
+                        """.trimIndent()
+                    )
+                }
+            }
+
         fun get(context: Context): InventoryDatabase = INSTANCE ?: synchronized(this) {
             INSTANCE ?: Room.databaseBuilder(
                 context.applicationContext,
@@ -800,7 +1066,8 @@ abstract class InventoryDatabase : RoomDatabase() {
                     MIGRATION_1_2,
                     MIGRATION_2_3,
                     MIGRATION_3_4,
-                    MIGRATION_4_5
+                    MIGRATION_4_5,
+                    MIGRATION_5_6
                 )
                 .build()
                 .also { INSTANCE = it }

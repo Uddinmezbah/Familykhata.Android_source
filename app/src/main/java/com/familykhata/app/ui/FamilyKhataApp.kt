@@ -51,6 +51,8 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import com.familykhata.app.FamilyKhataViewModel
+import com.familykhata.app.BusinessMode
+import com.familykhata.app.detectBusinessMode
 import com.familykhata.app.data.BakiEntryEntity
 import com.familykhata.app.data.BakiPersonSummary
 import com.familykhata.app.data.TransactionEntity
@@ -91,6 +93,23 @@ fun FamilyKhataApp(viewModel: FamilyKhataViewModel) {
     val trialStatus by viewModel.trialStatus.collectAsState()
     val isAppUnlocked by viewModel.isAppUnlocked.collectAsState()
     val appContext = LocalContext.current
+
+    val businessType =
+        appContext.getSharedPreferences(
+            "hisabi_khata_v14_settings",
+            Context.MODE_PRIVATE
+        ).getString(
+            "business_type",
+            ""
+        ).orEmpty()
+
+    val businessMode =
+        if (workspace == "SHOP") {
+            detectBusinessMode(businessType)
+        } else {
+            BusinessMode.RETAIL
+        }
+
     V15LanguageState.ensureInitialized(appContext)
     var showSettingsMenu by remember { mutableStateOf(false) }
     LaunchedEffect(Unit) { V14DisplayState.initialize(appContext) }
@@ -142,7 +161,11 @@ fun FamilyKhataApp(viewModel: FamilyKhataViewModel) {
                             },
                             label = {
                                 Text(
-                                    tabLabel(item, workspace),
+                                    tabLabel(
+                                        item,
+                                        workspace,
+                                        businessMode
+                                    ),
                                     fontWeight = if (tab == item) FontWeight.Bold else FontWeight.Medium
                                 )
                             }
@@ -204,11 +227,27 @@ fun FamilyKhataApp(viewModel: FamilyKhataViewModel) {
                             canWrite = !trialStatus.expired,
                             onExit = { tab = Tab.DASHBOARD }
                         )
-                        Tab.PRODUCTS -> V15InventoryScreen(
-                            workspace = workspace,
-                            canWrite = !trialStatus.expired,
-                            onExit = { tab = Tab.DASHBOARD }
-                        )
+                        Tab.PRODUCTS -> {
+                            when (businessMode) {
+                                BusinessMode.COACHING ->
+                                    V15CoachingScreen(
+                                        workspace = workspace,
+                                        canWrite = !trialStatus.expired,
+                                        onExit = {
+                                            tab = Tab.DASHBOARD
+                                        }
+                                    )
+
+                                else ->
+                                    V15InventoryScreen(
+                                        workspace = workspace,
+                                        canWrite = !trialStatus.expired,
+                                        onExit = {
+                                            tab = Tab.DASHBOARD
+                                        }
+                                    )
+                            }
+                        }
                         Tab.HISTORY -> HistoryScreen(viewModel, workspace)
                         Tab.MORE -> MoreScreen(viewModel)
                     }
@@ -1751,13 +1790,49 @@ private fun workspaceSummary(workspace: String): String = when (workspace) {
     else -> v15Text("পরিবারের সার্বিক আয়-খরচ ও দেনা-পাওনা", "Family income, expenses and dues")
 }
 
-private fun tabLabel(tab: Tab, workspace: String): String = when (tab) {
-    Tab.DASHBOARD -> v15Text("হোম", "Home")
-    Tab.ADD -> if (workspace == "SHOP") v15Text("ক্যাশ", "Cash") else v15Text("নতুন", "Add")
-    Tab.BAKI -> if (workspace == "SHOP") v15Text("খাতা", "Ledger") else v15Text("বাকি", "Due")
-    Tab.PRODUCTS -> v15Text("পণ্য", "Products")
-    Tab.HISTORY -> if (workspace == "SHOP") v15Text("লেনদেন", "History") else v15Text("হিসাব", "History")
-    Tab.MORE -> v15Text("আরও", "More")
+private fun tabLabel(
+    tab: Tab,
+    workspace: String,
+    businessMode: BusinessMode
+): String = when (tab) {
+    Tab.DASHBOARD ->
+        v15Text("হোম", "Home")
+
+    Tab.ADD ->
+        if (workspace == "SHOP")
+            v15Text("ক্যাশ", "Cash")
+        else
+            v15Text("নতুন", "Add")
+
+    Tab.BAKI ->
+        if (workspace == "SHOP")
+            v15Text("খাতা", "Ledger")
+        else
+            v15Text("বাকি", "Due")
+
+    Tab.PRODUCTS ->
+        when (businessMode) {
+            BusinessMode.COACHING ->
+                v15Text("শিক্ষার্থী", "Students")
+
+            BusinessMode.DIGITAL_AGENCY ->
+                v15Text("ক্লায়েন্ট", "Clients")
+
+            BusinessMode.DEALERSHIP ->
+                v15Text("পণ্য", "Products")
+
+            BusinessMode.RETAIL ->
+                v15Text("পণ্য", "Products")
+        }
+
+    Tab.HISTORY ->
+        if (workspace == "SHOP")
+            v15Text("লেনদেন", "History")
+        else
+            v15Text("হিসাব", "History")
+
+    Tab.MORE ->
+        v15Text("আরও", "More")
 }
 
 private fun tabSymbol(tab: Tab): String = when (tab) {

@@ -247,6 +247,16 @@ fun FamilyKhataApp(viewModel: FamilyKhataViewModel) {
                                         }
                                     )
 
+                                BusinessMode.SERVICE_JOB ->
+                                    V15ServiceJobScreen(
+                                        workspace = workspace,
+                                        shopType = businessType,
+                                        canWrite = !trialStatus.expired,
+                                        onExit = {
+                                            tab = Tab.DASHBOARD
+                                        }
+                                    )
+
                                 else ->
                                     V15InventoryScreen(
                                         workspace = workspace,
@@ -1826,6 +1836,9 @@ private fun tabLabel(
 
             BusinessMode.DIGITAL_AGENCY ->
                 v15Text("ক্লায়েন্ট", "Clients")
+
+            BusinessMode.SERVICE_JOB ->
+                v15Text("সার্ভিস", "Services")
 
             else ->
                 v15Text("পণ্য", "Products")

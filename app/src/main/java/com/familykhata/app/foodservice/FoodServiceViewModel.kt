@@ -171,6 +171,17 @@ class FoodServiceViewModel(
                                 currentWorkspace
                         )
 
+                        require(
+                            dao.countRecipeIngredient(
+                                menuItemId =
+                                    menuItemId,
+                                productId =
+                                    product.id
+                            ) == 0
+                        ) {
+                            "Ingredient already exists in recipe"
+                        }
+
                         dao.insertRecipeIngredient(
                             FoodRecipeIngredientEntity(
                                 menuItemId =

@@ -88,6 +88,19 @@ interface FoodServiceDao {
         menuItemId: Long
     ): List<FoodRecipeIngredientEntity>
 
+    @Query(
+        """
+        SELECT COUNT(*)
+        FROM food_recipe_ingredients
+        WHERE menuItemId = :menuItemId
+          AND ingredientProductId = :productId
+        """
+    )
+    suspend fun countRecipeIngredient(
+        menuItemId: Long,
+        productId: Long
+    ): Int
+
     @Delete
     suspend fun deleteRecipeIngredient(
         item: FoodRecipeIngredientEntity

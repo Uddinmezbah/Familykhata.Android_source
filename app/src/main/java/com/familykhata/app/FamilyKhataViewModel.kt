@@ -469,10 +469,14 @@ class FamilyKhataViewModel(application: Application) : AndroidViewModel(applicat
                 val people = dao.getAllPeople()
                 val entries = dao.getAllBakiEntries()
                 val inventory = InventoryBackupBridge.export(getApplication())
+                val businessData =
+                    V15BusinessBackupBridge.export(
+                        getApplication()
+                    )
 
                 JSONObject().apply {
                     put("format", "hisabi-khata-backup")
-                    put("version", 4)
+                    put("version", 5)
                     put("createdAt", System.currentTimeMillis())
                     put("transactions", JSONArray().apply {
                         transactions.forEach { item ->
@@ -519,6 +523,11 @@ class FamilyKhataViewModel(application: Application) : AndroidViewModel(applicat
                             getApplication(),
                             _selectedWorkspace.value
                         )
+                    )
+
+                    put(
+                        "businessData",
+                        businessData
                     )
 
                     put("inventoryProducts", JSONArray().apply {
@@ -577,7 +586,7 @@ class FamilyKhataViewModel(application: Application) : AndroidViewModel(applicat
                     "এটি হিসাবী খাতার সঠিক ব্যাকআপ ফাইল নয়"
                 }
                 val backupVersion = root.optInt("version")
-                require(backupVersion in 1..4) {
+                require(backupVersion in 1..5) {
                     "এই ব্যাকআপ ভার্সনটি এখনো সমর্থিত নয়"
                 }
 
@@ -721,6 +730,18 @@ class FamilyKhataViewModel(application: Application) : AndroidViewModel(applicat
                     )
                 }
 
+                val businessRowsRestored =
+                    V15BusinessBackupBridge.restore(
+                        getApplication(),
+                        if (backupVersion >= 5) {
+                            root.optJSONObject(
+                                "businessData"
+                            )
+                        } else {
+                            null
+                        }
+                    )
+
                 if (backupVersion >= 4) {
                     V15SettingsBackupBridge.restore(
                         getApplication(),
@@ -734,7 +755,8 @@ class FamilyKhataViewModel(application: Application) : AndroidViewModel(applicat
                     people.size +
                     entries.size +
                     inventoryProducts.size +
-                    inventoryBatches.size
+                    inventoryBatches.size +
+                    businessRowsRestored
             }.onSuccess(onDone).onFailure {
                 onError(it.message ?: "ব্যাকআপ রিস্টোর করা যায়নি")
             }

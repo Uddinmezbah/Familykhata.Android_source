@@ -2,7 +2,7 @@ name: Build Play-Ready Android Release
 
 on:
   push:
-    branches: [ "main" ]
+    branches: [ "main", "v1.4-test" ]
   workflow_dispatch:
 
 jobs:

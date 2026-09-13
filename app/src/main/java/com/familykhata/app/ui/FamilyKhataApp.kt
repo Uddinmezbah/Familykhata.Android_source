@@ -238,6 +238,15 @@ fun FamilyKhataApp(viewModel: FamilyKhataViewModel) {
                                         }
                                     )
 
+                                BusinessMode.DIGITAL_AGENCY ->
+                                    V15AgencyScreen(
+                                        workspace = workspace,
+                                        canWrite = !trialStatus.expired,
+                                        onExit = {
+                                            tab = Tab.DASHBOARD
+                                        }
+                                    )
+
                                 else ->
                                     V15InventoryScreen(
                                         workspace = workspace,

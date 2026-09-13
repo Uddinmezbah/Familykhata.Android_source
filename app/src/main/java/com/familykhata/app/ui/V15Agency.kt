@@ -1,0 +1,1099 @@
+package com.familykhata.app.ui
+
+import androidx.activity.compose.BackHandler
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.Button
+import androidx.compose.material3.Card
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.dp
+import androidx.lifecycle.viewmodel.compose.viewModel
+import com.familykhata.app.agency.AgencyClientEntity
+import com.familykhata.app.agency.AgencyPaymentEntity
+import com.familykhata.app.agency.AgencyProjectSummary
+import com.familykhata.app.agency.AgencyViewModel
+import java.text.SimpleDateFormat
+import java.util.Date
+import java.util.Locale
+
+@Composable
+internal fun V15AgencyScreen(
+    workspace: String,
+    canWrite: Boolean,
+    onExit: () -> Unit
+) {
+    val vm: AgencyViewModel = viewModel()
+
+    val clients by vm.clients.collectAsState()
+    val projects by vm.projects.collectAsState()
+
+    var showClientDialog by remember {
+        mutableStateOf(false)
+    }
+
+    var showProjectDialog by remember {
+        mutableStateOf(false)
+    }
+
+    var selectedProject by remember {
+        mutableStateOf<AgencyProjectSummary?>(null)
+    }
+
+    LaunchedEffect(workspace) {
+        vm.setWorkspace(workspace)
+    }
+
+    BackHandler(enabled = selectedProject != null) {
+        selectedProject = null
+    }
+
+    BackHandler(enabled = selectedProject == null) {
+        onExit()
+    }
+
+    if (selectedProject != null) {
+        AgencyProjectLedger(
+            project = selectedProject!!,
+            viewModel = vm,
+            canWrite = canWrite,
+            onBack = {
+                selectedProject = null
+            }
+        )
+
+        return
+    }
+
+    val totalValue =
+        projects.sumOf {
+            it.totalPrice
+        }
+
+    val totalPaid =
+        projects.sumOf {
+            it.totalPaid
+        }
+
+    val totalDue =
+        projects.sumOf {
+            it.dueAmount.coerceAtLeast(0.0)
+        }
+
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .verticalScroll(
+                rememberScrollState()
+            ),
+        verticalArrangement =
+            Arrangement.spacedBy(12.dp)
+    ) {
+        Text(
+            v15Text(
+                "ডিজিটাল এজেন্সি",
+                "Digital Agency"
+            ),
+            style =
+                MaterialTheme.typography.headlineSmall,
+            fontWeight = FontWeight.ExtraBold
+        )
+
+        Text(
+            v15Text(
+                "ক্লায়েন্ট, প্রজেক্ট, পেমেন্ট ও বকেয়া",
+                "Clients, projects, payments and dues"
+            )
+        )
+
+        Row(
+            modifier =
+                Modifier.fillMaxWidth(),
+            horizontalArrangement =
+                Arrangement.spacedBy(8.dp)
+        ) {
+            AgencyMetric(
+                title =
+                    v15Text(
+                        "প্রজেক্ট",
+                        "Projects"
+                    ),
+                value =
+                    projects.size.toString(),
+                modifier =
+                    Modifier.weight(1f)
+            )
+
+            AgencyMetric(
+                title =
+                    v15Text(
+                        "মোট মূল্য",
+                        "Value"
+                    ),
+                value =
+                    agencyMoney(totalValue),
+                modifier =
+                    Modifier.weight(1f)
+            )
+        }
+
+        Row(
+            modifier =
+                Modifier.fillMaxWidth(),
+            horizontalArrangement =
+                Arrangement.spacedBy(8.dp)
+        ) {
+            AgencyMetric(
+                title =
+                    v15Text(
+                        "আদায়",
+                        "Paid"
+                    ),
+                value =
+                    agencyMoney(totalPaid),
+                modifier =
+                    Modifier.weight(1f)
+            )
+
+            AgencyMetric(
+                title =
+                    v15Text(
+                        "বকেয়া",
+                        "Due"
+                    ),
+                value =
+                    agencyMoney(totalDue),
+                modifier =
+                    Modifier.weight(1f)
+            )
+        }
+
+        if (canWrite) {
+            Row(
+                modifier =
+                    Modifier.fillMaxWidth(),
+                horizontalArrangement =
+                    Arrangement.spacedBy(8.dp)
+            ) {
+                Button(
+                    onClick = {
+                        showClientDialog = true
+                    },
+                    modifier =
+                        Modifier.weight(1f)
+                ) {
+                    Text(
+                        v15Text(
+                            "+ ক্লায়েন্ট",
+                            "+ Client"
+                        )
+                    )
+                }
+
+                OutlinedButton(
+                    onClick = {
+                        showProjectDialog = true
+                    },
+                    enabled = clients.isNotEmpty(),
+                    modifier =
+                        Modifier.weight(1f)
+                ) {
+                    Text(
+                        v15Text(
+                            "+ প্রজেক্ট",
+                            "+ Project"
+                        )
+                    )
+                }
+            }
+        }
+
+        Text(
+            v15Text(
+                "চলমান প্রজেক্ট ও হিসাব",
+                "Projects & accounts"
+            ),
+            fontWeight = FontWeight.Bold
+        )
+
+        if (projects.isEmpty()) {
+            Text(
+                v15Text(
+                    "এখনো কোনো প্রজেক্ট যোগ করা হয়নি।",
+                    "No projects added yet."
+                )
+            )
+        } else {
+            projects.forEach { item ->
+                AgencyProjectCard(
+                    item = item,
+                    onClick = {
+                        selectedProject = item
+                    }
+                )
+            }
+        }
+    }
+
+    if (showClientDialog) {
+        AddAgencyClientDialog(
+            onDismiss = {
+                showClientDialog = false
+            }
+        ) {
+                name,
+                phone,
+                email,
+                company,
+                note ->
+
+            vm.addClient(
+                name = name,
+                phone = phone,
+                email = email,
+                company = company,
+                note = note,
+                workspace = workspace
+            )
+
+            showClientDialog = false
+        }
+    }
+
+    if (showProjectDialog) {
+        AddAgencyProjectDialog(
+            clients = clients,
+            onDismiss = {
+                showProjectDialog = false
+            }
+        ) {
+                clientId,
+                title,
+                service,
+                total,
+                advance,
+                note ->
+
+            vm.addProject(
+                clientId = clientId,
+                title = title,
+                serviceType = service,
+                totalPrice = total,
+                advance = advance,
+                note = note
+            )
+
+            showProjectDialog = false
+        }
+    }
+}
+
+@Composable
+private fun AgencyMetric(
+    title: String,
+    value: String,
+    modifier: Modifier
+) {
+    Card(modifier = modifier) {
+        Column(
+            modifier =
+                Modifier.padding(11.dp)
+        ) {
+            Text(
+                title,
+                style =
+                    MaterialTheme.typography.labelSmall
+            )
+
+            Text(
+                value,
+                fontWeight = FontWeight.Bold
+            )
+        }
+    }
+}
+
+@Composable
+private fun AgencyProjectCard(
+    item: AgencyProjectSummary,
+    onClick: () -> Unit
+) {
+    Card(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable(onClick = onClick)
+    ) {
+        Column(
+            modifier =
+                Modifier.padding(14.dp),
+            verticalArrangement =
+                Arrangement.spacedBy(4.dp)
+        ) {
+            Row(
+                modifier =
+                    Modifier.fillMaxWidth(),
+                horizontalArrangement =
+                    Arrangement.SpaceBetween
+            ) {
+                Text(
+                    item.title,
+                    fontWeight =
+                        FontWeight.Bold
+                )
+
+                Text(
+                    agencyStatusLabel(
+                        item.status
+                    ),
+                    style =
+                        MaterialTheme.typography.labelMedium
+                )
+            }
+
+            Text(
+                v15Text(
+                    "ক্লায়েন্ট: ${item.clientName}",
+                    "Client: ${item.clientName}"
+                )
+            )
+
+            if (
+                item.company.isNotBlank()
+            ) {
+                Text(item.company)
+            }
+
+            if (
+                item.serviceType.isNotBlank()
+            ) {
+                Text(
+                    v15Text(
+                        "সার্ভিস: ${item.serviceType}",
+                        "Service: ${item.serviceType}"
+                    )
+                )
+            }
+
+            Text(
+                v15Text(
+                    "মোট: ${agencyMoney(item.totalPrice)}",
+                    "Total: ${agencyMoney(item.totalPrice)}"
+                )
+            )
+
+            Text(
+                v15Text(
+                    "পরিশোধ: ${agencyMoney(item.totalPaid)}",
+                    "Paid: ${agencyMoney(item.totalPaid)}"
+                )
+            )
+
+            Text(
+                v15Text(
+                    "বকেয়া: ${agencyMoney(item.dueAmount)}",
+                    "Due: ${agencyMoney(item.dueAmount)}"
+                ),
+                fontWeight =
+                    FontWeight.SemiBold
+            )
+        }
+    }
+}
+
+@Composable
+private fun AddAgencyClientDialog(
+    onDismiss: () -> Unit,
+    onSave: (
+        String,
+        String,
+        String,
+        String,
+        String
+    ) -> Unit
+) {
+    var name by remember {
+        mutableStateOf("")
+    }
+
+    var phone by remember {
+        mutableStateOf("")
+    }
+
+    var email by remember {
+        mutableStateOf("")
+    }
+
+    var company by remember {
+        mutableStateOf("")
+    }
+
+    var note by remember {
+        mutableStateOf("")
+    }
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = {
+            Text(
+                v15Text(
+                    "নতুন ক্লায়েন্ট",
+                    "New client"
+                )
+            )
+        },
+        text = {
+            Column(
+                modifier =
+                    Modifier.verticalScroll(
+                        rememberScrollState()
+                    ),
+                verticalArrangement =
+                    Arrangement.spacedBy(7.dp)
+            ) {
+                AgencyField(
+                    value = name,
+                    onChange = {
+                        name = it
+                    },
+                    label =
+                        v15Text(
+                            "ক্লায়েন্টের নাম",
+                            "Client name"
+                        )
+                )
+
+                AgencyField(
+                    value = company,
+                    onChange = {
+                        company = it
+                    },
+                    label =
+                        v15Text(
+                            "কোম্পানি / ব্র্যান্ড",
+                            "Company / brand"
+                        )
+                )
+
+                AgencyField(
+                    value = phone,
+                    onChange = {
+                        phone = it
+                    },
+                    label =
+                        v15Text(
+                            "ফোন",
+                            "Phone"
+                        )
+                )
+
+                AgencyField(
+                    value = email,
+                    onChange = {
+                        email = it
+                    },
+                    label = "Email"
+                )
+
+                AgencyField(
+                    value = note,
+                    onChange = {
+                        note = it
+                    },
+                    label =
+                        v15Text(
+                            "নোট",
+                            "Note"
+                        )
+                )
+            }
+        },
+        confirmButton = {
+            TextButton(
+                onClick = {
+                    if (
+                        name.isNotBlank()
+                    ) {
+                        onSave(
+                            name,
+                            phone,
+                            email,
+                            company,
+                            note
+                        )
+                    }
+                }
+            ) {
+                Text(
+                    v15Text(
+                        "সেভ",
+                        "Save"
+                    )
+                )
+            }
+        },
+        dismissButton = {
+            TextButton(
+                onClick = onDismiss
+            ) {
+                Text(
+                    v15Text(
+                        "বাতিল",
+                        "Cancel"
+                    )
+                )
+            }
+        }
+    )
+}
+
+@Composable
+private fun AddAgencyProjectDialog(
+    clients: List<AgencyClientEntity>,
+    onDismiss: () -> Unit,
+    onSave: (
+        Long,
+        String,
+        String,
+        Double,
+        Double,
+        String
+    ) -> Unit
+) {
+    var clientId by remember {
+        mutableStateOf<Long?>(null)
+    }
+
+    var title by remember {
+        mutableStateOf("")
+    }
+
+    var service by remember {
+        mutableStateOf("")
+    }
+
+    var total by remember {
+        mutableStateOf("")
+    }
+
+    var advance by remember {
+        mutableStateOf("")
+    }
+
+    var note by remember {
+        mutableStateOf("")
+    }
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = {
+            Text(
+                v15Text(
+                    "নতুন প্রজেক্ট / সার্ভিস",
+                    "New project / service"
+                )
+            )
+        },
+        text = {
+            Column(
+                modifier =
+                    Modifier.verticalScroll(
+                        rememberScrollState()
+                    ),
+                verticalArrangement =
+                    Arrangement.spacedBy(7.dp)
+            ) {
+                Text(
+                    v15Text(
+                        "ক্লায়েন্ট নির্বাচন",
+                        "Select client"
+                    ),
+                    fontWeight = FontWeight.Bold
+                )
+
+                clients.forEach { client ->
+                    OutlinedButton(
+                        onClick = {
+                            clientId =
+                                client.id
+                        },
+                        modifier =
+                            Modifier.fillMaxWidth()
+                    ) {
+                        Text(
+                            if (
+                                clientId ==
+                                client.id
+                            ) {
+                                "✓ ${client.name}"
+                            } else {
+                                client.name
+                            }
+                        )
+                    }
+                }
+
+                AgencyField(
+                    value = title,
+                    onChange = {
+                        title = it
+                    },
+                    label =
+                        v15Text(
+                            "প্রজেক্টের নাম",
+                            "Project name"
+                        )
+                )
+
+                AgencyField(
+                    value = service,
+                    onChange = {
+                        service = it
+                    },
+                    label =
+                        v15Text(
+                            "সার্ভিস",
+                            "Service"
+                        )
+                )
+
+                AgencyField(
+                    value = total,
+                    onChange = {
+                        total = it
+                    },
+                    label =
+                        v15Text(
+                            "মোট মূল্য",
+                            "Total price"
+                        )
+                )
+
+                AgencyField(
+                    value = advance,
+                    onChange = {
+                        advance = it
+                    },
+                    label =
+                        v15Text(
+                            "অগ্রিম / Advance",
+                            "Advance payment"
+                        )
+                )
+
+                AgencyField(
+                    value = note,
+                    onChange = {
+                        note = it
+                    },
+                    label =
+                        v15Text(
+                            "নোট",
+                            "Note"
+                        )
+                )
+            }
+        },
+        confirmButton = {
+            TextButton(
+                enabled =
+                    clientId != null &&
+                    title.isNotBlank() &&
+                    (
+                        total.toDoubleOrNull()
+                            ?: 0.0
+                    ) > 0,
+                onClick = {
+                    onSave(
+                        clientId!!,
+                        title,
+                        service,
+                        total.toDoubleOrNull()
+                            ?: 0.0,
+                        advance.toDoubleOrNull()
+                            ?: 0.0,
+                        note
+                    )
+                }
+            ) {
+                Text(
+                    v15Text(
+                        "প্রজেক্ট যোগ করুন",
+                        "Add project"
+                    )
+                )
+            }
+        },
+        dismissButton = {
+            TextButton(
+                onClick = onDismiss
+            ) {
+                Text(
+                    v15Text(
+                        "বাতিল",
+                        "Cancel"
+                    )
+                )
+            }
+        }
+    )
+}
+
+@Composable
+private fun AgencyProjectLedger(
+    project: AgencyProjectSummary,
+    viewModel: AgencyViewModel,
+    canWrite: Boolean,
+    onBack: () -> Unit
+) {
+    val payments by
+        viewModel.observePayments(
+            project.projectId
+        ).collectAsState(
+            initial = emptyList()
+        )
+
+    var paymentAmount by remember {
+        mutableStateOf("")
+    }
+
+    var paymentNote by remember {
+        mutableStateOf("")
+    }
+
+    val livePaid =
+        payments.sumOf {
+            it.amount
+        }
+
+    val liveDue =
+        (
+            project.totalPrice -
+            livePaid
+        ).coerceAtLeast(0.0)
+
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .verticalScroll(
+                rememberScrollState()
+            ),
+        verticalArrangement =
+            Arrangement.spacedBy(10.dp)
+    ) {
+        TextButton(
+            onClick = onBack
+        ) {
+            Text(
+                v15Text(
+                    "← প্রজেক্ট তালিকা",
+                    "← Project list"
+                )
+            )
+        }
+
+        Text(
+            project.title,
+            style =
+                MaterialTheme.typography.headlineSmall,
+            fontWeight = FontWeight.ExtraBold
+        )
+
+        Text(
+            v15Text(
+                "ক্লায়েন্ট: ${project.clientName}",
+                "Client: ${project.clientName}"
+            )
+        )
+
+        if (
+            project.serviceType
+                .isNotBlank()
+        ) {
+            Text(
+                v15Text(
+                    "সার্ভিস: ${project.serviceType}",
+                    "Service: ${project.serviceType}"
+                )
+            )
+        }
+
+        Text(
+            v15Text(
+                "মোট মূল্য: ${agencyMoney(project.totalPrice)}",
+                "Total value: ${agencyMoney(project.totalPrice)}"
+            )
+        )
+
+        Text(
+            v15Text(
+                "মোট পরিশোধ: ${agencyMoney(livePaid)}",
+                "Total paid: ${agencyMoney(livePaid)}"
+            )
+        )
+
+        Text(
+            v15Text(
+                "বকেয়া: ${agencyMoney(liveDue)}",
+                "Due: ${agencyMoney(liveDue)}"
+            ),
+            fontWeight = FontWeight.Bold
+        )
+
+        Text(
+            v15Text(
+                "স্ট্যাটাস: ${agencyStatusLabel(project.status)}",
+                "Status: ${agencyStatusLabel(project.status)}"
+            )
+        )
+
+        if (canWrite) {
+            Row(
+                modifier =
+                    Modifier.fillMaxWidth(),
+                horizontalArrangement =
+                    Arrangement.spacedBy(8.dp)
+            ) {
+                OutlinedButton(
+                    onClick = {
+                        viewModel
+                            .setProjectStatus(
+                                project.projectId,
+                                "ACTIVE"
+                            )
+                    },
+                    modifier =
+                        Modifier.weight(1f)
+                ) {
+                    Text(
+                        v15Text(
+                            "চলমান",
+                            "Active"
+                        )
+                    )
+                }
+
+                OutlinedButton(
+                    onClick = {
+                        viewModel
+                            .setProjectStatus(
+                                project.projectId,
+                                "COMPLETED"
+                            )
+                    },
+                    modifier =
+                        Modifier.weight(1f)
+                ) {
+                    Text(
+                        v15Text(
+                            "সম্পন্ন",
+                            "Completed"
+                        )
+                    )
+                }
+            }
+
+            AgencyField(
+                value = paymentAmount,
+                onChange = {
+                    paymentAmount = it
+                },
+                label =
+                    v15Text(
+                        "পেমেন্টের পরিমাণ",
+                        "Payment amount"
+                    )
+            )
+
+            AgencyField(
+                value = paymentNote,
+                onChange = {
+                    paymentNote = it
+                },
+                label =
+                    v15Text(
+                        "পেমেন্ট নোট",
+                        "Payment note"
+                    )
+            )
+
+            Button(
+                onClick = {
+                    val amount =
+                        paymentAmount
+                            .toDoubleOrNull()
+                            ?: 0.0
+
+                    if (amount > 0) {
+                        viewModel
+                            .addPayment(
+                                project.projectId,
+                                amount,
+                                paymentNote
+                            )
+
+                        paymentAmount = ""
+                        paymentNote = ""
+                    }
+                },
+                modifier =
+                    Modifier.fillMaxWidth()
+            ) {
+                Text(
+                    v15Text(
+                        "পেমেন্ট যোগ করুন",
+                        "Add payment"
+                    )
+                )
+            }
+        }
+
+        Text(
+            v15Text(
+                "পেমেন্ট ইতিহাস",
+                "Payment history"
+            ),
+            fontWeight = FontWeight.Bold
+        )
+
+        if (payments.isEmpty()) {
+            Text(
+                v15Text(
+                    "এখনো কোনো পেমেন্ট নেই।",
+                    "No payments yet."
+                )
+            )
+        }
+
+        payments.forEach { payment ->
+            AgencyPaymentCard(payment)
+        }
+    }
+}
+
+@Composable
+private fun AgencyPaymentCard(
+    payment: AgencyPaymentEntity
+) {
+    Card(
+        modifier =
+            Modifier.fillMaxWidth()
+    ) {
+        Column(
+            modifier =
+                Modifier.padding(11.dp),
+            verticalArrangement =
+                Arrangement.spacedBy(3.dp)
+        ) {
+            Row(
+                modifier =
+                    Modifier.fillMaxWidth(),
+                horizontalArrangement =
+                    Arrangement.SpaceBetween
+            ) {
+                Text(
+                    agencyDate(
+                        payment.paidAt
+                    )
+                )
+
+                Text(
+                    agencyMoney(
+                        payment.amount
+                    ),
+                    fontWeight =
+                        FontWeight.Bold
+                )
+            }
+
+            if (
+                payment.note.isNotBlank()
+            ) {
+                Text(
+                    payment.note,
+                    style =
+                        MaterialTheme.typography.bodySmall
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun AgencyField(
+    value: String,
+    onChange: (String) -> Unit,
+    label: String
+) {
+    OutlinedTextField(
+        value = value,
+        onValueChange = onChange,
+        label = {
+            Text(label)
+        },
+        modifier =
+            Modifier.fillMaxWidth(),
+        singleLine = true
+    )
+}
+
+private fun agencyStatusLabel(
+    value: String
+): String =
+    when (value) {
+        "COMPLETED" ->
+            v15Text(
+                "সম্পন্ন",
+                "Completed"
+            )
+
+        "CANCELLED" ->
+            v15Text(
+                "বাতিল",
+                "Cancelled"
+            )
+
+        else ->
+            v15Text(
+                "চলমান",
+                "Active"
+            )
+    }
+
+private fun agencyMoney(
+    value: Double
+): String =
+    String.format(
+        Locale.US,
+        "%.2f",
+        value
+    )
+
+private fun agencyDate(
+    value: Long
+): String =
+    SimpleDateFormat(
+        "dd MMM yyyy",
+        Locale.getDefault()
+    ).format(
+        Date(value)
+    )

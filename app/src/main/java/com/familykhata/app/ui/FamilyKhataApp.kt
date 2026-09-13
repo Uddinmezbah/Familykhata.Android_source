@@ -1827,10 +1827,7 @@ private fun tabLabel(
             BusinessMode.DIGITAL_AGENCY ->
                 v15Text("ক্লায়েন্ট", "Clients")
 
-            BusinessMode.DEALERSHIP ->
-                v15Text("পণ্য", "Products")
-
-            BusinessMode.RETAIL ->
+            else ->
                 v15Text("পণ্য", "Products")
         }
 

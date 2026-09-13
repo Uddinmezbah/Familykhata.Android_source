@@ -53,6 +53,77 @@ private val InventoryOrange = Color(0xFFB85C00)
 private val InventoryRed = Color(0xFFC4473A)
 private val InventoryBlue = Color(0xFF1565C0)
 
+private enum class ProductFormMode {
+    PHARMACY,
+    ELECTRONICS,
+    FASHION,
+    EXPIRY_RETAIL,
+    GENERAL
+}
+
+private data class ProductDetailsInput(
+    val name: String,
+    val category: String,
+    val sku: String,
+    val unit: String,
+    val brand: String,
+    val genericName: String,
+    val modelName: String,
+    val serialOrImei: String,
+    val size: String,
+    val color: String,
+    val warrantyMonths: Int,
+    val sellingPrice: Double,
+    val lowStockLevel: Int,
+    val note: String
+)
+
+private data class NewProductInput(
+    val product: ProductDetailsInput,
+    val initialQuantity: Int,
+    val purchasePrice: Double,
+    val purchaseDate: Long,
+    val expiryDate: Long?,
+    val batchNo: String
+)
+
+private data class BatchInput(
+    val quantity: Int,
+    val purchasePrice: Double,
+    val purchaseDate: Long,
+    val expiryDate: Long?,
+    val batchNo: String
+)
+
+private fun productFormMode(shopType: String): ProductFormMode {
+    val value = shopType.lowercase(Locale.getDefault())
+
+    return when {
+        listOf("pharmacy", "medicine", "ফার্মেসি", "ঔষধ", "ওষুধ")
+            .any { value.contains(it) } -> ProductFormMode.PHARMACY
+
+        listOf("electronics", "mobile", "gadget", "ইলেকট্রনিক", "মোবাইল")
+            .any { value.contains(it) } -> ProductFormMode.ELECTRONICS
+
+        listOf("fashion", "clothing", "shoe", "জুতা", "পোশাক", "ফ্যাশন", "bag", "jewellery", "jewelry")
+            .any { value.contains(it) } -> ProductFormMode.FASHION
+
+        listOf("grocery", "food", "bakery", "cosmetic", "মুদি", "খাদ্য", "কসমেটিক", "restaurant", "agro")
+            .any { value.contains(it) } -> ProductFormMode.EXPIRY_RETAIL
+
+        else -> ProductFormMode.GENERAL
+    }
+}
+
+private fun productNameLabel(mode: ProductFormMode): String = when (mode) {
+    ProductFormMode.PHARMACY -> v15Text("ওষুধের নাম", "Medicine name")
+    ProductFormMode.ELECTRONICS -> v15Text("পণ্যের নাম", "Product name")
+    ProductFormMode.FASHION -> v15Text("পণ্যের নাম", "Product name")
+    ProductFormMode.EXPIRY_RETAIL -> v15Text("পণ্যের নাম", "Product name")
+    ProductFormMode.GENERAL -> v15Text("পণ্যের নাম", "Product name")
+}
+
+
 @Composable
 internal fun V15InventoryScreen(
     workspace: String,
@@ -100,7 +171,10 @@ private fun ProductListScreen(
     val nearLimit = now + 30L * 86_400_000L
     val lowCount = products.count { it.totalStock <= it.lowStockLevel }
     val expiringCount = products.count { it.nextExpiry != null && it.nextExpiry in now..nearLimit }
+    val expiredCount = products.count { it.nextExpiry != null && it.nextExpiry < now }
     val stockValue = products.sumOf { it.stockValue }
+    val saleValue = products.sumOf { it.saleValue }
+    val potentialProfit = products.sumOf { it.potentialProfit }
     val filtered = products.filter {
         query.isBlank() || it.name.contains(query, true) || it.category.contains(query, true) || it.sku.contains(query, true)
     }
@@ -115,19 +189,33 @@ private fun ProductListScreen(
         Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             InventoryMetric(v15Text("পণ্য", "Products"), products.size.toString(), InventoryBlue, Modifier.weight(1f))
             InventoryMetric(v15Text("লো স্টক", "Low stock"), lowCount.toString(), InventoryOrange, Modifier.weight(1f))
-            InventoryMetric(v15Text("মেয়াদ নিকট", "Expiring"), expiringCount.toString(), InventoryRed, Modifier.weight(1f))
+            InventoryMetric(v15Text("মেয়াদ শেষ", "Expired"), expiredCount.toString(), InventoryRed, Modifier.weight(1f))
         }
-        Surface(
-            modifier = Modifier.fillMaxWidth(),
-            shape = RoundedCornerShape(18.dp),
-            color = InventoryGreen.copy(alpha = 0.09f),
-            border = BorderStroke(1.dp, InventoryGreen.copy(alpha = 0.20f))
-        ) {
-            Text(
-                v15Text("বর্তমান স্টক ভ্যালু: ${V14DisplayState.currencySymbol} ${v15Money(stockValue)}", "Current stock value: ${V14DisplayState.currencySymbol} ${v15Money(stockValue)}"),
-                modifier = Modifier.padding(14.dp),
-                fontWeight = FontWeight.Bold,
-                color = InventoryGreen
+
+        Text(
+            v15Text("আগামী ৩০ দিনে মেয়াদ শেষ: $expiringCount", "Expiring within 30 days: $expiringCount"),
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
+
+        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            InventoryMetric(
+                v15Text("ক্রয় মূল্য", "Purchase"),
+                "${V14DisplayState.currencySymbol}${v15Money(stockValue)}",
+                InventoryBlue,
+                Modifier.weight(1f)
+            )
+            InventoryMetric(
+                v15Text("বিক্রয় মূল্য", "Sale value"),
+                "${V14DisplayState.currencySymbol}${v15Money(saleValue)}",
+                InventoryGreen,
+                Modifier.weight(1f)
+            )
+            InventoryMetric(
+                v15Text("সম্ভাব্য লাভ", "Potential profit"),
+                "${V14DisplayState.currencySymbol}${v15Money(potentialProfit)}",
+                InventoryOrange,
+                Modifier.weight(1f)
             )
         }
 
@@ -153,8 +241,30 @@ private fun ProductListScreen(
         AddProductDialog(
             workspace = workspace,
             onDismiss = { showAdd = false },
-            onSave = { name, category, sku, sell, low, note, qty, buy, purchaseDate, expiryDate ->
-                viewModel.addProduct(name, category, sku, sell, low, note, workspace, qty, buy, purchaseDate, expiryDate)
+            onSave = { input ->
+                val p = input.product
+                viewModel.addProduct(
+                    name = p.name,
+                    category = p.category,
+                    sku = p.sku,
+                    unit = p.unit,
+                    brand = p.brand,
+                    genericName = p.genericName,
+                    modelName = p.modelName,
+                    serialOrImei = p.serialOrImei,
+                    size = p.size,
+                    color = p.color,
+                    warrantyMonths = p.warrantyMonths,
+                    sellingPrice = p.sellingPrice,
+                    lowStockLevel = p.lowStockLevel,
+                    note = p.note,
+                    workspace = workspace,
+                    initialQuantity = input.initialQuantity,
+                    purchasePrice = input.purchasePrice,
+                    purchaseDate = input.purchaseDate,
+                    expiryDate = input.expiryDate,
+                    batchNo = input.batchNo
+                )
                 showAdd = false
             }
         )
@@ -192,7 +302,39 @@ private fun ProductCard(item: ProductStockSummary, onSelect: (ProductStockSummar
                 Text(v15Text("স্টক ${item.totalStock}", "Stock ${item.totalStock}"), fontWeight = FontWeight.Bold, color = accent)
             }
             if (item.category.isNotBlank()) Text(item.category, style = MaterialTheme.typography.bodySmall)
+
+            if (item.brand.isNotBlank()) {
+                Text(
+                    v15Text("ব্র্যান্ড: ${item.brand}", "Brand: ${item.brand}"),
+                    style = MaterialTheme.typography.bodySmall
+                )
+            }
+
+            Text(
+                v15Text("ইউনিট: ${item.unit}", "Unit: ${item.unit}"),
+                style = MaterialTheme.typography.bodySmall
+            )
+
             if (item.sku.isNotBlank()) Text(v15Text("বারকোড/SKU: ${item.sku}", "Barcode/SKU: ${item.sku}"), style = MaterialTheme.typography.bodySmall)
+
+            val unitProfit = item.sellingPrice - item.avgPurchasePrice
+            Text(
+                v15Text(
+                    "কেনা ${V14DisplayState.currencySymbol} ${v15Money(item.avgPurchasePrice)} • বিক্রি ${V14DisplayState.currencySymbol} ${v15Money(item.sellingPrice)}",
+                    "Buy ${V14DisplayState.currencySymbol} ${v15Money(item.avgPurchasePrice)} • Sell ${V14DisplayState.currencySymbol} ${v15Money(item.sellingPrice)}"
+                ),
+                style = MaterialTheme.typography.bodySmall,
+                fontWeight = FontWeight.SemiBold
+            )
+            Text(
+                v15Text(
+                    "লাভ/ইউনিট: ${V14DisplayState.currencySymbol} ${v15Money(unitProfit)}",
+                    "Profit/unit: ${V14DisplayState.currencySymbol} ${v15Money(unitProfit)}"
+                ),
+                style = MaterialTheme.typography.bodySmall,
+                color = if (unitProfit >= 0) InventoryGreen else InventoryRed
+            )
+
             item.nextExpiry?.let {
                 Text(v15Text("নিকটতম মেয়াদ: ${v15Date(it)}", "Next expiry: ${v15Date(it)}"), style = MaterialTheme.typography.bodySmall, color = if (it < now) InventoryRed else MaterialTheme.colorScheme.onSurfaceVariant)
             }
@@ -221,9 +363,87 @@ private fun ProductDetailScreen(
         Text(v15Text("ফোনের Back ব্যবহার করে পণ্য তালিকায় ফিরুন", "Use your phone Back button to return to the product list"), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
         Surface(modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(18.dp), color = InventoryGreen.copy(alpha = 0.09f)) {
             Column(modifier = Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(3.dp)) {
-                Text(v15Text("বর্তমান স্টক: ${product.totalStock}", "Current stock: ${product.totalStock}"), fontWeight = FontWeight.ExtraBold)
-                Text(v15Text("স্টক ভ্যালু: ${V14DisplayState.currencySymbol} ${v15Money(product.stockValue)}", "Stock value: ${V14DisplayState.currencySymbol} ${v15Money(product.stockValue)}"))
-                Text(v15Text("বিক্রয় মূল্য: ${V14DisplayState.currencySymbol} ${v15Money(product.sellingPrice)}", "Selling price: ${V14DisplayState.currencySymbol} ${v15Money(product.sellingPrice)}"))
+                Text(
+                    v15Text(
+                        "বর্তমান স্টক: ${product.totalStock} ${product.unit}",
+                        "Current stock: ${product.totalStock} ${product.unit}"
+                    ),
+                    fontWeight = FontWeight.ExtraBold
+                )
+
+                if (product.brand.isNotBlank()) {
+                    Text(v15Text("ব্র্যান্ড: ${product.brand}", "Brand: ${product.brand}"))
+                }
+                if (product.genericName.isNotBlank()) {
+                    Text(v15Text("জেনেরিক: ${product.genericName}", "Generic: ${product.genericName}"))
+                }
+                if (product.modelName.isNotBlank()) {
+                    Text(v15Text("মডেল: ${product.modelName}", "Model: ${product.modelName}"))
+                }
+                if (product.serialOrImei.isNotBlank()) {
+                    Text(v15Text("Serial / IMEI: ${product.serialOrImei}", "Serial / IMEI: ${product.serialOrImei}"))
+                }
+                if (product.size.isNotBlank()) {
+                    Text(v15Text("সাইজ: ${product.size}", "Size: ${product.size}"))
+                }
+                if (product.color.isNotBlank()) {
+                    Text(v15Text("রং: ${product.color}", "Color: ${product.color}"))
+                }
+                if (product.warrantyMonths > 0) {
+                    Text(
+                        v15Text(
+                            "ওয়ারেন্টি: ${product.warrantyMonths} মাস",
+                            "Warranty: ${product.warrantyMonths} months"
+                        )
+                    )
+                }
+
+                Text(
+                    v15Text(
+                        "গড় কেনা দাম: ${V14DisplayState.currencySymbol} ${v15Money(product.avgPurchasePrice)}",
+                        "Average purchase price: ${V14DisplayState.currencySymbol} ${v15Money(product.avgPurchasePrice)}"
+                    )
+                )
+
+                Text(
+                    v15Text(
+                        "বিক্রয় দাম: ${V14DisplayState.currencySymbol} ${v15Money(product.sellingPrice)}",
+                        "Selling price: ${V14DisplayState.currencySymbol} ${v15Money(product.sellingPrice)}"
+                    )
+                )
+
+                Text(
+                    v15Text(
+                        "প্রতি ইউনিট লাভ: ${V14DisplayState.currencySymbol} ${v15Money(product.sellingPrice - product.avgPurchasePrice)}",
+                        "Profit per unit: ${V14DisplayState.currencySymbol} ${v15Money(product.sellingPrice - product.avgPurchasePrice)}"
+                    ),
+                    color = if (product.sellingPrice >= product.avgPurchasePrice) InventoryGreen else InventoryRed,
+                    fontWeight = FontWeight.Bold
+                )
+
+                Text(
+                    v15Text(
+                        "বর্তমান ক্রয় মূল্য: ${V14DisplayState.currencySymbol} ${v15Money(product.stockValue)}",
+                        "Current purchase value: ${V14DisplayState.currencySymbol} ${v15Money(product.stockValue)}"
+                    )
+                )
+
+                Text(
+                    v15Text(
+                        "সম্ভাব্য বিক্রয় মূল্য: ${V14DisplayState.currencySymbol} ${v15Money(product.saleValue)}",
+                        "Potential sale value: ${V14DisplayState.currencySymbol} ${v15Money(product.saleValue)}"
+                    )
+                )
+
+                Text(
+                    v15Text(
+                        "সম্ভাব্য লাভ: ${V14DisplayState.currencySymbol} ${v15Money(product.potentialProfit)}",
+                        "Potential profit: ${V14DisplayState.currencySymbol} ${v15Money(product.potentialProfit)}"
+                    ),
+                    fontWeight = FontWeight.Bold,
+                    color = if (product.potentialProfit >= 0) InventoryGreen else InventoryRed
+                )
+
                 if (product.lowStockLevel > 0) Text(v15Text("লো-স্টক সীমা: ${product.lowStockLevel}", "Low-stock threshold: ${product.lowStockLevel}"))
             }
         }
@@ -242,8 +462,15 @@ private fun ProductDetailScreen(
     }
 
     if (showAddBatch) {
-        AddBatchDialog(onDismiss = { showAddBatch = false }) { qty, buy, purchaseDate, expiryDate ->
-            viewModel.addBatch(product.id, qty, buy, purchaseDate, expiryDate)
+        AddBatchDialog(onDismiss = { showAddBatch = false }) { input ->
+            viewModel.addBatch(
+                productId = product.id,
+                quantity = input.quantity,
+                purchasePrice = input.purchasePrice,
+                purchaseDate = input.purchaseDate,
+                expiryDate = input.expiryDate,
+                batchNo = input.batchNo
+            )
             showAddBatch = false
         }
     }
@@ -256,8 +483,24 @@ private fun ProductDetailScreen(
         }
     }
     if (showEdit) {
-        EditProductDialog(product, onDismiss = { showEdit = false }) { name, category, sku, sell, low, note ->
-            viewModel.updateProduct(product, name, category, sku, sell, low, note)
+        EditProductDialog(product, onDismiss = { showEdit = false }) { input ->
+            viewModel.updateProduct(
+                item = product,
+                name = input.name,
+                category = input.category,
+                sku = input.sku,
+                unit = input.unit,
+                brand = input.brand,
+                genericName = input.genericName,
+                modelName = input.modelName,
+                serialOrImei = input.serialOrImei,
+                size = input.size,
+                color = input.color,
+                warrantyMonths = input.warrantyMonths,
+                sellingPrice = input.sellingPrice,
+                lowStockLevel = input.lowStockLevel,
+                note = input.note
+            )
             showEdit = false
         }
     }
@@ -279,6 +522,9 @@ private fun BatchCard(item: StockBatchEntity) {
     Card(modifier = Modifier.fillMaxWidth(), colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.45f))) {
         Column(modifier = Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(3.dp)) {
             Text(v15Text("পরিমাণ: ${item.quantity}", "Quantity: ${item.quantity}"), fontWeight = FontWeight.Bold)
+            if (item.batchNo.isNotBlank()) {
+                Text(v15Text("Batch/Lot: ${item.batchNo}", "Batch/Lot: ${item.batchNo}"))
+            }
             Text(v15Text("কেনা: ${v15Date(item.purchaseDate)} • ${V14DisplayState.currencySymbol} ${v15Money(item.purchasePrice)}", "Purchased: ${v15Date(item.purchaseDate)} • ${V14DisplayState.currencySymbol} ${v15Money(item.purchasePrice)}"), style = MaterialTheme.typography.bodySmall)
             item.expiryDate?.let { Text(v15Text("মেয়াদ: ${v15Date(it)}", "Expiry: ${v15Date(it)}"), style = MaterialTheme.typography.bodySmall, color = expiryColor) }
         }
@@ -289,84 +535,472 @@ private fun BatchCard(item: StockBatchEntity) {
 private fun AddProductDialog(
     workspace: String,
     onDismiss: () -> Unit,
-    onSave: (String, String, String, Double, Int, String, Int, Double, Long, Long?) -> Unit
+    onSave: (NewProductInput) -> Unit
 ) {
     val context = LocalContext.current
     val scanner = remember { GmsBarcodeScanning.getClient(context) }
+
+    val prefs = remember {
+        context.getSharedPreferences(
+            "hisabi_khata_v14_settings",
+            android.content.Context.MODE_PRIVATE
+        )
+    }
+
+    val shopType = remember {
+        prefs.getString("business_type", "") ?: ""
+    }
+
+    val mode = remember(shopType) {
+        productFormMode(shopType)
+    }
+
     var name by remember { mutableStateOf("") }
     var category by remember { mutableStateOf("") }
     var sku by remember { mutableStateOf("") }
+    var unit by remember { mutableStateOf("pcs") }
+    var brand by remember { mutableStateOf("") }
+    var genericName by remember { mutableStateOf("") }
+    var modelName by remember { mutableStateOf("") }
+    var serialOrImei by remember { mutableStateOf("") }
+    var size by remember { mutableStateOf("") }
+    var color by remember { mutableStateOf("") }
+    var warranty by remember { mutableStateOf("") }
+
     var sell by remember { mutableStateOf("") }
     var low by remember { mutableStateOf("5") }
     var note by remember { mutableStateOf("") }
+
     var qty by remember { mutableStateOf("") }
     var buy by remember { mutableStateOf("") }
-    var purchaseDate by remember { mutableStateOf(startOfDay(System.currentTimeMillis())) }
-    var expiryDate by remember { mutableStateOf<Long?>(null) }
+    var batchNo by remember { mutableStateOf("") }
+
+    var purchaseDate by remember {
+        mutableStateOf(startOfDay(System.currentTimeMillis()))
+    }
+
+    var expiryDate by remember {
+        mutableStateOf<Long?>(null)
+    }
+
+    var showUnitPicker by remember { mutableStateOf(false) }
     var error by remember { mutableStateOf<String?>(null) }
+
+    val showExpiry =
+        mode == ProductFormMode.PHARMACY ||
+        mode == ProductFormMode.EXPIRY_RETAIL ||
+        mode == ProductFormMode.GENERAL
 
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text(v15Text("নতুন পণ্য", "New product")) },
+        title = {
+            Text(v15Text("নতুন পণ্য", "New product"))
+        },
         text = {
-            Column(modifier = Modifier.verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(7.dp)) {
-                OutlinedTextField(name, { name = it }, label = { Text(v15Text("পণ্যের নাম", "Product name")) }, singleLine = true)
-                OutlinedTextField(category, { category = it }, label = { Text(v15Text("ক্যাটাগরি", "Category")) }, singleLine = true)
-                OutlinedTextField(sku, { sku = it }, label = { Text("Barcode / SKU") }, singleLine = true)
-                OutlinedButton(onClick = {
-                    scanner.startScan().addOnSuccessListener { code -> sku = code.rawValue.orEmpty() }
-                        .addOnFailureListener { Toast.makeText(context, v15Text("স্ক্যান করা যায়নি", "Scan failed"), Toast.LENGTH_SHORT).show() }
-                }, modifier = Modifier.fillMaxWidth()) { Text(v15Text("▣ বারকোড স্ক্যান", "▣ Scan barcode")) }
-                OutlinedTextField(sell, { sell = it }, label = { Text(v15Text("বিক্রয় মূল্য", "Selling price")) }, singleLine = true)
-                OutlinedTextField(low, { low = it }, label = { Text(v15Text("লো-স্টক সীমা", "Low-stock threshold")) }, singleLine = true)
-                OutlinedTextField(qty, { qty = it }, label = { Text(v15Text("প্রাথমিক পরিমাণ", "Initial quantity")) }, singleLine = true)
-                OutlinedTextField(buy, { buy = it }, label = { Text(v15Text("ক্রয় মূল্য / ইউনিট", "Purchase price / unit")) }, singleLine = true)
-                DateButton(v15Text("কেনার তারিখ", "Purchase date"), purchaseDate) { purchaseDate = it }
-                NullableDateButton(v15Text("মেয়াদ শেষের তারিখ", "Expiry date"), expiryDate) { expiryDate = it }
-                OutlinedTextField(note, { note = it }, label = { Text(v15Text("নোট", "Note")) })
-                error?.let { Text(it, color = MaterialTheme.colorScheme.error) }
+            Column(
+                modifier = Modifier.verticalScroll(rememberScrollState()),
+                verticalArrangement = Arrangement.spacedBy(7.dp)
+            ) {
+                if (shopType.isNotBlank()) {
+                    Text(
+                        v15Text(
+                            "দোকানের ধরন: $shopType",
+                            "Business type: $shopType"
+                        ),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.primary,
+                        fontWeight = FontWeight.SemiBold
+                    )
+                }
+
+                OutlinedTextField(
+                    name,
+                    { name = it },
+                    label = { Text(productNameLabel(mode)) },
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth()
+                )
+
+                OutlinedTextField(
+                    category,
+                    { category = it },
+                    label = {
+                        Text(v15Text("পণ্যের ক্যাটাগরি", "Product category"))
+                    },
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth()
+                )
+
+                OutlinedTextField(
+                    sku,
+                    { sku = it },
+                    label = { Text("Barcode / SKU") },
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth()
+                )
+
+                OutlinedButton(
+                    onClick = {
+                        scanner.startScan()
+                            .addOnSuccessListener {
+                                sku = it.rawValue.orEmpty()
+                            }
+                            .addOnFailureListener {
+                                Toast.makeText(
+                                    context,
+                                    v15Text("স্ক্যান করা যায়নি", "Scan failed"),
+                                    Toast.LENGTH_SHORT
+                                ).show()
+                            }
+                    },
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Text(v15Text("▣ বারকোড স্ক্যান", "▣ Scan barcode"))
+                }
+
+                OutlinedButton(
+                    onClick = { showUnitPicker = true },
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Text(
+                        v15Text(
+                            "ইউনিট: $unit",
+                            "Unit: $unit"
+                        )
+                    )
+                }
+
+                OutlinedTextField(
+                    brand,
+                    { brand = it },
+                    label = { Text(v15Text("ব্র্যান্ড", "Brand")) },
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth()
+                )
+
+                if (mode == ProductFormMode.PHARMACY) {
+                    OutlinedTextField(
+                        genericName,
+                        { genericName = it },
+                        label = {
+                            Text(v15Text("জেনেরিক নাম", "Generic name"))
+                        },
+                        singleLine = true,
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                }
+
+                if (mode == ProductFormMode.ELECTRONICS) {
+                    OutlinedTextField(
+                        modelName,
+                        { modelName = it },
+                        label = { Text(v15Text("মডেল", "Model")) },
+                        singleLine = true,
+                        modifier = Modifier.fillMaxWidth()
+                    )
+
+                    OutlinedTextField(
+                        serialOrImei,
+                        { serialOrImei = it },
+                        label = { Text("Serial / IMEI") },
+                        singleLine = true,
+                        modifier = Modifier.fillMaxWidth()
+                    )
+
+                    OutlinedTextField(
+                        warranty,
+                        { warranty = it },
+                        label = {
+                            Text(
+                                v15Text(
+                                    "ওয়ারেন্টি (মাস)",
+                                    "Warranty (months)"
+                                )
+                            )
+                        },
+                        singleLine = true,
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                }
+
+                if (mode == ProductFormMode.FASHION) {
+                    OutlinedTextField(
+                        size,
+                        { size = it },
+                        label = { Text(v15Text("সাইজ", "Size")) },
+                        singleLine = true,
+                        modifier = Modifier.fillMaxWidth()
+                    )
+
+                    OutlinedTextField(
+                        color,
+                        { color = it },
+                        label = { Text(v15Text("রং", "Color")) },
+                        singleLine = true,
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                }
+
+                OutlinedTextField(
+                    sell,
+                    { sell = it },
+                    label = {
+                        Text(v15Text("বিক্রয় মূল্য / ইউনিট", "Selling price / unit"))
+                    },
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth()
+                )
+
+                OutlinedTextField(
+                    buy,
+                    { buy = it },
+                    label = {
+                        Text(v15Text("ক্রয় মূল্য / ইউনিট", "Purchase price / unit"))
+                    },
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth()
+                )
+
+                OutlinedTextField(
+                    qty,
+                    { qty = it },
+                    label = {
+                        Text(v15Text("প্রাথমিক স্টক", "Initial stock"))
+                    },
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth()
+                )
+
+                OutlinedTextField(
+                    low,
+                    { low = it },
+                    label = {
+                        Text(v15Text("লো-স্টক সীমা", "Low-stock threshold"))
+                    },
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth()
+                )
+
+                OutlinedTextField(
+                    batchNo,
+                    { batchNo = it },
+                    label = {
+                        Text(v15Text("Batch / Lot No. (ঐচ্ছিক)", "Batch / Lot No. (optional)"))
+                    },
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth()
+                )
+
+                DateButton(
+                    v15Text("কেনার তারিখ", "Purchase date"),
+                    purchaseDate
+                ) {
+                    purchaseDate = it
+                }
+
+                if (showExpiry) {
+                    NullableDateButton(
+                        v15Text("মেয়াদ শেষের তারিখ", "Expiry date"),
+                        expiryDate
+                    ) {
+                        expiryDate = it
+                    }
+                }
+
+                OutlinedTextField(
+                    note,
+                    { note = it },
+                    label = { Text(v15Text("নোট", "Note")) },
+                    modifier = Modifier.fillMaxWidth()
+                )
+
+                error?.let {
+                    Text(
+                        it,
+                        color = MaterialTheme.colorScheme.error
+                    )
+                }
             }
         },
         confirmButton = {
-            TextButton(onClick = {
-                val selling = sell.toDoubleOrNull() ?: 0.0
-                val lowValue = low.toIntOrNull() ?: 0
-                val quantity = qty.toIntOrNull() ?: 0
-                val purchase = buy.toDoubleOrNull() ?: 0.0
-                if (name.isBlank()) error = v15Text("পণ্যের নাম লিখুন", "Enter a product name")
-                else if (quantity < 0 || selling < 0 || purchase < 0 || lowValue < 0) error = v15Text("সংখ্যাগুলো সঠিক নয়", "Check the numeric values")
-                else onSave(name, category, sku, selling, lowValue, note, quantity, purchase, purchaseDate, expiryDate)
-            }) { Text(v15Text("সেভ", "Save")) }
+            TextButton(
+                onClick = {
+                    val selling = sell.toDoubleOrNull() ?: 0.0
+                    val purchase = buy.toDoubleOrNull() ?: 0.0
+                    val quantity = qty.toIntOrNull() ?: 0
+                    val lowValue = low.toIntOrNull() ?: 0
+                    val warrantyMonths = warranty.toIntOrNull() ?: 0
+
+                    when {
+                        name.isBlank() ->
+                            error = v15Text(
+                                "পণ্যের নাম লিখুন",
+                                "Enter product name"
+                            )
+
+                        selling < 0 ||
+                            purchase < 0 ||
+                            quantity < 0 ||
+                            lowValue < 0 ||
+                            warrantyMonths < 0 ->
+                            error = v15Text(
+                                "সংখ্যাগুলো সঠিক নয়",
+                                "Check numeric values"
+                            )
+
+                        else -> {
+                            onSave(
+                                NewProductInput(
+                                    product = ProductDetailsInput(
+                                        name = name.trim(),
+                                        category = category.trim(),
+                                        sku = sku.trim(),
+                                        unit = unit.trim().ifBlank { "pcs" },
+                                        brand = brand.trim(),
+                                        genericName = genericName.trim(),
+                                        modelName = modelName.trim(),
+                                        serialOrImei = serialOrImei.trim(),
+                                        size = size.trim(),
+                                        color = color.trim(),
+                                        warrantyMonths = warrantyMonths,
+                                        sellingPrice = selling,
+                                        lowStockLevel = lowValue,
+                                        note = note.trim()
+                                    ),
+                                    initialQuantity = quantity,
+                                    purchasePrice = purchase,
+                                    purchaseDate = purchaseDate,
+                                    expiryDate = if (showExpiry) expiryDate else null,
+                                    batchNo = batchNo.trim()
+                                )
+                            )
+                        }
+                    }
+                }
+            ) {
+                Text(v15Text("সেভ", "Save"))
+            }
         },
-        dismissButton = { TextButton(onClick = onDismiss) { Text(v15Text("বাতিল", "Cancel")) } }
+        dismissButton = {
+            TextButton(onClick = onDismiss) {
+                Text(v15Text("বাতিল", "Cancel"))
+            }
+        }
     )
+
+    if (showUnitPicker) {
+        UnitPickerDialog(
+            selected = unit,
+            onDismiss = { showUnitPicker = false }
+        ) {
+            unit = it
+            showUnitPicker = false
+        }
+    }
 }
 
 @Composable
-private fun AddBatchDialog(onDismiss: () -> Unit, onSave: (Int, Double, Long, Long?) -> Unit) {
+private fun AddBatchDialog(
+    onDismiss: () -> Unit,
+    onSave: (BatchInput) -> Unit
+) {
     var qty by remember { mutableStateOf("") }
     var buy by remember { mutableStateOf("") }
-    var purchaseDate by remember { mutableStateOf(startOfDay(System.currentTimeMillis())) }
-    var expiryDate by remember { mutableStateOf<Long?>(null) }
+    var batchNo by remember { mutableStateOf("") }
+
+    var purchaseDate by remember {
+        mutableStateOf(startOfDay(System.currentTimeMillis()))
+    }
+
+    var expiryDate by remember {
+        mutableStateOf<Long?>(null)
+    }
+
     var error by remember { mutableStateOf<String?>(null) }
+
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text(v15Text("স্টক ব্যাচ যোগ করুন", "Add stock batch")) },
+        title = {
+            Text(v15Text("স্টক ব্যাচ যোগ করুন", "Add stock batch"))
+        },
         text = {
-            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                OutlinedTextField(qty, { qty = it }, label = { Text(v15Text("পরিমাণ", "Quantity")) }, singleLine = true)
-                OutlinedTextField(buy, { buy = it }, label = { Text(v15Text("ক্রয় মূল্য / ইউনিট", "Purchase price / unit")) }, singleLine = true)
-                DateButton(v15Text("কেনার তারিখ", "Purchase date"), purchaseDate) { purchaseDate = it }
-                NullableDateButton(v15Text("মেয়াদ শেষ", "Expiry date"), expiryDate) { expiryDate = it }
-                error?.let { Text(it, color = MaterialTheme.colorScheme.error) }
+            Column(
+                verticalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                OutlinedTextField(
+                    qty,
+                    { qty = it },
+                    label = { Text(v15Text("পরিমাণ", "Quantity")) },
+                    singleLine = true
+                )
+
+                OutlinedTextField(
+                    buy,
+                    { buy = it },
+                    label = {
+                        Text(v15Text("ক্রয় মূল্য / ইউনিট", "Purchase price / unit"))
+                    },
+                    singleLine = true
+                )
+
+                OutlinedTextField(
+                    batchNo,
+                    { batchNo = it },
+                    label = { Text("Batch / Lot No.") },
+                    singleLine = true
+                )
+
+                DateButton(
+                    v15Text("কেনার তারিখ", "Purchase date"),
+                    purchaseDate
+                ) {
+                    purchaseDate = it
+                }
+
+                NullableDateButton(
+                    v15Text("মেয়াদ শেষ", "Expiry date"),
+                    expiryDate
+                ) {
+                    expiryDate = it
+                }
+
+                error?.let {
+                    Text(it, color = MaterialTheme.colorScheme.error)
+                }
             }
         },
-        confirmButton = { TextButton(onClick = {
-            val q = qty.toIntOrNull()
-            val p = buy.toDoubleOrNull() ?: 0.0
-            if (q == null || q <= 0 || p < 0) error = v15Text("সঠিক তথ্য দিন", "Enter valid values") else onSave(q, p, purchaseDate, expiryDate)
-        }) { Text(v15Text("যোগ করুন", "Add")) } },
-        dismissButton = { TextButton(onClick = onDismiss) { Text(v15Text("বাতিল", "Cancel")) } }
+        confirmButton = {
+            TextButton(
+                onClick = {
+                    val q = qty.toIntOrNull()
+                    val p = buy.toDoubleOrNull() ?: 0.0
+
+                    if (q == null || q <= 0 || p < 0) {
+                        error = v15Text(
+                            "সঠিক তথ্য দিন",
+                            "Enter valid values"
+                        )
+                    } else {
+                        onSave(
+                            BatchInput(
+                                quantity = q,
+                                purchasePrice = p,
+                                purchaseDate = purchaseDate,
+                                expiryDate = expiryDate,
+                                batchNo = batchNo.trim()
+                            )
+                        )
+                    }
+                }
+            ) {
+                Text(v15Text("যোগ করুন", "Add"))
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) {
+                Text(v15Text("বাতিল", "Cancel"))
+            }
+        }
     )
 }
 
@@ -393,28 +1027,276 @@ private fun ReduceStockDialog(max: Int, onDismiss: () -> Unit, onSave: (Int) -> 
 }
 
 @Composable
-private fun EditProductDialog(product: ProductStockSummary, onDismiss: () -> Unit, onSave: (String, String, String, Double, Int, String) -> Unit) {
+private fun EditProductDialog(
+    product: ProductStockSummary,
+    onDismiss: () -> Unit,
+    onSave: (ProductDetailsInput) -> Unit
+) {
+    val context = LocalContext.current
+    val prefs = remember {
+        context.getSharedPreferences(
+            "hisabi_khata_v14_settings",
+            android.content.Context.MODE_PRIVATE
+        )
+    }
+
+    val shopType = remember {
+        prefs.getString("business_type", "") ?: ""
+    }
+
+    val mode = remember(shopType) {
+        productFormMode(shopType)
+    }
+
     var name by remember { mutableStateOf(product.name) }
     var category by remember { mutableStateOf(product.category) }
     var sku by remember { mutableStateOf(product.sku) }
+    var unit by remember { mutableStateOf(product.unit) }
+    var brand by remember { mutableStateOf(product.brand) }
+    var genericName by remember { mutableStateOf(product.genericName) }
+    var modelName by remember { mutableStateOf(product.modelName) }
+    var serialOrImei by remember { mutableStateOf(product.serialOrImei) }
+    var size by remember { mutableStateOf(product.size) }
+    var color by remember { mutableStateOf(product.color) }
+    var warranty by remember { mutableStateOf(product.warrantyMonths.toString()) }
     var sell by remember { mutableStateOf(v15Money(product.sellingPrice)) }
     var low by remember { mutableStateOf(product.lowStockLevel.toString()) }
     var note by remember { mutableStateOf(product.note) }
+    var showUnitPicker by remember { mutableStateOf(false) }
+
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text(v15Text("পণ্য সম্পাদনা", "Edit product")) },
+        title = {
+            Text(v15Text("পণ্য সম্পাদনা", "Edit product"))
+        },
         text = {
-            Column(modifier = Modifier.verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(7.dp)) {
-                OutlinedTextField(name, { name = it }, label = { Text(v15Text("পণ্যের নাম", "Product name")) })
-                OutlinedTextField(category, { category = it }, label = { Text(v15Text("ক্যাটাগরি", "Category")) })
-                OutlinedTextField(sku, { sku = it }, label = { Text("Barcode / SKU") })
-                OutlinedTextField(sell, { sell = it }, label = { Text(v15Text("বিক্রয় মূল্য", "Selling price")) })
-                OutlinedTextField(low, { low = it }, label = { Text(v15Text("লো-স্টক সীমা", "Low-stock threshold")) })
-                OutlinedTextField(note, { note = it }, label = { Text(v15Text("নোট", "Note")) })
+            Column(
+                modifier = Modifier.verticalScroll(rememberScrollState()),
+                verticalArrangement = Arrangement.spacedBy(7.dp)
+            ) {
+                OutlinedTextField(
+                    name,
+                    { name = it },
+                    label = { Text(productNameLabel(mode)) }
+                )
+
+                OutlinedTextField(
+                    category,
+                    { category = it },
+                    label = { Text(v15Text("ক্যাটাগরি", "Category")) }
+                )
+
+                OutlinedTextField(
+                    sku,
+                    { sku = it },
+                    label = { Text("Barcode / SKU") }
+                )
+
+                OutlinedButton(
+                    onClick = { showUnitPicker = true },
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Text(v15Text("ইউনিট: $unit", "Unit: $unit"))
+                }
+
+                OutlinedTextField(
+                    brand,
+                    { brand = it },
+                    label = { Text(v15Text("ব্র্যান্ড", "Brand")) }
+                )
+
+                if (mode == ProductFormMode.PHARMACY) {
+                    OutlinedTextField(
+                        genericName,
+                        { genericName = it },
+                        label = { Text(v15Text("জেনেরিক নাম", "Generic name")) }
+                    )
+                }
+
+                if (mode == ProductFormMode.ELECTRONICS) {
+                    OutlinedTextField(
+                        modelName,
+                        { modelName = it },
+                        label = { Text(v15Text("মডেল", "Model")) }
+                    )
+
+                    OutlinedTextField(
+                        serialOrImei,
+                        { serialOrImei = it },
+                        label = { Text("Serial / IMEI") }
+                    )
+
+                    OutlinedTextField(
+                        warranty,
+                        { warranty = it },
+                        label = {
+                            Text(v15Text("ওয়ারেন্টি (মাস)", "Warranty (months)"))
+                        }
+                    )
+                }
+
+                if (mode == ProductFormMode.FASHION) {
+                    OutlinedTextField(
+                        size,
+                        { size = it },
+                        label = { Text(v15Text("সাইজ", "Size")) }
+                    )
+
+                    OutlinedTextField(
+                        color,
+                        { color = it },
+                        label = { Text(v15Text("রং", "Color")) }
+                    )
+                }
+
+                OutlinedTextField(
+                    sell,
+                    { sell = it },
+                    label = { Text(v15Text("বিক্রয় মূল্য", "Selling price")) }
+                )
+
+                OutlinedTextField(
+                    low,
+                    { low = it },
+                    label = {
+                        Text(v15Text("লো-স্টক সীমা", "Low-stock threshold"))
+                    }
+                )
+
+                OutlinedTextField(
+                    note,
+                    { note = it },
+                    label = { Text(v15Text("নোট", "Note")) }
+                )
             }
         },
-        confirmButton = { TextButton(onClick = { onSave(name, category, sku, sell.toDoubleOrNull() ?: 0.0, low.toIntOrNull() ?: 0, note) }) { Text(v15Text("সেভ", "Save")) } },
-        dismissButton = { TextButton(onClick = onDismiss) { Text(v15Text("বাতিল", "Cancel")) } }
+        confirmButton = {
+            TextButton(
+                onClick = {
+                    onSave(
+                        ProductDetailsInput(
+                            name = name.trim(),
+                            category = category.trim(),
+                            sku = sku.trim(),
+                            unit = unit.trim().ifBlank { "pcs" },
+                            brand = brand.trim(),
+                            genericName = genericName.trim(),
+                            modelName = modelName.trim(),
+                            serialOrImei = serialOrImei.trim(),
+                            size = size.trim(),
+                            color = color.trim(),
+                            warrantyMonths = warranty.toIntOrNull() ?: 0,
+                            sellingPrice = sell.toDoubleOrNull() ?: 0.0,
+                            lowStockLevel = low.toIntOrNull() ?: 0,
+                            note = note.trim()
+                        )
+                    )
+                }
+            ) {
+                Text(v15Text("সেভ", "Save"))
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) {
+                Text(v15Text("বাতিল", "Cancel"))
+            }
+        }
+    )
+
+    if (showUnitPicker) {
+        UnitPickerDialog(
+            selected = unit,
+            onDismiss = { showUnitPicker = false }
+        ) {
+            unit = it
+            showUnitPicker = false
+        }
+    }
+}
+
+@Composable
+private fun UnitPickerDialog(
+    selected: String,
+    onDismiss: () -> Unit,
+    onSelect: (String) -> Unit
+) {
+    val units = listOf(
+        "pcs",
+        "box",
+        "pack",
+        "strip",
+        "bottle",
+        "kg",
+        "gram",
+        "liter",
+        "ml",
+        "meter",
+        "feet",
+        "pair",
+        "dozen",
+        "set"
+    )
+
+    var custom by remember { mutableStateOf("") }
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = {
+            Text(v15Text("ইউনিট নির্বাচন করুন", "Select unit"))
+        },
+        text = {
+            Column(
+                modifier = Modifier
+                    .heightIn(max = 430.dp)
+                    .verticalScroll(rememberScrollState()),
+                verticalArrangement = Arrangement.spacedBy(6.dp)
+            ) {
+                units.forEach { item ->
+                    if (item == selected) {
+                        Button(
+                            onClick = { onSelect(item) },
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Text("$item ✓")
+                        }
+                    } else {
+                        OutlinedButton(
+                            onClick = { onSelect(item) },
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Text(item)
+                        }
+                    }
+                }
+
+                OutlinedTextField(
+                    custom,
+                    { custom = it },
+                    label = {
+                        Text(v15Text("Custom unit", "Custom unit"))
+                    },
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth()
+                )
+
+                Button(
+                    onClick = {
+                        if (custom.isNotBlank()) {
+                            onSelect(custom.trim())
+                        }
+                    },
+                    enabled = custom.isNotBlank(),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Text(v15Text("এই ইউনিট ব্যবহার করুন", "Use this unit"))
+                }
+            }
+        },
+        confirmButton = {
+            TextButton(onClick = onDismiss) {
+                Text(v15Text("বন্ধ", "Close"))
+            }
+        }
     )
 }
 

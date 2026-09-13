@@ -97,11 +97,13 @@ internal fun V14SettingsScreen(
     var businessName by remember { mutableStateOf(prefs.getString("business_name", "") ?: "") }
     var businessType by remember { mutableStateOf(prefs.getString("business_type", "") ?: "") }
     var businessAddress by remember { mutableStateOf(prefs.getString("business_address", "") ?: "") }
+    var businessLogoPath by remember { mutableStateOf(prefs.getString("business_logo_path", "") ?: "") }
     var profilePhone by remember { mutableStateOf(prefs.getString("profile_phone", "") ?: "") }
     var showProfile by remember { mutableStateOf(false) }
     var showLanguage by remember { mutableStateOf(false) }
     var showCurrency by remember { mutableStateOf(false) }
     var showReminder by remember { mutableStateOf(false) }
+    var showInventoryAlerts by remember { mutableStateOf(false) }
     var showPlan by remember { mutableStateOf(false) }
     var showPin by remember { mutableStateOf(false) }
     var showSmsInfo by remember { mutableStateOf(false) }
@@ -152,6 +154,7 @@ internal fun V14SettingsScreen(
         SettingsActionCard("💬", "তাগাদা মেসেজ", "SMS/WhatsApp-এ প্রস্তুত বার্তা; আলাদা SMS প্যাক এখন লাগবে না") { showSmsInfo = true }
         SettingsActionCard("🔒", "PIN / পাসওয়ার্ড পরিবর্তন", "অ্যাপ লক সেট, পরিবর্তন বা বন্ধ করুন") { showPin = true }
         SettingsActionCard("🔔", "বাকি পরিশোধের নোটিফিকেশন", "৩০/১৫/৭/৩ দিন আগে এবং নির্ধারিত দিনে মনে করাবে") { showReminder = true }
+        SettingsActionCard("📦", "পণ্য ও Expiry নোটিফিকেশন", "Low stock, Out of stock এবং Expiry reminder") { showInventoryAlerts = true }
         SettingsActionCard("💱", "মুদ্রা পরিবর্তন করুন", "প্রদর্শনের মুদ্রা বদলাবে; FX conversion হবে না") { showCurrency = true }
 
         Card(
@@ -207,19 +210,21 @@ internal fun V14SettingsScreen(
     }
 
     if (showProfile) {
-        ProfileDialog(
+        V15BusinessProfileDialog(
             initialName = profileName,
             initialBusiness = businessName,
             initialPhone = profilePhone,
             initialBusinessType = businessType,
             initialAddress = businessAddress,
+            initialLogoPath = businessLogoPath,
             onDismiss = { showProfile = false }
-        ) { name, business, phone, type, address ->
+        ) { name, business, phone, type, address, logo ->
             profileName = name
             businessName = business
             profilePhone = phone
             businessType = type
             businessAddress = address
+            businessLogoPath = logo
 
             prefs.edit()
                 .putString("profile_name", name)
@@ -227,6 +232,7 @@ internal fun V14SettingsScreen(
                 .putString("profile_phone", phone)
                 .putString("business_type", type)
                 .putString("business_address", address)
+                .putString("business_logo_path", logo)
                 .apply()
 
             showProfile = false
@@ -243,7 +249,12 @@ internal fun V14SettingsScreen(
         }
     )
     if (showReminder) ReminderSettingsDialog(context, prefs) { showReminder = false }
-    if (showPlan) PlanPurchaseDialog(context) { showPlan = false }
+    if (showInventoryAlerts) {
+        V15InventoryNotificationSettingsDialog {
+            showInventoryAlerts = false
+        }
+    }
+    if (showPlan) V15PremiumDialog { showPlan = false }
     if (showPin) PinSettingsDialog(viewModel) { showPin = false }
     if (showSmsInfo) {
         AlertDialog(

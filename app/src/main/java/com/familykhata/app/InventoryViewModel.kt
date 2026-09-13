@@ -37,6 +37,14 @@ class InventoryViewModel(application: Application) : AndroidViewModel(applicatio
         name: String,
         category: String,
         sku: String,
+        unit: String,
+        brand: String,
+        genericName: String,
+        modelName: String,
+        serialOrImei: String,
+        size: String,
+        color: String,
+        warrantyMonths: Int,
         sellingPrice: Double,
         lowStockLevel: Int,
         note: String,
@@ -44,10 +52,12 @@ class InventoryViewModel(application: Application) : AndroidViewModel(applicatio
         initialQuantity: Int,
         purchasePrice: Double,
         purchaseDate: Long,
-        expiryDate: Long?
+        expiryDate: Long?,
+        batchNo: String
     ) {
         val cleanName = name.trim()
         if (cleanName.isBlank()) return
+
         viewModelScope.launch {
             database.withTransaction {
                 val productId = dao.insertProduct(
@@ -55,16 +65,26 @@ class InventoryViewModel(application: Application) : AndroidViewModel(applicatio
                         name = cleanName,
                         category = category.trim(),
                         sku = sku.trim(),
+                        unit = unit.trim().ifBlank { "pcs" },
+                        brand = brand.trim(),
+                        genericName = genericName.trim(),
+                        modelName = modelName.trim(),
+                        serialOrImei = serialOrImei.trim(),
+                        size = size.trim(),
+                        color = color.trim(),
+                        warrantyMonths = warrantyMonths.coerceAtLeast(0),
                         sellingPrice = sellingPrice.coerceAtLeast(0.0),
                         lowStockLevel = lowStockLevel.coerceAtLeast(0),
                         note = note.trim(),
                         workspace = workspace
                     )
                 )
+
                 if (initialQuantity > 0) {
                     dao.insertBatch(
                         StockBatchEntity(
                             productId = productId,
+                            batchNo = batchNo.trim(),
                             quantity = initialQuantity,
                             purchasePrice = purchasePrice.coerceAtLeast(0.0),
                             purchaseDate = purchaseDate,
@@ -81,17 +101,34 @@ class InventoryViewModel(application: Application) : AndroidViewModel(applicatio
         name: String,
         category: String,
         sku: String,
+        unit: String,
+        brand: String,
+        genericName: String,
+        modelName: String,
+        serialOrImei: String,
+        size: String,
+        color: String,
+        warrantyMonths: Int,
         sellingPrice: Double,
         lowStockLevel: Int,
         note: String
     ) {
         if (name.isBlank()) return
+
         viewModelScope.launch {
             dao.updateProduct(
                 productId = item.id,
                 name = name.trim(),
                 category = category.trim(),
                 sku = sku.trim(),
+                unit = unit.trim().ifBlank { "pcs" },
+                brand = brand.trim(),
+                genericName = genericName.trim(),
+                modelName = modelName.trim(),
+                serialOrImei = serialOrImei.trim(),
+                size = size.trim(),
+                color = color.trim(),
+                warrantyMonths = warrantyMonths.coerceAtLeast(0),
                 sellingPrice = sellingPrice.coerceAtLeast(0.0),
                 lowStockLevel = lowStockLevel.coerceAtLeast(0),
                 note = note.trim()
@@ -108,13 +145,16 @@ class InventoryViewModel(application: Application) : AndroidViewModel(applicatio
         quantity: Int,
         purchasePrice: Double,
         purchaseDate: Long,
-        expiryDate: Long?
+        expiryDate: Long?,
+        batchNo: String
     ) {
         if (quantity <= 0) return
+
         viewModelScope.launch {
             dao.insertBatch(
                 StockBatchEntity(
                     productId = productId,
+                    batchNo = batchNo.trim(),
                     quantity = quantity,
                     purchasePrice = purchasePrice.coerceAtLeast(0.0),
                     purchaseDate = purchaseDate,

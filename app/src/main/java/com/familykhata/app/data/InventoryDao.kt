@@ -18,6 +18,14 @@ interface InventoryDao {
         SET name = :name,
             category = :category,
             sku = :sku,
+            unit = :unit,
+            brand = :brand,
+            genericName = :genericName,
+            modelName = :modelName,
+            serialOrImei = :serialOrImei,
+            size = :size,
+            color = :color,
+            warrantyMonths = :warrantyMonths,
             sellingPrice = :sellingPrice,
             lowStockLevel = :lowStockLevel,
             note = :note
@@ -29,6 +37,14 @@ interface InventoryDao {
         name: String,
         category: String,
         sku: String,
+        unit: String,
+        brand: String,
+        genericName: String,
+        modelName: String,
+        serialOrImei: String,
+        size: String,
+        color: String,
+        warrantyMonths: Int,
         sellingPrice: Double,
         lowStockLevel: Int,
         note: String
@@ -43,12 +59,30 @@ interface InventoryDao {
                p.name AS name,
                p.category AS category,
                p.sku AS sku,
+               p.unit AS unit,
+               p.brand AS brand,
+               p.genericName AS genericName,
+               p.modelName AS modelName,
+               p.serialOrImei AS serialOrImei,
+               p.size AS size,
+               p.color AS color,
+               p.warrantyMonths AS warrantyMonths,
                p.sellingPrice AS sellingPrice,
                p.lowStockLevel AS lowStockLevel,
                p.note AS note,
                p.workspace AS workspace,
                COALESCE(SUM(b.quantity), 0) AS totalStock,
                COALESCE(SUM(CASE WHEN b.quantity > 0 THEN b.quantity * b.purchasePrice ELSE 0 END), 0) AS stockValue,
+               CASE
+                   WHEN COALESCE(SUM(b.quantity), 0) > 0
+                   THEN COALESCE(SUM(CASE WHEN b.quantity > 0 THEN b.quantity * b.purchasePrice ELSE 0 END), 0) * 1.0
+                        / COALESCE(SUM(b.quantity), 0)
+                   ELSE 0
+               END AS avgPurchasePrice,
+               COALESCE(SUM(b.quantity), 0) * p.sellingPrice AS saleValue,
+               (COALESCE(SUM(b.quantity), 0) * p.sellingPrice)
+                   - COALESCE(SUM(CASE WHEN b.quantity > 0 THEN b.quantity * b.purchasePrice ELSE 0 END), 0)
+                   AS potentialProfit,
                MIN(CASE WHEN b.quantity > 0 AND b.expiryDate IS NOT NULL THEN b.expiryDate END) AS nextExpiry
         FROM inventory_products p
         LEFT JOIN inventory_batches b ON b.productId = p.id

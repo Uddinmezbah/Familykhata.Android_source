@@ -68,16 +68,38 @@ internal object V14DisplayState {
 }
 
 @Composable
-internal fun TopCornerMenuButton(onClick: () -> Unit) {
-    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.Start) {
-        Card(
-            onClick = onClick,
-            shape = RoundedCornerShape(16.dp),
-            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
-            border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.22f))
-        ) {
-            Text(v15Text("☰  মেনু","☰  Menu"), modifier = Modifier.padding(horizontal = 14.dp, vertical = 9.dp), fontWeight = FontWeight.Bold)
-        }
+internal fun TopCornerMenuButton(
+    onClick: () -> Unit
+) {
+    Card(
+        onClick = onClick,
+        shape = RoundedCornerShape(16.dp),
+        colors =
+            CardDefaults.cardColors(
+                containerColor =
+                    MaterialTheme.colorScheme.surfaceVariant
+            ),
+        border =
+            BorderStroke(
+                1.dp,
+                MaterialTheme.colorScheme.outline.copy(
+                    alpha = 0.22f
+                )
+            )
+    ) {
+        Text(
+            v15Text(
+                "☰  মেনু",
+                "☰  Menu"
+            ),
+            modifier =
+                Modifier.padding(
+                    horizontal = 14.dp,
+                    vertical = 9.dp
+                ),
+            fontWeight =
+                FontWeight.Bold
+        )
     }
 }
 

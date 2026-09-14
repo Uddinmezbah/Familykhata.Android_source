@@ -51,6 +51,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import com.familykhata.app.FamilyKhataViewModel
+import com.familykhata.app.PremiumBillingManager
 import com.familykhata.app.BusinessMode
 import com.familykhata.app.detectBusinessMode
 import com.familykhata.app.data.BakiEntryEntity
@@ -94,6 +95,24 @@ fun FamilyKhataApp(viewModel: FamilyKhataViewModel) {
     val trialStatus by viewModel.trialStatus.collectAsState()
     val isAppUnlocked by viewModel.isAppUnlocked.collectAsState()
     val appContext = LocalContext.current
+
+    val premiumBillingManager =
+        remember(appContext) {
+            PremiumBillingManager.get(
+                appContext.applicationContext
+            )
+        }
+
+    val premiumBillingState by
+        premiumBillingManager.state.collectAsState()
+
+    LaunchedEffect(Unit) {
+        premiumBillingManager.start()
+    }
+
+    LaunchedEffect(premiumBillingState.active) {
+        viewModel.refreshTrialStatus()
+    }
 
     var appRefreshToken by remember {
         mutableStateOf(0L)

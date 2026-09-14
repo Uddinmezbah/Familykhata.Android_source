@@ -401,97 +401,127 @@ internal fun BakiEntryActionRow(
 @Composable
 internal fun PurchaseAndTutorialSection() {
     val context = LocalContext.current
-    var selectedPlan by remember { mutableStateOf(v15Text("মাসিক","Monthly")) }
+    var showPremium by remember {
+        mutableStateOf(false)
+    }
 
     Text(
-        v15Text("প্ল্যান ও সহায়তা","Plans & support"),
-        style = MaterialTheme.typography.titleMedium,
+        v15Text(
+            "প্ল্যান ও সহায়তা",
+            "Plans & support"
+        ),
+        style =
+            MaterialTheme.typography.titleMedium,
         fontWeight = FontWeight.Bold
     )
+
     Text(
-        v15Text("৩০ দিনের ট্রায়াল শেষে নতুন হিসাব যোগ/সম্পাদনার জন্য একটি প্ল্যান নিন। পুরনো ডেটা মুছে যাবে না।","After the 30-day trial, choose a plan to add or edit records. Existing data will not be deleted."),
-        style = MaterialTheme.typography.bodySmall,
-        color = MaterialTheme.colorScheme.onSurfaceVariant
+        v15Text(
+            "৩০ দিনের ট্রায়াল শেষে নতুন হিসাব যোগ/সম্পাদনার জন্য Premium নিন। পুরনো ডেটা মুছে যাবে না।",
+            "After the 30-day trial, get Premium to add or edit records. Existing data will not be deleted."
+        ),
+        style =
+            MaterialTheme.typography.bodySmall,
+        color =
+            MaterialTheme.colorScheme
+                .onSurfaceVariant
     )
 
-    Row(
+    Card(
         modifier = Modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.spacedBy(8.dp)
+        colors =
+            CardDefaults.cardColors(
+                containerColor =
+                    PlanAccent.copy(alpha = 0.07f)
+            ),
+        border =
+            BorderStroke(
+                1.dp,
+                PlanAccent.copy(alpha = 0.18f)
+            )
     ) {
-        listOf(v15Text("মাসিক","Monthly"), v15Text("বার্ষিক","Yearly"), "Lifetime").forEach { plan ->
-            val selected = selectedPlan == plan
-            if (selected) {
-                Button(
-                    onClick = { selectedPlan = plan },
-                    modifier = Modifier.weight(1f)
-                ) { Text(plan) }
-            } else {
-                OutlinedButton(
-                    onClick = { selectedPlan = plan },
-                    modifier = Modifier.weight(1f)
-                ) { Text(plan) }
+        Column(
+            modifier = Modifier.padding(14.dp),
+            verticalArrangement =
+                Arrangement.spacedBy(8.dp)
+        ) {
+            Text(
+                v15Text(
+                    "Premium প্ল্যান",
+                    "Premium plans"
+                ),
+                fontWeight = FontWeight.Bold
+            )
+
+            Text(
+                "৳99 / মাস  •  ৳899 / বছর  •  ৳2,999 Lifetime",
+                style =
+                    MaterialTheme.typography.bodySmall
+            )
+
+            Button(
+                onClick = {
+                    showPremium = true
+                },
+                modifier =
+                    Modifier.fillMaxWidth()
+            ) {
+                Text(
+                    v15Text(
+                        "প্ল্যান দেখুন / কিনুন",
+                        "View plans / Buy"
+                    )
+                )
             }
         }
     }
 
     Card(
+        onClick = {
+            v13OpenUrl(
+                context,
+                V13_TUTORIAL
+            )
+        },
         modifier = Modifier.fillMaxWidth(),
-        colors = CardDefaults.cardColors(containerColor = PlanAccent.copy(alpha = 0.07f)),
-        border = BorderStroke(1.dp, PlanAccent.copy(alpha = 0.18f))
+        colors =
+            CardDefaults.cardColors(
+                containerColor =
+                    DueTodayAccent.copy(alpha = 0.07f)
+            ),
+        border =
+            BorderStroke(
+                1.dp,
+                DueTodayAccent.copy(alpha = 0.18f)
+            )
     ) {
         Column(
             modifier = Modifier.padding(14.dp),
-            verticalArrangement = Arrangement.spacedBy(8.dp)
+            verticalArrangement =
+                Arrangement.spacedBy(4.dp)
         ) {
-            Text(v15Text("$selectedPlan প্ল্যান কিনতে যোগাযোগ করুন","Contact us to get the $selectedPlan plan"), fontWeight = FontWeight.Bold)
             Text(
-                v15Text("দাম ও পেমেন্ট নির্দেশনা বিক্রয় চ্যানেলে জানানো হবে।","Pricing and payment instructions will be provided through the sales channel."),
-                style = MaterialTheme.typography.bodySmall
+                v15Text(
+                    "▶ ব্যবহারের নিয়ম / ভিডিও",
+                    "▶ Usage guide / video"
+                ),
+                fontWeight = FontWeight.Bold
             )
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(6.dp)
-            ) {
-                OutlinedButton(
-                    onClick = { purchaseWhatsApp(context, selectedPlan) },
-                    modifier = Modifier.weight(1f)
-                ) { Text("WhatsApp") }
-                OutlinedButton(
-                    onClick = { purchaseMessenger(context, selectedPlan) },
-                    modifier = Modifier.weight(1f)
-                ) { Text("Messenger") }
-            }
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(6.dp)
-            ) {
-                OutlinedButton(
-                    onClick = { purchaseSms(context, selectedPlan) },
-                    modifier = Modifier.weight(1f)
-                ) { Text("SMS") }
-                OutlinedButton(
-                    onClick = { v13OpenUrl(context, V13_WEBSITE) },
-                    modifier = Modifier.weight(1f)
-                ) { Text("Website") }
-            }
+
+            Text(
+                v15Text(
+                    "নতুন খাতা, বাকি, পরিশোধ, ব্যাকআপ ও রিপোর্ট ব্যবহারের গাইড দেখুন।",
+                    "See the guide for ledgers, dues, payments, backups and reports."
+                ),
+                style =
+                    MaterialTheme.typography.bodySmall
+            )
         }
     }
 
-    Card(
-        onClick = { v13OpenUrl(context, V13_TUTORIAL) },
-        modifier = Modifier.fillMaxWidth(),
-        colors = CardDefaults.cardColors(containerColor = DueTodayAccent.copy(alpha = 0.07f)),
-        border = BorderStroke(1.dp, DueTodayAccent.copy(alpha = 0.18f))
-    ) {
-        Column(
-            modifier = Modifier.padding(14.dp),
-            verticalArrangement = Arrangement.spacedBy(4.dp)
-        ) {
-            Text(v15Text("▶ ব্যবহারের নিয়ম / ভিডিও","▶ Usage guide / video"), fontWeight = FontWeight.Bold)
-            Text(
-                v15Text("নতুন খাতা, বাকি, পরিশোধ, ব্যাকআপ ও রিপোর্ট ব্যবহারের গাইড দেখুন।","See the guide for ledgers, dues, payments, backups and reports."),
-                style = MaterialTheme.typography.bodySmall
-            )
+    if (showPremium) {
+        V15PremiumDialog {
+            showPremium = false
         }
     }
 }
@@ -515,37 +545,6 @@ private fun sendEntryWhatsApp(context: Context, person: BakiPersonSummary, item:
 
 private fun callPerson(context: Context, phone: String) {
     val intent = Intent(Intent.ACTION_DIAL, Uri.parse("tel:${Uri.encode(phone)}"))
-    runCatching { context.startActivity(intent) }
-}
-
-private fun purchaseMessage(plan: String): String =
-    v15Text("আমি হিসাবী খাতা অ্যাপের $plan প্ল্যান নিতে চাই। পেমেন্ট ও অ্যাক্টিভেশন নির্দেশনা দিন।","I want the $plan plan for Hisabi Khata. Please send payment and activation instructions.")
-
-private fun purchaseWhatsApp(context: Context, plan: String) {
-    val url = "https://wa.me/?text=${Uri.encode(purchaseMessage(plan))}"
-    v13OpenUrl(context, url)
-}
-
-private fun purchaseMessenger(context: Context, plan: String) {
-    val intent = Intent(Intent.ACTION_SEND).apply {
-        type = "text/plain"
-        putExtra(Intent.EXTRA_TEXT, purchaseMessage(plan))
-        setPackage("com.facebook.orca")
-    }
-    runCatching { context.startActivity(intent) }
-        .recoverCatching {
-            context.startActivity(Intent.createChooser(Intent(Intent.ACTION_SEND).apply {
-                type = "text/plain"
-                putExtra(Intent.EXTRA_TEXT, purchaseMessage(plan))
-            }, v15Text("যোগাযোগ করুন","Contact")))
-        }
-}
-
-private fun purchaseSms(context: Context, plan: String) {
-    val intent = Intent(Intent.ACTION_SENDTO).apply {
-        data = Uri.parse("smsto:")
-        putExtra("sms_body", purchaseMessage(plan))
-    }
     runCatching { context.startActivity(intent) }
 }
 

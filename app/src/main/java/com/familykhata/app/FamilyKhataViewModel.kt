@@ -333,7 +333,11 @@ class FamilyKhataViewModel(application: Application) : AndroidViewModel(applicat
     }
 
     private fun calculateTrialStatus(now: Long = System.currentTimeMillis()): TrialStatus {
-        val premiumUnlocked = preferences.getBoolean("premium_unlocked", false)
+        val premiumUnlocked =
+            preferences.getBoolean(
+                PremiumBillingManager.KEY_PLAY_PREMIUM_UNLOCKED,
+                false
+            )
         val expiresAt = trialStartedAt + TRIAL_DAYS * DAY_MS
         val remainingMillis = (expiresAt - now).coerceAtLeast(0L)
         val daysRemaining = if (premiumUnlocked) {

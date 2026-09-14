@@ -231,10 +231,8 @@ class PremiumBillingManager private constructor(
                     ?.firstOrNull()
                     ?: details.oneTimePurchaseOfferDetails
 
-            if (offer != null) {
-                productParams.setOfferToken(
-                    offer.offerToken
-                )
+            offer?.offerToken?.let { token ->
+                productParams.setOfferToken(token)
             }
         }
 

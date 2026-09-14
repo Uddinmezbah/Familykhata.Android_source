@@ -138,11 +138,7 @@ internal fun V15CoachingScreen(
                     "Students"
                 ),
                 value =
-                    summaries
-                        .map { it.studentId }
-                        .distinct()
-                        .size
-                        .toString(),
+                    students.size.toString(),
                 modifier = Modifier.weight(1f)
             )
 
@@ -162,6 +158,20 @@ internal fun V15CoachingScreen(
                 ),
                 value = coachingMoney(totalDue),
                 modifier = Modifier.weight(1f)
+            )
+        }
+
+        OutlinedButton(
+            onClick = {
+                vm.refresh()
+            },
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            Text(
+                v15Text(
+                    "↻ রিফ্রেশ",
+                    "↻ Refresh"
+                )
             )
         }
 
@@ -217,6 +227,13 @@ internal fun V15CoachingScreen(
                 )
             }
         }
+
+        V15CoachingEntityManagement(
+            students = students,
+            batches = batches,
+            canWrite = canWrite,
+            viewModel = vm
+        )
 
         if (summaries.isEmpty()) {
             Text(

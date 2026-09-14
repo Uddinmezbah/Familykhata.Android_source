@@ -9,6 +9,7 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
@@ -27,8 +28,19 @@ class AgencyViewModel(
     private val workspace =
         MutableStateFlow("SHOP")
 
+    private val refreshTick =
+        MutableStateFlow(0L)
+
+    private val liveWorkspace =
+        combine(
+            workspace,
+            refreshTick
+        ) { currentWorkspace, _ ->
+            currentWorkspace
+        }
+
     val clients: StateFlow<List<AgencyClientEntity>> =
-        workspace.flatMapLatest {
+        liveWorkspace.flatMapLatest {
             dao.observeClients(it)
         }.stateIn(
             viewModelScope,
@@ -37,7 +49,7 @@ class AgencyViewModel(
         )
 
     val projects: StateFlow<List<AgencyProjectSummary>> =
-        workspace.flatMapLatest {
+        liveWorkspace.flatMapLatest {
             dao.observeProjectSummaries(it)
         }.stateIn(
             viewModelScope,
@@ -48,6 +60,42 @@ class AgencyViewModel(
     fun setWorkspace(value: String) {
         if (workspace.value != value) {
             workspace.value = value
+        }
+    }
+
+    fun refresh() {
+        refreshTick.value =
+            refreshTick.value + 1L
+    }
+
+    fun updateClient(
+        item: AgencyClientEntity,
+        name: String,
+        phone: String,
+        email: String,
+        company: String,
+        note: String
+    ) {
+        if (name.isBlank()) return
+
+        viewModelScope.launch {
+            dao.updateClient(
+                item.copy(
+                    name = name.trim(),
+                    phone = phone.trim(),
+                    email = email.trim(),
+                    company = company.trim(),
+                    note = note.trim()
+                )
+            )
+        }
+    }
+
+    fun deleteClient(
+        item: AgencyClientEntity
+    ) {
+        viewModelScope.launch {
+            dao.deleteClient(item)
         }
     }
 

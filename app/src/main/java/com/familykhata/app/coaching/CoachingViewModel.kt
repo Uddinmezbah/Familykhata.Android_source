@@ -8,6 +8,7 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
@@ -25,8 +26,19 @@ class CoachingViewModel(
     private val workspace =
         MutableStateFlow("SHOP")
 
+    private val refreshTick =
+        MutableStateFlow(0L)
+
+    private val liveWorkspace =
+        combine(
+            workspace,
+            refreshTick
+        ) { currentWorkspace, _ ->
+            currentWorkspace
+        }
+
     val students: StateFlow<List<CoachingStudentEntity>> =
-        workspace.flatMapLatest {
+        liveWorkspace.flatMapLatest {
             dao.observeStudents(it)
         }.stateIn(
             viewModelScope,
@@ -35,7 +47,7 @@ class CoachingViewModel(
         )
 
     val batches: StateFlow<List<CoachingBatchEntity>> =
-        workspace.flatMapLatest {
+        liveWorkspace.flatMapLatest {
             dao.observeBatches(it)
         }.stateIn(
             viewModelScope,
@@ -44,7 +56,7 @@ class CoachingViewModel(
         )
 
     val summaries: StateFlow<List<CoachingEnrollmentSummary>> =
-        workspace.flatMapLatest {
+        liveWorkspace.flatMapLatest {
             dao.observeEnrollmentSummaries(it)
         }.stateIn(
             viewModelScope,
@@ -55,6 +67,71 @@ class CoachingViewModel(
     fun setWorkspace(value: String) {
         if (workspace.value != value) {
             workspace.value = value
+        }
+    }
+
+    fun refresh() {
+        refreshTick.value =
+            refreshTick.value + 1L
+    }
+
+    fun updateStudent(
+        item: CoachingStudentEntity,
+        name: String,
+        phone: String,
+        guardian: String,
+        address: String
+    ) {
+        if (name.isBlank()) return
+
+        viewModelScope.launch {
+            dao.updateStudent(
+                item.copy(
+                    name = name.trim(),
+                    phone = phone.trim(),
+                    guardianName = guardian.trim(),
+                    address = address.trim()
+                )
+            )
+        }
+    }
+
+    fun deleteStudent(
+        item: CoachingStudentEntity
+    ) {
+        viewModelScope.launch {
+            dao.deleteStudent(item)
+        }
+    }
+
+    fun updateBatch(
+        item: CoachingBatchEntity,
+        name: String,
+        admissionFee: Double,
+        monthlyFee: Double,
+        note: String
+    ) {
+        if (name.isBlank()) return
+
+        viewModelScope.launch {
+            dao.updateBatch(
+                item.copy(
+                    name = name.trim(),
+                    admissionFee =
+                        admissionFee.coerceAtLeast(0.0),
+                    monthlyFee =
+                        monthlyFee.coerceAtLeast(0.0),
+                    note = note.trim()
+                )
+            )
+        }
+    }
+
+    fun deleteBatch(
+        item: CoachingBatchEntity
+    ) {
+        viewModelScope.launch {
+            dao.deleteBatch(item)
         }
     }
 

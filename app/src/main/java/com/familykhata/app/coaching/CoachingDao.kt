@@ -5,6 +5,7 @@ import androidx.room.Delete
 import androidx.room.Insert
 import androidx.room.OnConflictStrategy
 import androidx.room.Query
+import androidx.room.Update
 import kotlinx.coroutines.flow.Flow
 
 @Dao
@@ -90,6 +91,26 @@ interface CoachingDao {
         feeType: String,
         periodKey: String
     ): Int
+
+    @Update
+    suspend fun updateStudent(
+        item: CoachingStudentEntity
+    )
+
+    @Delete
+    suspend fun deleteStudent(
+        item: CoachingStudentEntity
+    )
+
+    @Update
+    suspend fun updateBatch(
+        item: CoachingBatchEntity
+    )
+
+    @Delete
+    suspend fun deleteBatch(
+        item: CoachingBatchEntity
+    )
 
     @Delete
     suspend fun deleteCharge(item: CoachingChargeEntity)

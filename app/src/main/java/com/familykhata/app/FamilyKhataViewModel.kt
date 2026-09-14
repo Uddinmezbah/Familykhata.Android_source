@@ -137,6 +137,37 @@ class FamilyKhataViewModel(application: Application) : AndroidViewModel(applicat
         viewModelScope.launch { dao.deleteTransaction(item) }
     }
 
+    fun updateTransaction(
+        item: TransactionEntity,
+        type: String,
+        amount: Double,
+        category: String,
+        note: String
+    ) {
+        val cleanType = type.trim().uppercase(Locale.US)
+
+        if (
+            !canWriteNow() ||
+            cleanType !in setOf("INCOME", "EXPENSE") ||
+            amount <= 0
+        ) {
+            return
+        }
+
+        viewModelScope.launch {
+            dao.updateTransaction(
+                transactionId = item.id,
+                type = cleanType,
+                amount = amount,
+                category =
+                    category.trim().ifBlank {
+                        "অন্যান্য"
+                    },
+                note = note.trim()
+            )
+        }
+    }
+
     fun addBakiPerson(name: String, phone: String) {
         if (!canWriteNow() || name.isBlank()) return
         val workspace = _selectedWorkspace.value
@@ -190,15 +221,21 @@ class FamilyKhataViewModel(application: Application) : AndroidViewModel(applicat
 
     fun updateBakiEntry(
         item: BakiEntryEntity,
+        action: String,
         amount: Double,
         note: String,
         dueAt: Long?
     ) {
         if (!canWriteNow() || amount <= 0) return
-        val delta = balanceDelta(item.action, amount) ?: return
+
+        val delta =
+            balanceDelta(action, amount)
+                ?: return
+
         viewModelScope.launch {
             dao.updateBakiEntry(
                 entryId = item.id,
+                action = action,
                 amount = amount,
                 balanceDelta = delta,
                 note = note.trim(),

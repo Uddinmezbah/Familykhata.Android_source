@@ -15,6 +15,24 @@ interface FamilyKhataDao {
     @Delete
     suspend fun deleteTransaction(item: TransactionEntity)
 
+    @Query(
+        """
+        UPDATE transactions
+        SET type = :type,
+            amount = :amount,
+            category = :category,
+            note = :note
+        WHERE id = :transactionId
+        """
+    )
+    suspend fun updateTransaction(
+        transactionId: Long,
+        type: String,
+        amount: Double,
+        category: String,
+        note: String
+    )
+
     @Query("SELECT * FROM transactions WHERE workspace = :workspace ORDER BY createdAt DESC")
     fun observeTransactions(workspace: String): Flow<List<TransactionEntity>>
 
@@ -50,7 +68,8 @@ interface FamilyKhataDao {
     @Query(
         """
         UPDATE baki_entries
-        SET amount = :amount,
+        SET action = :action,
+            amount = :amount,
             balanceDelta = :balanceDelta,
             note = :note,
             dueAt = :dueAt
@@ -59,6 +78,7 @@ interface FamilyKhataDao {
     )
     suspend fun updateBakiEntry(
         entryId: Long,
+        action: String,
         amount: Double,
         balanceDelta: Double,
         note: String,

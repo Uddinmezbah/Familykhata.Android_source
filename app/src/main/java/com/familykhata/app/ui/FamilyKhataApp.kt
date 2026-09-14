@@ -420,7 +420,12 @@ fun FamilyKhataApp(viewModel: FamilyKhataViewModel) {
                                     )
                             }
                         }
-                        Tab.HISTORY -> HistoryScreen(viewModel, workspace)
+                        Tab.HISTORY ->
+                            HistoryScreen(
+                                viewModel = viewModel,
+                                workspace = workspace,
+                                canWrite = !trialStatus.expired
+                            )
                         Tab.MORE -> MoreScreen(viewModel)
                     }
                 }
@@ -1103,35 +1108,91 @@ private fun TransactionTypeCard(
 }
 
 @Composable
-private fun HistoryScreen(viewModel: FamilyKhataViewModel, workspace: String) {
-    val transactions by viewModel.transactions.collectAsState()
-    val isBusiness = workspace == "SHOP"
+private fun HistoryScreen(
+    viewModel: FamilyKhataViewModel,
+    workspace: String,
+    canWrite: Boolean
+) {
+    val transactions by
+        viewModel.transactions.collectAsState()
+
+    val isBusiness =
+        workspace == "SHOP"
 
     if (transactions.isEmpty()) {
-        Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+        Column(
+            verticalArrangement =
+                Arrangement.spacedBy(6.dp)
+        ) {
             Text(
-                if (isBusiness) v15Text("ব্যবসার লেনদেন", "Business transactions") else v15Text("আয়-খরচের ইতিহাস", "Income & expense history"),
-                style = MaterialTheme.typography.titleMedium,
-                fontWeight = FontWeight.Bold
+                if (isBusiness)
+                    v15Text(
+                        "ব্যবসার লেনদেন",
+                        "Business transactions"
+                    )
+                else
+                    v15Text(
+                        "আয়-খরচের ইতিহাস",
+                        "Income & expense history"
+                    ),
+                style =
+                    MaterialTheme.typography.titleMedium,
+                fontWeight =
+                    FontWeight.Bold
             )
-            Text(if (isBusiness) v15Text("এখনও কোনো ক্যাশ লেনদেন যোগ করা হয়নি।", "No cash transaction has been added yet.") else v15Text("এখনও কোনো আয়/খরচ যোগ করা হয়নি।", "No income or expense has been added yet."))
+
+            Text(
+                if (isBusiness)
+                    v15Text(
+                        "এখনও কোনো ক্যাশ লেনদেন যোগ করা হয়নি।",
+                        "No cash transaction has been added yet."
+                    )
+                else
+                    v15Text(
+                        "এখনও কোনো আয়/খরচ যোগ করা হয়নি।",
+                        "No income or expense has been added yet."
+                    )
+            )
         }
+
         return
     }
 
-    LazyColumn(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+    LazyColumn(
+        verticalArrangement =
+            Arrangement.spacedBy(8.dp)
+    ) {
         item {
             Text(
-                if (isBusiness) v15Text("ব্যবসার লেনদেন", "Business transactions") else v15Text("আয়-খরচের ইতিহাস", "Income & expense history"),
-                style = MaterialTheme.typography.titleMedium,
-                fontWeight = FontWeight.Bold
+                if (isBusiness)
+                    v15Text(
+                        "ব্যবসার লেনদেন",
+                        "Business transactions"
+                    )
+                else
+                    v15Text(
+                        "আয়-খরচের ইতিহাস",
+                        "Income & expense history"
+                    ),
+                style =
+                    MaterialTheme.typography.titleMedium,
+                fontWeight =
+                    FontWeight.Bold
             )
         }
-        items(transactions, key = { it.id }) { item ->
+
+        items(
+            transactions,
+            key = { it.id }
+        ) { item ->
             TransactionRow(
                 item = item,
                 isBusiness = isBusiness,
-                onDelete = { viewModel.deleteTransaction(item) }
+                canWrite = canWrite,
+                viewModel = viewModel,
+                onDelete = {
+                    viewModel.deleteTransaction(item)
+                }
             )
         }
     }
@@ -1141,51 +1202,394 @@ private fun HistoryScreen(viewModel: FamilyKhataViewModel, workspace: String) {
 private fun TransactionRow(
     item: TransactionEntity,
     isBusiness: Boolean,
+    canWrite: Boolean,
+    viewModel: FamilyKhataViewModel,
     onDelete: () -> Unit
 ) {
-    val accent = if (item.type == "INCOME") IncomeAccent else ExpenseAccent
+    val accent =
+        if (item.type == "INCOME")
+            IncomeAccent
+        else
+            ExpenseAccent
+
+    var showEdit by remember(
+        item.id,
+        item.type,
+        item.amount,
+        item.category,
+        item.note
+    ) {
+        mutableStateOf(false)
+    }
+
     Card(
-        modifier = Modifier.fillMaxWidth(),
-        colors = CardDefaults.cardColors(
-            containerColor = accent.copy(alpha = 0.09f)
-        ),
-        border = BorderStroke(1.dp, accent.copy(alpha = 0.20f))
+        modifier =
+            Modifier.fillMaxWidth(),
+        colors =
+            CardDefaults.cardColors(
+                containerColor =
+                    accent.copy(alpha = 0.09f)
+            ),
+        border =
+            BorderStroke(
+                1.dp,
+                accent.copy(alpha = 0.20f)
+            )
     ) {
         Column(
-            modifier = Modifier.padding(14.dp),
-            verticalArrangement = Arrangement.spacedBy(3.dp)
+            modifier =
+                Modifier.padding(14.dp),
+            verticalArrangement =
+                Arrangement.spacedBy(5.dp)
         ) {
-            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+            Row(
+                Modifier.fillMaxWidth(),
+                horizontalArrangement =
+                    Arrangement.SpaceBetween
+            ) {
                 Text(
                     if (isBusiness) {
-                        if (item.type == "INCOME") v15Text("ক্যাশ ইন", "Cash in") else v15Text("ক্যাশ আউট", "Cash out")
+                        if (item.type == "INCOME")
+                            v15Text(
+                                "ক্যাশ ইন",
+                                "Cash in"
+                            )
+                        else
+                            v15Text(
+                                "ক্যাশ আউট",
+                                "Cash out"
+                            )
                     } else {
-                        if (item.type == "INCOME") v15Text("আয়", "Income") else v15Text("খরচ", "Expense")
+                        if (item.type == "INCOME")
+                            v15Text(
+                                "আয়",
+                                "Income"
+                            )
+                        else
+                            v15Text(
+                                "খরচ",
+                                "Expense"
+                            )
                     },
-                    fontWeight = FontWeight.Bold,
+                    fontWeight =
+                        FontWeight.Bold,
                     color = accent
                 )
+
                 Text(
                     "${V14DisplayState.currencySymbol} ${money(item.amount)}",
-                    fontWeight = FontWeight.ExtraBold,
+                    fontWeight =
+                        FontWeight.ExtraBold,
                     color = accent
                 )
             }
-            Text(item.category, fontWeight = FontWeight.SemiBold)
+
+            Text(
+                item.category,
+                fontWeight =
+                    FontWeight.SemiBold
+            )
+
             if (item.note.isNotBlank()) {
                 Text(
                     item.note,
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                    style =
+                        MaterialTheme.typography.bodySmall,
+                    color =
+                        MaterialTheme.colorScheme
+                            .onSurfaceVariant
                 )
             }
+
             Text(
                 formatDate(item.createdAt),
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
+                style =
+                    MaterialTheme.typography.bodySmall,
+                color =
+                    MaterialTheme.colorScheme
+                        .onSurfaceVariant
             )
-            TextButton(onClick = onDelete) { Text(v15Text("মুছুন", "Delete")) }
+
+            if (canWrite) {
+                Row(
+                    modifier =
+                        Modifier.fillMaxWidth(),
+                    horizontalArrangement =
+                        Arrangement.spacedBy(8.dp)
+                ) {
+                    OutlinedButton(
+                        onClick = {
+                            showEdit = true
+                        },
+                        modifier =
+                            Modifier.weight(1f)
+                    ) {
+                        Text(
+                            v15Text(
+                                "এডিট",
+                                "Edit"
+                            )
+                        )
+                    }
+
+                    OutlinedButton(
+                        onClick = onDelete,
+                        modifier =
+                            Modifier.weight(1f)
+                    ) {
+                        Text(
+                            v15Text(
+                                "মুছুন",
+                                "Delete"
+                            )
+                        )
+                    }
+                }
+            }
         }
+    }
+
+    if (showEdit) {
+        var type by remember(
+            item.id,
+            item.type
+        ) {
+            mutableStateOf(item.type)
+        }
+
+        var amount by remember(
+            item.id,
+            item.amount
+        ) {
+            mutableStateOf(
+                money(item.amount)
+            )
+        }
+
+        var category by remember(
+            item.id,
+            item.category
+        ) {
+            mutableStateOf(item.category)
+        }
+
+        var note by remember(
+            item.id,
+            item.note
+        ) {
+            mutableStateOf(item.note)
+        }
+
+        var error by remember {
+            mutableStateOf<String?>(null)
+        }
+
+        AlertDialog(
+            onDismissRequest = {
+                showEdit = false
+            },
+            title = {
+                Text(
+                    if (isBusiness)
+                        v15Text(
+                            "ক্যাশ লেনদেন এডিট",
+                            "Edit cash transaction"
+                        )
+                    else
+                        v15Text(
+                            "আয়/খরচ এডিট",
+                            "Edit income/expense"
+                        )
+                )
+            },
+            text = {
+                Column(
+                    verticalArrangement =
+                        Arrangement.spacedBy(8.dp)
+                ) {
+                    Text(
+                        v15Text(
+                            "লেনদেনের ধরন",
+                            "Transaction type"
+                        ),
+                        fontWeight =
+                            FontWeight.Bold
+                    )
+
+                    Row(
+                        modifier =
+                            Modifier.fillMaxWidth(),
+                        horizontalArrangement =
+                            Arrangement.spacedBy(8.dp)
+                    ) {
+                        OutlinedButton(
+                            onClick = {
+                                type = "INCOME"
+                                error = null
+                            },
+                            modifier =
+                                Modifier.weight(1f)
+                        ) {
+                            Text(
+                                (
+                                    if (type == "INCOME")
+                                        "✓ "
+                                    else
+                                        ""
+                                ) +
+                                    if (isBusiness)
+                                        v15Text(
+                                            "ক্যাশ ইন",
+                                            "Cash in"
+                                        )
+                                    else
+                                        v15Text(
+                                            "আয়",
+                                            "Income"
+                                        )
+                            )
+                        }
+
+                        OutlinedButton(
+                            onClick = {
+                                type = "EXPENSE"
+                                error = null
+                            },
+                            modifier =
+                                Modifier.weight(1f)
+                        ) {
+                            Text(
+                                (
+                                    if (type == "EXPENSE")
+                                        "✓ "
+                                    else
+                                        ""
+                                ) +
+                                    if (isBusiness)
+                                        v15Text(
+                                            "ক্যাশ আউট",
+                                            "Cash out"
+                                        )
+                                    else
+                                        v15Text(
+                                            "খরচ",
+                                            "Expense"
+                                        )
+                            )
+                        }
+                    }
+
+                    OutlinedTextField(
+                        value = amount,
+                        onValueChange = {
+                            amount = it
+                            error = null
+                        },
+                        label = {
+                            Text(
+                                v15Text(
+                                    "টাকার পরিমাণ",
+                                    "Amount"
+                                )
+                            )
+                        },
+                        singleLine = true,
+                        modifier =
+                            Modifier.fillMaxWidth()
+                    )
+
+                    OutlinedTextField(
+                        value = category,
+                        onValueChange = {
+                            category = it
+                        },
+                        label = {
+                            Text(
+                                v15Text(
+                                    "ক্যাটাগরি",
+                                    "Category"
+                                )
+                            )
+                        },
+                        singleLine = true,
+                        modifier =
+                            Modifier.fillMaxWidth()
+                    )
+
+                    OutlinedTextField(
+                        value = note,
+                        onValueChange = {
+                            note = it
+                        },
+                        label = {
+                            Text(
+                                v15Text(
+                                    "নোট",
+                                    "Note"
+                                )
+                            )
+                        },
+                        modifier =
+                            Modifier.fillMaxWidth()
+                    )
+
+                    error?.let {
+                        Text(
+                            it,
+                            color =
+                                MaterialTheme.colorScheme.error
+                        )
+                    }
+                }
+            },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        val parsed =
+                            parseAmount(amount)
+
+                        if (parsed == null) {
+                            error =
+                                v15Text(
+                                    "সঠিক টাকার পরিমাণ লিখুন",
+                                    "Enter a valid amount"
+                                )
+                        } else {
+                            viewModel.updateTransaction(
+                                item = item,
+                                type = type,
+                                amount = parsed,
+                                category = category,
+                                note = note
+                            )
+
+                            showEdit = false
+                        }
+                    }
+                ) {
+                    Text(
+                        v15Text(
+                            "সেভ করুন",
+                            "Save"
+                        )
+                    )
+                }
+            },
+            dismissButton = {
+                TextButton(
+                    onClick = {
+                        showEdit = false
+                    }
+                ) {
+                    Text(
+                        v15Text(
+                            "বাতিল",
+                            "Cancel"
+                        )
+                    )
+                }
+            }
+        )
     }
 }
 

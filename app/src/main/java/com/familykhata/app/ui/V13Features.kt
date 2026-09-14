@@ -159,7 +159,15 @@ internal fun BakiEntryActionRow(
     onDelete: () -> Unit
 ) {
     val context = LocalContext.current
-    var showEdit by remember(item.id, item.amount, item.note, item.dueAt) { mutableStateOf(false) }
+    var showEdit by remember(
+        item.id,
+        item.action,
+        item.amount,
+        item.note,
+        item.dueAt
+    ) {
+        mutableStateOf(false)
+    }
 
     Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
         Row(
@@ -200,16 +208,154 @@ internal fun BakiEntryActionRow(
     }
 
     if (showEdit) {
-        var amount by remember(item.id) { mutableStateOf(v13Money(item.amount)) }
-        var note by remember(item.id) { mutableStateOf(item.note) }
-        var dueAt by remember(item.id) { mutableStateOf(item.dueAt) }
-        var error by remember { mutableStateOf<String?>(null) }
+        var action by remember(
+            item.id,
+            item.action
+        ) {
+            mutableStateOf(item.action)
+        }
+
+        var amount by remember(item.id) {
+            mutableStateOf(
+                v13Money(item.amount)
+            )
+        }
+
+        var note by remember(item.id) {
+            mutableStateOf(item.note)
+        }
+
+        var dueAt by remember(item.id) {
+            mutableStateOf(item.dueAt)
+        }
+
+        var error by remember {
+            mutableStateOf<String?>(null)
+        }
 
         AlertDialog(
             onDismissRequest = { showEdit = false },
             title = { Text(v15Text("এন্ট্রি সম্পাদনা","Edit entry")) },
             text = {
-                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Column(
+                    verticalArrangement =
+                        Arrangement.spacedBy(8.dp)
+                ) {
+                    Text(
+                        v15Text(
+                            "লেনদেনের ধরন",
+                            "Transaction type"
+                        ),
+                        fontWeight =
+                            FontWeight.Bold
+                    )
+
+                    Row(
+                        modifier =
+                            Modifier.fillMaxWidth(),
+                        horizontalArrangement =
+                            Arrangement.spacedBy(6.dp)
+                    ) {
+                        OutlinedButton(
+                            onClick = {
+                                action = "GAVE"
+                            },
+                            modifier =
+                                Modifier.weight(1f)
+                        ) {
+                            Text(
+                                (
+                                    if (action == "GAVE")
+                                        "✓ "
+                                    else
+                                        ""
+                                ) +
+                                    v15Text(
+                                        "দিলাম",
+                                        "Gave"
+                                    )
+                            )
+                        }
+
+                        OutlinedButton(
+                            onClick = {
+                                action =
+                                    "RECEIVED_BACK"
+                            },
+                            modifier =
+                                Modifier.weight(1f)
+                        ) {
+                            Text(
+                                (
+                                    if (
+                                        action ==
+                                        "RECEIVED_BACK"
+                                    )
+                                        "✓ "
+                                    else
+                                        ""
+                                ) +
+                                    v15Text(
+                                        "ফেরত পেলাম",
+                                        "Received back"
+                                    )
+                            )
+                        }
+                    }
+
+                    Row(
+                        modifier =
+                            Modifier.fillMaxWidth(),
+                        horizontalArrangement =
+                            Arrangement.spacedBy(6.dp)
+                    ) {
+                        OutlinedButton(
+                            onClick = {
+                                action = "TOOK"
+                            },
+                            modifier =
+                                Modifier.weight(1f)
+                        ) {
+                            Text(
+                                (
+                                    if (action == "TOOK")
+                                        "✓ "
+                                    else
+                                        ""
+                                ) +
+                                    v15Text(
+                                        "নিলাম",
+                                        "Took"
+                                    )
+                            )
+                        }
+
+                        OutlinedButton(
+                            onClick = {
+                                action =
+                                    "PAID_BACK"
+                            },
+                            modifier =
+                                Modifier.weight(1f)
+                        ) {
+                            Text(
+                                (
+                                    if (
+                                        action ==
+                                        "PAID_BACK"
+                                    )
+                                        "✓ "
+                                    else
+                                        ""
+                                ) +
+                                    v15Text(
+                                        "ফেরত দিলাম",
+                                        "Paid back"
+                                    )
+                            )
+                        }
+                    }
+
                     OutlinedTextField(
                         value = amount,
                         onValueChange = { amount = it; error = null },
@@ -233,7 +379,14 @@ internal fun BakiEntryActionRow(
                     if (parsed == null) {
                         error = v15Text("সঠিক টাকার পরিমাণ লিখুন","Enter a valid amount")
                     } else {
-                        viewModel.updateBakiEntry(item, parsed, note, dueAt)
+                        viewModel.updateBakiEntry(
+                            item = item,
+                            action = action,
+                            amount = parsed,
+                            note = note,
+                            dueAt = dueAt
+                        )
+
                         showEdit = false
                     }
                 }) { Text(v15Text("সেভ করুন","Save")) }

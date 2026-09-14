@@ -162,8 +162,10 @@ fun FamilyKhataApp(viewModel: FamilyKhataViewModel) {
                             icon = {
                                 Text(
                                     tabSymbol(item),
-                                    style = MaterialTheme.typography.titleMedium,
-                                    fontWeight = if (tab == item) FontWeight.Bold else FontWeight.Medium
+                                    style =
+                                        MaterialTheme.typography.titleLarge,
+                                    fontWeight =
+                                        FontWeight.ExtraBold
                                 )
                             },
                             label = {
@@ -173,7 +175,10 @@ fun FamilyKhataApp(viewModel: FamilyKhataViewModel) {
                                         workspace,
                                         businessMode
                                     ),
-                                    fontWeight = if (tab == item) FontWeight.Bold else FontWeight.Medium
+                                    style =
+                                        MaterialTheme.typography.labelMedium,
+                                    fontWeight =
+                                        FontWeight.Bold
                                 )
                             }
                         )
@@ -1970,10 +1975,10 @@ private fun tabLabel(
 
 private fun tabSymbol(tab: Tab): String = when (tab) {
     Tab.DASHBOARD -> "⌂"
-    Tab.ADD -> "＋"
-    Tab.BAKI -> "৳"
+    Tab.ADD -> "✚"
+    Tab.BAKI -> "▤"
     Tab.PRODUCTS -> "▦"
-    Tab.HISTORY -> "≡"
+    Tab.HISTORY -> "◷"
     Tab.MORE -> "⋯"
 }
 

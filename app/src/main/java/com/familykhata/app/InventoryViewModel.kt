@@ -13,6 +13,7 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
@@ -21,11 +22,60 @@ import kotlinx.coroutines.launch
 class InventoryViewModel(application: Application) : AndroidViewModel(application) {
     private val database = InventoryDatabase.get(application)
     private val dao = database.dao()
-    private val workspace = MutableStateFlow("SHOP")
+    private val workspace =
+        MutableStateFlow("SHOP")
 
-    val products: StateFlow<List<ProductStockSummary>> = workspace
-        .flatMapLatest { dao.observeProductSummaries(it) }
+    private val businessKey =
+        MutableStateFlow("legacy")
+
+    private val inventoryContext =
+        combine(
+            workspace,
+            businessKey
+        ) { workspaceValue, businessValue ->
+            workspaceValue to businessValue
+        }
+
+    val products: StateFlow<List<ProductStockSummary>> =
+        inventoryContext
+        .flatMapLatest { context ->
+            dao.observeProductSummaries(
+                workspace = context.first,
+                businessKey = context.second
+            )
+        }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
+
+    fun setContext(
+        workspaceValue: String,
+        shopType: String
+    ) {
+        val key =
+            businessDataKey(shopType)
+
+        if (
+            workspace.value !=
+            workspaceValue
+        ) {
+            workspace.value =
+                workspaceValue
+        }
+
+        if (
+            businessKey.value !=
+            key
+        ) {
+            businessKey.value =
+                key
+        }
+
+        viewModelScope.launch {
+            dao.claimLegacyProducts(
+                workspace = workspaceValue,
+                businessKey = key
+            )
+        }
+    }
 
     fun setWorkspace(value: String) {
         if (workspace.value != value) workspace.value = value
@@ -76,7 +126,9 @@ class InventoryViewModel(application: Application) : AndroidViewModel(applicatio
                         sellingPrice = sellingPrice.coerceAtLeast(0.0),
                         lowStockLevel = lowStockLevel.coerceAtLeast(0),
                         note = note.trim(),
-                        workspace = workspace
+                        workspace = workspace,
+                        businessKey =
+                            businessKey.value
                     )
                 )
 

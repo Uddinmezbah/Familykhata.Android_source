@@ -549,6 +549,7 @@ class FamilyKhataViewModel(application: Application) : AndroidViewModel(applicat
                                 put("lowStockLevel", product.lowStockLevel)
                                 put("note", product.note)
                                 put("workspace", product.workspace)
+                                put("businessKey", product.businessKey)
                                 put("createdAt", product.createdAt)
                             })
                         }
@@ -690,6 +691,13 @@ class FamilyKhataViewModel(application: Application) : AndroidViewModel(applicat
                             lowStockLevel = item.optInt("lowStockLevel", 0).coerceAtLeast(0),
                             note = item.optString("note", ""),
                             workspace = workspace,
+                            businessKey =
+                                item.optString(
+                                    "businessKey",
+                                    "legacy"
+                                ).ifBlank {
+                                    "legacy"
+                                },
                             createdAt = item.optLong("createdAt", System.currentTimeMillis())
                         )
                     }

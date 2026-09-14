@@ -306,6 +306,7 @@ fun FamilyKhataApp(viewModel: FamilyKhataViewModel) {
                                 BusinessMode.PRODUCTION ->
                                     V15ProductionScreen(
                                         workspace = workspace,
+                                        shopType = businessType,
                                         canWrite = !trialStatus.expired,
                                         onExit = {
                                             tab = Tab.DASHBOARD
@@ -315,6 +316,7 @@ fun FamilyKhataApp(viewModel: FamilyKhataViewModel) {
                                 BusinessMode.DEALERSHIP ->
                                     V15DealershipScreen(
                                         workspace = workspace,
+                                        shopType = businessType,
                                         canWrite = !trialStatus.expired,
                                         onExit = {
                                             tab = Tab.DASHBOARD
@@ -353,6 +355,7 @@ fun FamilyKhataApp(viewModel: FamilyKhataViewModel) {
                                 else ->
                                     V15InventoryScreen(
                                         workspace = workspace,
+                                        shopType = businessType,
                                         canWrite = !trialStatus.expired,
                                         onExit = {
                                             tab = Tab.DASHBOARD

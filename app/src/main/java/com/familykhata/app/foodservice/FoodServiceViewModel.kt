@@ -4,6 +4,7 @@ import android.app.Application
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import androidx.room.withTransaction
+import com.familykhata.app.businessDataKey
 import com.familykhata.app.data.InventoryDatabase
 import com.familykhata.app.data.ProductEntity
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -11,6 +12,7 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
@@ -38,10 +40,25 @@ class FoodServiceViewModel(
     private val workspace =
         MutableStateFlow("SHOP")
 
+    private val businessKey =
+        MutableStateFlow("legacy")
+
+    private val productContext =
+        combine(
+            workspace,
+            businessKey
+        ) { workspaceValue, businessValue ->
+            workspaceValue to businessValue
+        }
+
+
     val inventoryProducts:
         StateFlow<List<ProductEntity>> =
-        workspace.flatMapLatest {
-            inventoryDao.observeProducts(it)
+        productContext.flatMapLatest { context ->
+            inventoryDao.observeProductsForBusiness(
+                workspace = context.first,
+                businessKey = context.second
+            )
         }.stateIn(
             viewModelScope,
             SharingStarted.WhileSubscribed(5_000),
@@ -67,6 +84,37 @@ class FoodServiceViewModel(
             SharingStarted.WhileSubscribed(5_000),
             emptyList()
         )
+
+    fun setBusinessContext(
+        workspaceValue: String,
+        shopType: String
+    ) {
+        val key =
+            businessDataKey(shopType)
+
+        if (
+            workspace.value !=
+            workspaceValue
+        ) {
+            workspace.value =
+                workspaceValue
+        }
+
+        if (
+            businessKey.value !=
+            key
+        ) {
+            businessKey.value =
+                key
+        }
+
+        viewModelScope.launch {
+            inventoryDao.claimLegacyProducts(
+                workspace = workspaceValue,
+                businessKey = key
+            )
+        }
+    }
 
     fun setWorkspace(
         value: String

@@ -128,6 +128,7 @@ private fun productNameLabel(mode: ProductFormMode): String = when (mode) {
 @Composable
 internal fun V15InventoryScreen(
     workspace: String,
+    shopType: String,
     canWrite: Boolean,
     onExit: () -> Unit
 ) {
@@ -136,7 +137,15 @@ internal fun V15InventoryScreen(
     var selectedId by remember { mutableStateOf<Long?>(null) }
     val selected = selectedId?.let { id -> products.firstOrNull { it.id == id } }
 
-    LaunchedEffect(workspace) { vm.setWorkspace(workspace) }
+    LaunchedEffect(
+        workspace,
+        shopType
+    ) {
+        vm.setContext(
+            workspaceValue = workspace,
+            shopType = shopType
+        )
+    }
     BackHandler(enabled = selected != null) { selectedId = null }
     BackHandler(enabled = selected == null) { onExit() }
 
@@ -168,6 +177,14 @@ private fun ProductListScreen(
 ) {
     var query by remember { mutableStateOf("") }
     var showAdd by remember { mutableStateOf(false) }
+
+    var editingProduct by remember {
+        mutableStateOf<ProductStockSummary?>(null)
+    }
+
+    var deletingProduct by remember {
+        mutableStateOf<ProductStockSummary?>(null)
+    }
     val now = System.currentTimeMillis()
     val nearLimit = now + 30L * 86_400_000L
     val lowCount = products.count { it.totalStock <= it.lowStockLevel }
@@ -234,8 +251,109 @@ private fun ProductListScreen(
         if (filtered.isEmpty()) {
             Text(v15Text("এখনও কোনো পণ্য নেই।", "No products yet."), color = MaterialTheme.colorScheme.onSurfaceVariant)
         } else {
-            filtered.forEach { item -> ProductCard(item, onSelect) }
+            filtered.forEach { item ->
+                ProductCard(
+                    item = item,
+                    canWrite = canWrite,
+                    onSelect = {
+                        onSelect(item)
+                    },
+                    onEdit = {
+                        editingProduct = item
+                    },
+                    onDelete = {
+                        deletingProduct = item
+                    }
+                )
+            }
         }
+    }
+
+    editingProduct?.let { product ->
+        EditProductDialog(
+            product = product,
+            onDismiss = {
+                editingProduct = null
+            }
+        ) { input ->
+            viewModel.updateProduct(
+                item = product,
+                name = input.name,
+                category = input.category,
+                sku = input.sku,
+                unit = input.unit,
+                brand = input.brand,
+                genericName = input.genericName,
+                modelName = input.modelName,
+                serialOrImei = input.serialOrImei,
+                size = input.size,
+                color = input.color,
+                warrantyMonths =
+                    input.warrantyMonths,
+                sellingPrice =
+                    input.sellingPrice,
+                lowStockLevel =
+                    input.lowStockLevel,
+                note = input.note
+            )
+
+            editingProduct = null
+        }
+    }
+
+    deletingProduct?.let { product ->
+        AlertDialog(
+            onDismissRequest = {
+                deletingProduct = null
+            },
+            title = {
+                Text(
+                    v15Text(
+                        "পণ্য ডিলিট করবেন?",
+                        "Delete product?"
+                    )
+                )
+            },
+            text = {
+                Text(
+                    v15Text(
+                        "${product.name} ডিলিট করলে এর সব stock batch মুছে যাবে এবং এই পণ্যের সাথে যুক্ত অন্য ব্যবসায়িক রেকর্ড প্রভাবিত হতে পারে। এই কাজ ফিরিয়ে আনা যাবে না।",
+                        "Deleting ${product.name} will remove all of its stock batches and may affect business records linked to this product. This cannot be undone."
+                    )
+                )
+            },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        viewModel.deleteProduct(
+                            product.id
+                        )
+                        deletingProduct = null
+                    }
+                ) {
+                    Text(
+                        v15Text(
+                            "ডিলিট করুন",
+                            "Delete"
+                        )
+                    )
+                }
+            },
+            dismissButton = {
+                TextButton(
+                    onClick = {
+                        deletingProduct = null
+                    }
+                ) {
+                    Text(
+                        v15Text(
+                            "বাতিল",
+                            "Cancel"
+                        )
+                    )
+                }
+            }
+        )
     }
 
     if (showAdd) {
@@ -283,63 +401,213 @@ private fun InventoryMetric(title: String, value: String, accent: Color, modifie
 }
 
 @Composable
-private fun ProductCard(item: ProductStockSummary, onSelect: (ProductStockSummary) -> Unit) {
+private fun ProductCard(
+    item: ProductStockSummary,
+    canWrite: Boolean,
+    onSelect: () -> Unit,
+    onEdit: () -> Unit,
+    onDelete: () -> Unit
+) {
     val now = System.currentTimeMillis()
+
     val accent = when {
-        item.totalStock <= 0 -> InventoryRed
-        item.totalStock <= item.lowStockLevel -> InventoryOrange
-        item.nextExpiry != null && item.nextExpiry < now -> InventoryRed
-        else -> InventoryGreen
+        item.totalStock <= 0 ->
+            InventoryRed
+
+        item.totalStock <=
+            item.lowStockLevel ->
+            InventoryOrange
+
+        item.nextExpiry != null &&
+            item.nextExpiry < now ->
+            InventoryRed
+
+        else ->
+            InventoryGreen
     }
+
     Card(
-        onClick = { onSelect(item) },
-        modifier = Modifier.fillMaxWidth(),
-        colors = CardDefaults.cardColors(containerColor = accent.copy(alpha = 0.07f)),
-        border = BorderStroke(1.dp, accent.copy(alpha = 0.18f))
+        modifier =
+            Modifier.fillMaxWidth(),
+        colors =
+            CardDefaults.cardColors(
+                containerColor =
+                    accent.copy(
+                        alpha = 0.07f
+                    )
+            ),
+        border =
+            BorderStroke(
+                1.dp,
+                accent.copy(
+                    alpha = 0.18f
+                )
+            )
     ) {
-        Column(modifier = Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                Text(item.name, fontWeight = FontWeight.ExtraBold, style = MaterialTheme.typography.titleMedium)
-                Text(v15Text("স্টক ${item.totalStock}", "Stock ${item.totalStock}"), fontWeight = FontWeight.Bold, color = accent)
+        Column(
+            modifier =
+                Modifier.padding(14.dp),
+            verticalArrangement =
+                Arrangement.spacedBy(5.dp)
+        ) {
+            Row(
+                modifier =
+                    Modifier.fillMaxWidth(),
+                horizontalArrangement =
+                    Arrangement.SpaceBetween
+            ) {
+                Text(
+                    item.name,
+                    fontWeight =
+                        FontWeight.ExtraBold,
+                    style =
+                        MaterialTheme.typography.titleMedium
+                )
+
+                Text(
+                    v15Text(
+                        "স্টক ${item.totalStock}",
+                        "Stock ${item.totalStock}"
+                    ),
+                    fontWeight =
+                        FontWeight.Bold,
+                    color = accent
+                )
             }
-            if (item.category.isNotBlank()) Text(item.category, style = MaterialTheme.typography.bodySmall)
+
+            if (item.category.isNotBlank()) {
+                Text(
+                    item.category,
+                    style =
+                        MaterialTheme.typography.bodySmall
+                )
+            }
 
             if (item.brand.isNotBlank()) {
                 Text(
-                    v15Text("ব্র্যান্ড: ${item.brand}", "Brand: ${item.brand}"),
-                    style = MaterialTheme.typography.bodySmall
+                    v15Text(
+                        "ব্র্যান্ড: ${item.brand}",
+                        "Brand: ${item.brand}"
+                    ),
+                    style =
+                        MaterialTheme.typography.bodySmall
                 )
             }
 
             Text(
-                v15Text("ইউনিট: ${item.unit}", "Unit: ${item.unit}"),
-                style = MaterialTheme.typography.bodySmall
+                v15Text(
+                    "ইউনিট: ${item.unit}",
+                    "Unit: ${item.unit}"
+                ),
+                style =
+                    MaterialTheme.typography.bodySmall
             )
 
-            if (item.sku.isNotBlank()) Text(v15Text("বারকোড/SKU: ${item.sku}", "Barcode/SKU: ${item.sku}"), style = MaterialTheme.typography.bodySmall)
+            if (item.sku.isNotBlank()) {
+                Text(
+                    v15Text(
+                        "বারকোড/SKU: ${item.sku}",
+                        "Barcode/SKU: ${item.sku}"
+                    ),
+                    style =
+                        MaterialTheme.typography.bodySmall
+                )
+            }
 
-            val unitProfit = item.sellingPrice - item.avgPurchasePrice
+            val unitProfit =
+                item.sellingPrice -
+                    item.avgPurchasePrice
+
             Text(
                 v15Text(
-                    v15Text("কেনা ${V14DisplayState.currencySymbol} ${v15Money(item.avgPurchasePrice)} • বিক্রি ${V14DisplayState.currencySymbol} ${v15Money(item.sellingPrice)}","Buy ${V14DisplayState.currencySymbol} ${v15Money(item.avgPurchasePrice)} • Sell ${V14DisplayState.currencySymbol} ${v15Money(item.sellingPrice)}"),
+                    "কেনা ${V14DisplayState.currencySymbol} ${v15Money(item.avgPurchasePrice)} • বিক্রি ${V14DisplayState.currencySymbol} ${v15Money(item.sellingPrice)}",
                     "Buy ${V14DisplayState.currencySymbol} ${v15Money(item.avgPurchasePrice)} • Sell ${V14DisplayState.currencySymbol} ${v15Money(item.sellingPrice)}"
                 ),
-                style = MaterialTheme.typography.bodySmall,
-                fontWeight = FontWeight.SemiBold
+                style =
+                    MaterialTheme.typography.bodySmall,
+                fontWeight =
+                    FontWeight.SemiBold
             )
+
             Text(
                 v15Text(
-                    v15Text("লাভ/ইউনিট: ${V14DisplayState.currencySymbol} ${v15Money(unitProfit)}","Profit/unit: ${V14DisplayState.currencySymbol} ${v15Money(unitProfit)}"),
+                    "লাভ/ইউনিট: ${V14DisplayState.currencySymbol} ${v15Money(unitProfit)}",
                     "Profit/unit: ${V14DisplayState.currencySymbol} ${v15Money(unitProfit)}"
                 ),
-                style = MaterialTheme.typography.bodySmall,
-                color = if (unitProfit >= 0) InventoryGreen else InventoryRed
+                style =
+                    MaterialTheme.typography.bodySmall,
+                color =
+                    if (unitProfit >= 0)
+                        InventoryGreen
+                    else
+                        InventoryRed
             )
 
             item.nextExpiry?.let {
-                Text(v15Text("নিকটতম মেয়াদ: ${v15Date(it)}", "Next expiry: ${v15Date(it)}"), style = MaterialTheme.typography.bodySmall, color = if (it < now) InventoryRed else MaterialTheme.colorScheme.onSurfaceVariant)
+                Text(
+                    v15Text(
+                        "নিকটতম মেয়াদ: ${v15Date(it)}",
+                        "Next expiry: ${v15Date(it)}"
+                    ),
+                    style =
+                        MaterialTheme.typography.bodySmall,
+                    color =
+                        if (it < now)
+                            InventoryRed
+                        else
+                            MaterialTheme
+                                .colorScheme
+                                .onSurfaceVariant
+                )
             }
-            Text(v15Text("বিস্তারিত দেখতে চাপুন", "Tap for details"), style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+
+            Row(
+                modifier =
+                    Modifier.fillMaxWidth(),
+                horizontalArrangement =
+                    Arrangement.spacedBy(6.dp)
+            ) {
+                OutlinedButton(
+                    onClick = onSelect,
+                    modifier =
+                        Modifier.weight(1f)
+                ) {
+                    Text(
+                        v15Text(
+                            "বিস্তারিত",
+                            "Details"
+                        )
+                    )
+                }
+
+                if (canWrite) {
+                    OutlinedButton(
+                        onClick = onEdit,
+                        modifier =
+                            Modifier.weight(1f)
+                    ) {
+                        Text(
+                            v15Text(
+                                "এডিট",
+                                "Edit"
+                            )
+                        )
+                    }
+
+                    OutlinedButton(
+                        onClick = onDelete,
+                        modifier =
+                            Modifier.weight(1f)
+                    ) {
+                        Text(
+                            v15Text(
+                                "ডিলিট",
+                                "Delete"
+                            )
+                        )
+                    }
+                }
+            }
         }
     }
 }

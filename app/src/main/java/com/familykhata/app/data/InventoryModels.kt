@@ -8,7 +8,16 @@ import androidx.room.PrimaryKey
 
 @Entity(
     tableName = "inventory_products",
-    indices = [Index(value = ["workspace", "name"])]
+    indices = [
+        Index(value = ["workspace", "name"]),
+        Index(
+            value = [
+                "workspace",
+                "businessKey",
+                "name"
+            ]
+        )
+    ]
 )
 data class ProductEntity(
     @PrimaryKey(autoGenerate = true) val id: Long = 0,
@@ -27,6 +36,8 @@ data class ProductEntity(
     val lowStockLevel: Int = 5,
     val note: String = "",
     @ColumnInfo(defaultValue = "'SHOP'") val workspace: String = "SHOP",
+    @ColumnInfo(defaultValue = "'legacy'")
+    val businessKey: String = "legacy",
     val createdAt: Long = System.currentTimeMillis()
 )
 
@@ -70,6 +81,7 @@ data class ProductStockSummary(
     val lowStockLevel: Int,
     val note: String,
     val workspace: String,
+    val businessKey: String,
     val totalStock: Int,
     val stockValue: Double,
     val avgPurchasePrice: Double,

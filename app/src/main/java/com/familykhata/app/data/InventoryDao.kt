@@ -71,6 +71,7 @@ interface InventoryDao {
                p.lowStockLevel AS lowStockLevel,
                p.note AS note,
                p.workspace AS workspace,
+               p.businessKey AS businessKey,
                COALESCE(SUM(b.quantity), 0) AS totalStock,
                COALESCE(SUM(CASE WHEN b.quantity > 0 THEN b.quantity * b.purchasePrice ELSE 0 END), 0) AS stockValue,
                CASE
@@ -87,14 +88,46 @@ interface InventoryDao {
         FROM inventory_products p
         LEFT JOIN inventory_batches b ON b.productId = p.id
         WHERE p.workspace = :workspace
+          AND p.businessKey = :businessKey
         GROUP BY p.id
         ORDER BY p.name COLLATE NOCASE ASC
         """
     )
-    fun observeProductSummaries(workspace: String): Flow<List<ProductStockSummary>>
+    fun observeProductSummaries(
+        workspace: String,
+        businessKey: String
+    ): Flow<List<ProductStockSummary>>
 
     @Query("SELECT * FROM inventory_products WHERE workspace = :workspace ORDER BY name COLLATE NOCASE ASC")
     fun observeProducts(workspace: String): Flow<List<ProductEntity>>
+
+    @Query(
+        """
+        SELECT *
+        FROM inventory_products
+        WHERE workspace = :workspace
+          AND businessKey = :businessKey
+        ORDER BY name COLLATE NOCASE ASC
+        """
+    )
+    fun observeProductsForBusiness(
+        workspace: String,
+        businessKey: String
+    ): Flow<List<ProductEntity>>
+
+    @Query(
+        """
+        UPDATE inventory_products
+        SET businessKey = :businessKey
+        WHERE workspace = :workspace
+          AND businessKey = 'legacy'
+        """
+    )
+    suspend fun claimLegacyProducts(
+        workspace: String,
+        businessKey: String
+    ): Int
+
 
     @Query("SELECT * FROM inventory_products WHERE id = :productId LIMIT 1")
     suspend fun getProductOnce(productId: Long): ProductEntity?

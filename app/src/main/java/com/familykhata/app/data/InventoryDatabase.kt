@@ -63,7 +63,7 @@ import com.familykhata.app.production.ProductionItemRoleEntity
         FoodStockAllocationEntity::class,
         FoodPaymentEntity::class
     ],
-    version = 6,
+    version = 7,
     exportSchema = false
 )
 abstract class InventoryDatabase : RoomDatabase() {
@@ -1056,6 +1056,32 @@ abstract class InventoryDatabase : RoomDatabase() {
                 }
             }
 
+
+        private val MIGRATION_6_7 =
+            object : Migration(6, 7) {
+                override fun migrate(
+                    db: SupportSQLiteDatabase
+                ) {
+                    db.execSQL(
+                        """
+                        ALTER TABLE inventory_products
+                        ADD COLUMN businessKey
+                        TEXT NOT NULL
+                        DEFAULT 'legacy'
+                        """.trimIndent()
+                    )
+
+                    db.execSQL(
+                        """
+                        CREATE INDEX IF NOT EXISTS
+                        `index_inventory_products_workspace_businessKey_name`
+                        ON `inventory_products`
+                        (`workspace`, `businessKey`, `name`)
+                        """.trimIndent()
+                    )
+                }
+            }
+
         fun get(context: Context): InventoryDatabase = INSTANCE ?: synchronized(this) {
             INSTANCE ?: Room.databaseBuilder(
                 context.applicationContext,
@@ -1067,7 +1093,8 @@ abstract class InventoryDatabase : RoomDatabase() {
                     MIGRATION_2_3,
                     MIGRATION_3_4,
                     MIGRATION_4_5,
-                    MIGRATION_5_6
+                    MIGRATION_5_6,
+                    MIGRATION_6_7
                 )
                 .build()
                 .also { INSTANCE = it }

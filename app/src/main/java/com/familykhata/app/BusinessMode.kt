@@ -163,3 +163,30 @@ fun detectBusinessMode(shopType: String): BusinessMode {
             BusinessMode.RETAIL
     }
 }
+
+
+fun businessDataKey(
+    shopType: String
+): String {
+    val normalized =
+        shopType
+            .trim()
+            .lowercase()
+            .map { char ->
+                if (char.isLetterOrDigit()) {
+                    char
+                } else {
+                    '_'
+                }
+            }
+            .joinToString("")
+            .replace(
+                Regex("_+"),
+                "_"
+            )
+            .trim('_')
+
+    return normalized.ifBlank {
+        "default"
+    }
+}

@@ -75,8 +75,14 @@ internal fun V15AgroScreen(
         mutableStateOf<AgroCycleSummary?>(null)
     }
 
-    LaunchedEffect(workspace) {
-        vm.setWorkspace(workspace)
+    LaunchedEffect(
+        workspace,
+        shopType
+    ) {
+        vm.setBusinessContext(
+            workspaceValue = workspace,
+            shopType = shopType
+        )
     }
 
     if (showInventory) {
@@ -86,6 +92,7 @@ internal fun V15AgroScreen(
 
         V15InventoryScreen(
             workspace = workspace,
+            shopType = shopType,
             canWrite = canWrite,
             onExit = {
                 showInventory = false

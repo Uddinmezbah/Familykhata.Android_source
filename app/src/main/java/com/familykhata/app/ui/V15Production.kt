@@ -43,6 +43,7 @@ import java.util.Locale
 @Composable
 internal fun V15ProductionScreen(
     workspace: String,
+    shopType: String,
     canWrite: Boolean,
     onExit: () -> Unit
 ) {
@@ -68,8 +69,14 @@ internal fun V15ProductionScreen(
         mutableStateOf<ProductionBatchSummary?>(null)
     }
 
-    LaunchedEffect(workspace) {
-        vm.setWorkspace(workspace)
+    LaunchedEffect(
+        workspace,
+        shopType
+    ) {
+        vm.setBusinessContext(
+            workspaceValue = workspace,
+            shopType = shopType
+        )
     }
 
     if (showInventory) {
@@ -79,6 +86,7 @@ internal fun V15ProductionScreen(
 
         V15InventoryScreen(
             workspace = workspace,
+            shopType = shopType,
             canWrite = canWrite,
             onExit = {
                 showInventory = false

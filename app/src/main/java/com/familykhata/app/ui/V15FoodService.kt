@@ -85,8 +85,14 @@ internal fun V15FoodServiceScreen(
         mutableStateOf<FoodOrderSummary?>(null)
     }
 
-    LaunchedEffect(workspace) {
-        vm.setWorkspace(workspace)
+    LaunchedEffect(
+        workspace,
+        shopType
+    ) {
+        vm.setBusinessContext(
+            workspaceValue = workspace,
+            shopType = shopType
+        )
     }
 
     if (showInventory) {
@@ -96,6 +102,7 @@ internal fun V15FoodServiceScreen(
 
         V15InventoryScreen(
             workspace = workspace,
+            shopType = shopType,
             canWrite = canWrite,
             onExit = {
                 showInventory = false

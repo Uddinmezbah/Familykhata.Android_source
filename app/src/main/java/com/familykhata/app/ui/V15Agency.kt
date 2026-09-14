@@ -189,20 +189,6 @@ internal fun V15AgencyScreen(
             )
         }
 
-        OutlinedButton(
-            onClick = {
-                vm.refresh()
-            },
-            modifier = Modifier.fillMaxWidth()
-        ) {
-            Text(
-                v15Text(
-                    "↻ রিফ্রেশ",
-                    "↻ Refresh"
-                )
-            )
-        }
-
         if (canWrite) {
             Row(
                 modifier =

@@ -161,20 +161,6 @@ internal fun V15CoachingScreen(
             )
         }
 
-        OutlinedButton(
-            onClick = {
-                vm.refresh()
-            },
-            modifier = Modifier.fillMaxWidth()
-        ) {
-            Text(
-                v15Text(
-                    "↻ রিফ্রেশ",
-                    "↻ Refresh"
-                )
-            )
-        }
-
         if (canWrite) {
             Row(
                 modifier = Modifier.fillMaxWidth(),
@@ -640,10 +626,12 @@ private fun AddCoachingBatchDialog(
                     if (name.isNotBlank()) {
                         onSave(
                             name,
-                            admission.toDoubleOrNull()
-                                ?: 0.0,
-                            monthly.toDoubleOrNull()
-                                ?: 0.0,
+                            coachingInputNumber(
+                                admission
+                            ),
+                            coachingInputNumber(
+                                monthly
+                            ),
                             note
                         )
                     }
@@ -1070,3 +1058,27 @@ private fun coachingDate(
         "dd MMM yyyy",
         Locale.getDefault()
     ).format(Date(value))
+
+
+private fun coachingInputNumber(
+    value: String
+): Double {
+    val normalized =
+        value.trim()
+            .replace('০', '0')
+            .replace('১', '1')
+            .replace('২', '2')
+            .replace('৩', '3')
+            .replace('৪', '4')
+            .replace('৫', '5')
+            .replace('৬', '6')
+            .replace('৭', '7')
+            .replace('৮', '8')
+            .replace('৯', '9')
+            .replace(",", "")
+
+    return normalized
+        .toDoubleOrNull()
+        ?.coerceAtLeast(0.0)
+        ?: 0.0
+}

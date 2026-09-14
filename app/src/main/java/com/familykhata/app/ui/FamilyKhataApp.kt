@@ -94,6 +94,13 @@ fun FamilyKhataApp(viewModel: FamilyKhataViewModel) {
     val isAppUnlocked by viewModel.isAppUnlocked.collectAsState()
     val appContext = LocalContext.current
 
+    var appRefreshToken by remember {
+        mutableStateOf(0L)
+    }
+
+    @Suppress("UNUSED_VARIABLE")
+    val refreshDependency = appRefreshToken
+
     val businessType =
         appContext.getSharedPreferences(
             "hisabi_khata_v14_settings",
@@ -180,7 +187,36 @@ fun FamilyKhataApp(viewModel: FamilyKhataViewModel) {
                     .padding(padding)
                     .padding(16.dp)
             ) {
-                TopCornerMenuButton { showSettingsMenu = true }
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement =
+                        Arrangement.spacedBy(8.dp),
+                    verticalAlignment =
+                        Alignment.CenterVertically
+                ) {
+                    OutlinedButton(
+                        onClick = {
+                            appRefreshToken =
+                                appRefreshToken + 1L
+
+                            viewModel.refreshTrialStatus()
+                        },
+                        modifier =
+                            Modifier.weight(1f)
+                    ) {
+                        Text(
+                            v15Text(
+                                "↻ রিফ্রেশ",
+                                "↻ Refresh"
+                            )
+                        )
+                    }
+
+                    TopCornerMenuButton {
+                        showSettingsMenu = true
+                    }
+                }
+
                 Spacer(Modifier.height(6.dp))
                 BrandHeader(workspace)
                 Spacer(Modifier.height(10.dp))

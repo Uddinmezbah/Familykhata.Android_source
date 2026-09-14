@@ -410,15 +410,15 @@ internal fun V15CoachingEntityManagement(
 
                     Text(
                         v15Text(
-                            "ভর্তি ফি: ${batch.admissionFee}",
-                            "Admission fee: ${batch.admissionFee}"
+                            "ভর্তি ফি: ৳${entityMoney(batch.admissionFee)}",
+                            "Admission fee: ৳${entityMoney(batch.admissionFee)}"
                         )
                     )
 
                     Text(
                         v15Text(
-                            "মাসিক ফি: ${batch.monthlyFee}",
-                            "Monthly fee: ${batch.monthlyFee}"
+                            "মাসিক ফি: ৳${entityMoney(batch.monthlyFee)}",
+                            "Monthly fee: ৳${entityMoney(batch.monthlyFee)}"
                         )
                     )
 
@@ -763,10 +763,12 @@ private fun EditCoachingBatchDialog(
                 onClick = {
                     onSave(
                         name,
-                        admission.toDoubleOrNull()
-                            ?: 0.0,
-                        monthly.toDoubleOrNull()
-                            ?: 0.0,
+                        entityInputNumber(
+                            admission
+                        ),
+                        entityInputNumber(
+                            monthly
+                        ),
                         note
                     )
                 }
@@ -851,3 +853,36 @@ private fun EntityField(
         singleLine = true
     )
 }
+
+
+private fun entityInputNumber(
+    value: String
+): Double {
+    val normalized =
+        value.trim()
+            .replace('০', '0')
+            .replace('১', '1')
+            .replace('২', '2')
+            .replace('৩', '3')
+            .replace('৪', '4')
+            .replace('৫', '5')
+            .replace('৬', '6')
+            .replace('৭', '7')
+            .replace('৮', '8')
+            .replace('৯', '9')
+            .replace(",", "")
+
+    return normalized
+        .toDoubleOrNull()
+        ?.coerceAtLeast(0.0)
+        ?: 0.0
+}
+
+private fun entityMoney(
+    value: Double
+): String =
+    String.format(
+        java.util.Locale.US,
+        "%.2f",
+        value
+    )

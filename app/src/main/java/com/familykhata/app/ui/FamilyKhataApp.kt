@@ -206,13 +206,14 @@ fun FamilyKhataApp(viewModel: FamilyKhataViewModel) {
                         modifier =
                             Modifier.fillMaxWidth(),
                         horizontalArrangement =
-                            Arrangement.spacedBy(
-                                4.dp,
-                                Alignment.End
-                            ),
+                            Arrangement.SpaceBetween,
                         verticalAlignment =
                             Alignment.CenterVertically
                     ) {
+                        TopCornerMenuButton {
+                            showSettingsMenu = true
+                        }
+
                         Button(
                             onClick = {
                                 appRefreshToken =
@@ -232,29 +233,61 @@ fun FamilyKhataApp(viewModel: FamilyKhataViewModel) {
                                     FontWeight.Bold
                             )
                         }
-
-                        TopCornerMenuButton {
-                            showSettingsMenu = true
-                        }
                     }
 
                     Spacer(
-                        Modifier.height(3.dp)
+                        Modifier.height(4.dp)
                     )
-                BrandHeader(workspace)
-                Spacer(Modifier.height(10.dp))
-                WorkspaceSwitcher(
-                    selected = workspace,
-                    onSelect = {
-                        viewModel.selectWorkspace(it)
-                        V15DeepNavigationState.clear()
-                        addTypePreset = "EXPENSE"
-                        tab = Tab.DASHBOARD
+
+                    if (tab == Tab.DASHBOARD) {
+                        Text(
+                            v15Text(
+                                "হিসাবী খাতা",
+                                "Hisabi Khata"
+                            ),
+                            style =
+                                MaterialTheme.typography.headlineMedium,
+                            fontWeight =
+                                FontWeight.ExtraBold
+                        )
+
+                        Spacer(
+                            Modifier.height(8.dp)
+                        )
+
+                        Text(
+                            v15Text(
+                                "কোন হিসাব দেখতে চান?",
+                                "Which account do you want to see?"
+                            ),
+                            style =
+                                MaterialTheme.typography.titleMedium,
+                            fontWeight =
+                                FontWeight.Bold
+                        )
+
+                        Spacer(
+                            Modifier.height(6.dp)
+                        )
+
+                        WorkspaceSwitcher(
+                            selected = workspace,
+                            onSelect = {
+                                viewModel.selectWorkspace(it)
+                                V15DeepNavigationState.clear()
+                                addTypePreset = "EXPENSE"
+                                tab = Tab.DASHBOARD
+                            }
+                        )
+
+                        Spacer(
+                            Modifier.height(10.dp)
+                        )
+                    } else {
+                        Spacer(
+                            Modifier.height(2.dp)
+                        )
                     }
-                )
-                Spacer(Modifier.height(8.dp))
-                TrialNotice(trialStatus)
-                    Spacer(Modifier.height(12.dp))
                 }
 
                 Box(

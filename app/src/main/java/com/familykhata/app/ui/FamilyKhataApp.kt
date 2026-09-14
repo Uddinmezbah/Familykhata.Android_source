@@ -205,14 +205,17 @@ fun FamilyKhataApp(viewModel: FamilyKhataViewModel) {
                     Row(
                         modifier =
                             Modifier.fillMaxWidth(),
-                        horizontalArrangement =
-                            Arrangement.SpaceBetween,
                         verticalAlignment =
                             Alignment.CenterVertically
                     ) {
                         TopCornerMenuButton {
                             showSettingsMenu = true
                         }
+
+                        Spacer(
+                            modifier =
+                                Modifier.weight(1f)
+                        )
 
                         Button(
                             onClick = {
@@ -222,7 +225,17 @@ fun FamilyKhataApp(viewModel: FamilyKhataViewModel) {
                                 viewModel.refreshTrialStatus()
                             },
                             modifier =
-                                Modifier.height(42.dp)
+                                Modifier.height(42.dp),
+                            colors =
+                                androidx.compose.material3.ButtonDefaults
+                                    .buttonColors(
+                                        containerColor =
+                                            workspaceAccent(
+                                                workspace
+                                            ),
+                                        contentColor =
+                                            Color.White
+                                    )
                         ) {
                             Text(
                                 v15Text(
@@ -230,7 +243,7 @@ fun FamilyKhataApp(viewModel: FamilyKhataViewModel) {
                                     "↻ Refresh"
                                 ),
                                 fontWeight =
-                                    FontWeight.Bold
+                                    FontWeight.ExtraBold
                             )
                         }
                     }
@@ -253,21 +266,6 @@ fun FamilyKhataApp(viewModel: FamilyKhataViewModel) {
 
                         Spacer(
                             Modifier.height(8.dp)
-                        )
-
-                        Text(
-                            v15Text(
-                                "কোন হিসাব দেখতে চান?",
-                                "Which account do you want to see?"
-                            ),
-                            style =
-                                MaterialTheme.typography.titleMedium,
-                            fontWeight =
-                                FontWeight.Bold
-                        )
-
-                        Spacer(
-                            Modifier.height(6.dp)
                         )
 
                         WorkspaceSwitcher(

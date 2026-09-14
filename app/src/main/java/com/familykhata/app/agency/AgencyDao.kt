@@ -50,6 +50,8 @@ interface AgencyDao {
             c.company AS company,
             p.title AS title,
             p.serviceType AS serviceType,
+            p.totalPrice AS projectBasePrice,
+            p.note AS projectNote,
 
             COALESCE(
                 (
@@ -150,6 +152,44 @@ interface AgencyDao {
         projectId: Long,
         chargeType: String,
         periodKey: String
+    ): Int
+
+    @Query("""
+        UPDATE agency_projects
+        SET clientId = :clientId,
+            title = :title,
+            serviceType = :serviceType,
+            totalPrice = :basePrice,
+            note = :note
+        WHERE id = :projectId
+    """)
+    suspend fun updateProjectFields(
+        projectId: Long,
+        clientId: Long,
+        title: String,
+        serviceType: String,
+        basePrice: Double,
+        note: String
+    ): Int
+
+    @Query("""
+        UPDATE agency_charges
+        SET amount = :amount
+        WHERE projectId = :projectId
+          AND chargeType = 'PACKAGE'
+          AND periodKey = 'INITIAL'
+    """)
+    suspend fun updateInitialPackageCharge(
+        projectId: Long,
+        amount: Double
+    ): Int
+
+    @Query("""
+        DELETE FROM agency_projects
+        WHERE id = :projectId
+    """)
+    suspend fun deleteProjectById(
+        projectId: Long
     ): Int
 
     @Query("""

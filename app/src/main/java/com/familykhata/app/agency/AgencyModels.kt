@@ -114,6 +114,8 @@ data class AgencyProjectSummary(
     val company: String,
     val title: String,
     val serviceType: String,
+    val projectBasePrice: Double,
+    val projectNote: String,
     val totalPrice: Double,
     val totalPaid: Double,
     val dueAmount: Double,

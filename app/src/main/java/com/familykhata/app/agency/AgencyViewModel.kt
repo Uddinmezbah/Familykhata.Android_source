@@ -183,6 +183,92 @@ class AgencyViewModel(
         }
     }
 
+    fun updateProject(
+        projectId: Long,
+        clientId: Long,
+        title: String,
+        serviceType: String,
+        basePrice: Double,
+        note: String,
+        onDone: (Boolean) -> Unit = {}
+    ) {
+        if (
+            projectId <= 0 ||
+            clientId <= 0 ||
+            title.isBlank() ||
+            basePrice <= 0
+        ) {
+            onDone(false)
+            return
+        }
+
+        viewModelScope.launch {
+            val success =
+                runCatching {
+                    database.withTransaction {
+                        val updated =
+                            dao.updateProjectFields(
+                                projectId = projectId,
+                                clientId = clientId,
+                                title = title.trim(),
+                                serviceType =
+                                    serviceType.trim(),
+                                basePrice =
+                                    basePrice.coerceAtLeast(0.0),
+                                note = note.trim()
+                            )
+
+                        if (updated <= 0) {
+                            error("Project not found")
+                        }
+
+                        val packageUpdated =
+                            dao.updateInitialPackageCharge(
+                                projectId = projectId,
+                                amount =
+                                    basePrice.coerceAtLeast(0.0)
+                            )
+
+                        if (packageUpdated <= 0) {
+                            dao.insertCharge(
+                                AgencyChargeEntity(
+                                    projectId = projectId,
+                                    chargeType = "PACKAGE",
+                                    periodKey = "INITIAL",
+                                    amount =
+                                        basePrice.coerceAtLeast(0.0),
+                                    note = ""
+                                )
+                            )
+                        }
+                    }
+                }.isSuccess
+
+            onDone(success)
+        }
+    }
+
+    fun deleteProject(
+        projectId: Long,
+        onDone: (Boolean) -> Unit = {}
+    ) {
+        if (projectId <= 0) {
+            onDone(false)
+            return
+        }
+
+        viewModelScope.launch {
+            val success =
+                runCatching {
+                    dao.deleteProjectById(
+                        projectId
+                    ) > 0
+                }.getOrDefault(false)
+
+            onDone(success)
+        }
+    }
+
     fun addCharge(
         projectId: Long,
         chargeType: String,

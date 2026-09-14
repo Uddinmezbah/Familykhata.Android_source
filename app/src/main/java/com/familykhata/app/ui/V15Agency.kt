@@ -61,6 +61,14 @@ internal fun V15AgencyScreen(
         mutableStateOf<AgencyProjectSummary?>(null)
     }
 
+    var editingProject by remember {
+        mutableStateOf<AgencyProjectSummary?>(null)
+    }
+
+    var deletingProject by remember {
+        mutableStateOf<AgencyProjectSummary?>(null)
+    }
+
     LaunchedEffect(workspace) {
         vm.setWorkspace(workspace)
     }
@@ -254,8 +262,15 @@ internal fun V15AgencyScreen(
             projects.forEach { item ->
                 AgencyProjectCard(
                     item = item,
-                    onClick = {
+                    canWrite = canWrite,
+                    onOpen = {
                         selectedProject = item
+                    },
+                    onEdit = {
+                        editingProject = item
+                    },
+                    onDelete = {
+                        deletingProject = item
                     }
                 )
             }
@@ -313,6 +328,63 @@ internal fun V15AgencyScreen(
             showProjectDialog = false
         }
     }
+
+    editingProject?.let { project ->
+        EditAgencyProjectDialog(
+            project = project,
+            clients = clients,
+            onDismiss = {
+                editingProject = null
+            },
+            onSave = {
+                    clientId,
+                    title,
+                    service,
+                    basePrice,
+                    note ->
+
+                vm.updateProject(
+                    projectId =
+                        project.projectId,
+                    clientId = clientId,
+                    title = title,
+                    serviceType = service,
+                    basePrice = basePrice,
+                    note = note
+                ) { success ->
+                    if (success) {
+                        editingProject = null
+                    }
+                }
+            }
+        )
+    }
+
+    deletingProject?.let { project ->
+        DeleteAgencyProjectDialog(
+            project = project,
+            onDismiss = {
+                deletingProject = null
+            },
+            onConfirm = {
+                vm.deleteProject(
+                    project.projectId
+                ) { success ->
+                    if (success) {
+                        if (
+                            selectedProject
+                                ?.projectId ==
+                            project.projectId
+                        ) {
+                            selectedProject = null
+                        }
+
+                        deletingProject = null
+                    }
+                }
+            }
+        )
+    }
 }
 
 @Composable
@@ -343,12 +415,14 @@ private fun AgencyMetric(
 @Composable
 private fun AgencyProjectCard(
     item: AgencyProjectSummary,
-    onClick: () -> Unit
+    canWrite: Boolean,
+    onOpen: () -> Unit,
+    onEdit: () -> Unit,
+    onDelete: () -> Unit
 ) {
     Card(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clickable(onClick = onClick)
+        modifier =
+            Modifier.fillMaxWidth()
     ) {
         Column(
             modifier =
@@ -384,15 +458,11 @@ private fun AgencyProjectCard(
                 )
             )
 
-            if (
-                item.company.isNotBlank()
-            ) {
+            if (item.company.isNotBlank()) {
                 Text(item.company)
             }
 
-            if (
-                item.serviceType.isNotBlank()
-            ) {
+            if (item.serviceType.isNotBlank()) {
                 Text(
                     v15Text(
                         "সার্ভিস: ${item.serviceType}",
@@ -403,8 +473,15 @@ private fun AgencyProjectCard(
 
             Text(
                 v15Text(
-                    "মোট: ${agencyMoney(item.totalPrice)}",
-                    "Total: ${agencyMoney(item.totalPrice)}"
+                    "প্রজেক্ট মূল্য: ${agencyMoney(item.projectBasePrice)}",
+                    "Project price: ${agencyMoney(item.projectBasePrice)}"
+                )
+            )
+
+            Text(
+                v15Text(
+                    "মোট চার্জ: ${agencyMoney(item.totalPrice)}",
+                    "Total charges: ${agencyMoney(item.totalPrice)}"
                 )
             )
 
@@ -417,12 +494,60 @@ private fun AgencyProjectCard(
 
             Text(
                 v15Text(
-                    "বকেয়া: ${agencyMoney(item.dueAmount)}",
-                    "Due: ${agencyMoney(item.dueAmount)}"
+                    "বকেয়া: ${agencyMoney(item.dueAmount.coerceAtLeast(0.0))}",
+                    "Due: ${agencyMoney(item.dueAmount.coerceAtLeast(0.0))}"
                 ),
                 fontWeight =
                     FontWeight.SemiBold
             )
+
+            Row(
+                modifier =
+                    Modifier.fillMaxWidth(),
+                horizontalArrangement =
+                    Arrangement.spacedBy(6.dp)
+            ) {
+                OutlinedButton(
+                    onClick = onOpen,
+                    modifier =
+                        Modifier.weight(1f)
+                ) {
+                    Text(
+                        v15Text(
+                            "হিসাব",
+                            "Details"
+                        )
+                    )
+                }
+
+                if (canWrite) {
+                    OutlinedButton(
+                        onClick = onEdit,
+                        modifier =
+                            Modifier.weight(1f)
+                    ) {
+                        Text(
+                            v15Text(
+                                "এডিট",
+                                "Edit"
+                            )
+                        )
+                    }
+
+                    OutlinedButton(
+                        onClick = onDelete,
+                        modifier =
+                            Modifier.weight(1f)
+                    ) {
+                        Text(
+                            v15Text(
+                                "ডিলিট",
+                                "Delete"
+                            )
+                        )
+                    }
+                }
+            }
         }
     }
 }
@@ -726,18 +851,15 @@ private fun AddAgencyProjectDialog(
                     clientId != null &&
                     title.isNotBlank() &&
                     (
-                        total.toDoubleOrNull()
-                            ?: 0.0
+                        agencyInputNumber(total)
                     ) > 0,
                 onClick = {
                     onSave(
                         clientId!!,
                         title,
                         service,
-                        total.toDoubleOrNull()
-                            ?: 0.0,
-                        advance.toDoubleOrNull()
-                            ?: 0.0,
+                        agencyInputNumber(total),
+                        agencyInputNumber(advance),
                         note
                     )
                 }
@@ -746,6 +868,241 @@ private fun AddAgencyProjectDialog(
                     v15Text(
                         "প্রজেক্ট যোগ করুন",
                         "Add project"
+                    )
+                )
+            }
+        },
+        dismissButton = {
+            TextButton(
+                onClick = onDismiss
+            ) {
+                Text(
+                    v15Text(
+                        "বাতিল",
+                        "Cancel"
+                    )
+                )
+            }
+        }
+    )
+}
+
+@Composable
+private fun EditAgencyProjectDialog(
+    project: AgencyProjectSummary,
+    clients: List<AgencyClientEntity>,
+    onDismiss: () -> Unit,
+    onSave: (
+        Long,
+        String,
+        String,
+        Double,
+        String
+    ) -> Unit
+) {
+    var clientId by remember(project.projectId) {
+        mutableStateOf(project.clientId)
+    }
+
+    var title by remember(project.projectId) {
+        mutableStateOf(project.title)
+    }
+
+    var service by remember(project.projectId) {
+        mutableStateOf(project.serviceType)
+    }
+
+    var basePrice by remember(project.projectId) {
+        mutableStateOf(
+            project.projectBasePrice.toString()
+        )
+    }
+
+    var note by remember(project.projectId) {
+        mutableStateOf(project.projectNote)
+    }
+
+    val price =
+        agencyInputNumber(basePrice)
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = {
+            Text(
+                v15Text(
+                    "প্রজেক্ট এডিট",
+                    "Edit project"
+                )
+            )
+        },
+        text = {
+            Column(
+                modifier =
+                    Modifier.verticalScroll(
+                        rememberScrollState()
+                    ),
+                verticalArrangement =
+                    Arrangement.spacedBy(7.dp)
+            ) {
+                Text(
+                    v15Text(
+                        "ক্লায়েন্ট নির্বাচন",
+                        "Select client"
+                    ),
+                    fontWeight =
+                        FontWeight.Bold
+                )
+
+                clients.forEach { client ->
+                    OutlinedButton(
+                        onClick = {
+                            clientId = client.id
+                        },
+                        modifier =
+                            Modifier.fillMaxWidth()
+                    ) {
+                        Text(
+                            if (
+                                clientId ==
+                                client.id
+                            ) {
+                                "✓ ${client.name}"
+                            } else {
+                                client.name
+                            }
+                        )
+                    }
+                }
+
+                AgencyField(
+                    value = title,
+                    onChange = {
+                        title = it
+                    },
+                    label =
+                        v15Text(
+                            "প্রজেক্টের নাম",
+                            "Project name"
+                        )
+                )
+
+                AgencyField(
+                    value = service,
+                    onChange = {
+                        service = it
+                    },
+                    label =
+                        v15Text(
+                            "সার্ভিস",
+                            "Service"
+                        )
+                )
+
+                AgencyField(
+                    value = basePrice,
+                    onChange = {
+                        basePrice = it
+                    },
+                    label =
+                        v15Text(
+                            "প্রজেক্টের মূল মূল্য",
+                            "Base project price"
+                        )
+                )
+
+                Text(
+                    v15Text(
+                        "এখানে মূল প্রজেক্ট মূল্য পরিবর্তন হবে। অতিরিক্ত মাসিক/অন্যান্য চার্জ অপরিবর্তিত থাকবে।",
+                        "This changes the base project price only. Recurring and other charges remain unchanged."
+                    ),
+                    style =
+                        MaterialTheme.typography.bodySmall
+                )
+
+                AgencyField(
+                    value = note,
+                    onChange = {
+                        note = it
+                    },
+                    label =
+                        v15Text(
+                            "নোট",
+                            "Note"
+                        )
+                )
+            }
+        },
+        confirmButton = {
+            TextButton(
+                enabled =
+                    clientId > 0 &&
+                    title.isNotBlank() &&
+                    price > 0,
+                onClick = {
+                    onSave(
+                        clientId,
+                        title,
+                        service,
+                        price,
+                        note
+                    )
+                }
+            ) {
+                Text(
+                    v15Text(
+                        "আপডেট",
+                        "Update"
+                    )
+                )
+            }
+        },
+        dismissButton = {
+            TextButton(
+                onClick = onDismiss
+            ) {
+                Text(
+                    v15Text(
+                        "বাতিল",
+                        "Cancel"
+                    )
+                )
+            }
+        }
+    )
+}
+
+@Composable
+private fun DeleteAgencyProjectDialog(
+    project: AgencyProjectSummary,
+    onDismiss: () -> Unit,
+    onConfirm: () -> Unit
+) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = {
+            Text(
+                v15Text(
+                    "প্রজেক্ট ডিলিট করবেন?",
+                    "Delete project?"
+                )
+            )
+        },
+        text = {
+            Text(
+                v15Text(
+                    "${project.title} ডিলিট করলে এই প্রজেক্টের চার্জ ও পেমেন্ট হিসাবও মুছে যাবে। এই কাজ ফিরিয়ে আনা যাবে না।",
+                    "Deleting ${project.title} will also remove its charges and payments. This cannot be undone."
+                )
+            )
+        },
+        confirmButton = {
+            TextButton(
+                onClick = onConfirm
+            ) {
+                Text(
+                    v15Text(
+                        "ডিলিট করুন",
+                        "Delete"
                     )
                 )
             }
@@ -1342,6 +1699,29 @@ private fun AgencyField(
             Modifier.fillMaxWidth(),
         singleLine = true
     )
+}
+
+private fun agencyInputNumber(
+    value: String
+): Double {
+    val normalized =
+        value.trim()
+            .replace('০', '0')
+            .replace('১', '1')
+            .replace('২', '2')
+            .replace('৩', '3')
+            .replace('৪', '4')
+            .replace('৫', '5')
+            .replace('৬', '6')
+            .replace('৭', '7')
+            .replace('৮', '8')
+            .replace('৯', '9')
+            .replace(",", "")
+
+    return normalized
+        .toDoubleOrNull()
+        ?.coerceAtLeast(0.0)
+        ?: 0.0
 }
 
 private fun agencyChargeTypeLabel(

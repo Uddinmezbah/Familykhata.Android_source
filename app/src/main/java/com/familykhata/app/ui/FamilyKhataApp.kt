@@ -119,6 +119,10 @@ fun FamilyKhataApp(viewModel: FamilyKhataViewModel) {
 
     V15LanguageState.ensureInitialized(appContext)
     var showSettingsMenu by remember { mutableStateOf(false) }
+
+    val deepScreenActive =
+        V15DeepNavigationState.active
+
     LaunchedEffect(Unit) { V14DisplayState.initialize(appContext) }
 
     HisabiKhataTheme {
@@ -138,7 +142,8 @@ fun FamilyKhataApp(viewModel: FamilyKhataViewModel) {
             Scaffold(
             containerColor = MaterialTheme.colorScheme.background,
             bottomBar = {
-                NavigationBar(
+                if (!deepScreenActive) {
+                    NavigationBar(
                     containerColor = MaterialTheme.colorScheme.surface,
                     tonalElevation = 8.dp
                 ) {
@@ -151,7 +156,10 @@ fun FamilyKhataApp(viewModel: FamilyKhataViewModel) {
                         val accent = tabAccent(item)
                         NavigationBarItem(
                             selected = tab == item,
-                            onClick = { tab = item },
+                            onClick = {
+                                V15DeepNavigationState.clear()
+                                tab = item
+                            },
                             colors = NavigationBarItemDefaults.colors(
                                 selectedIconColor = accent,
                                 selectedTextColor = accent,
@@ -183,6 +191,7 @@ fun FamilyKhataApp(viewModel: FamilyKhataViewModel) {
                             }
                         )
                     }
+                    }
                 }
             }
         ) { padding ->
@@ -192,50 +201,62 @@ fun FamilyKhataApp(viewModel: FamilyKhataViewModel) {
                     .padding(padding)
                     .padding(16.dp)
             ) {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement =
-                        Arrangement.spacedBy(8.dp),
-                    verticalAlignment =
-                        Alignment.CenterVertically
-                ) {
-                    OutlinedButton(
-                        onClick = {
-                            appRefreshToken =
-                                appRefreshToken + 1L
-
-                            viewModel.refreshTrialStatus()
-                        },
+                if (!deepScreenActive) {
+                    Row(
                         modifier =
-                            Modifier.weight(1f)
+                            Modifier.fillMaxWidth(),
+                        horizontalArrangement =
+                            Arrangement.spacedBy(
+                                4.dp,
+                                Alignment.End
+                            ),
+                        verticalAlignment =
+                            Alignment.CenterVertically
                     ) {
-                        Text(
-                            v15Text(
-                                "↻ রিফ্রেশ",
-                                "↻ Refresh"
+                        Button(
+                            onClick = {
+                                appRefreshToken =
+                                    appRefreshToken + 1L
+
+                                viewModel.refreshTrialStatus()
+                            },
+                            modifier =
+                                Modifier.height(42.dp)
+                        ) {
+                            Text(
+                                v15Text(
+                                    "↻ রিফ্রেশ",
+                                    "↻ Refresh"
+                                ),
+                                fontWeight =
+                                    FontWeight.Bold
                             )
-                        )
+                        }
+
+                        TopCornerMenuButton {
+                            showSettingsMenu = true
+                        }
                     }
 
-                    TopCornerMenuButton {
-                        showSettingsMenu = true
-                    }
-                }
-
-                Spacer(Modifier.height(6.dp))
+                    Spacer(
+                        Modifier.height(3.dp)
+                    )
                 BrandHeader(workspace)
                 Spacer(Modifier.height(10.dp))
                 WorkspaceSwitcher(
                     selected = workspace,
                     onSelect = {
                         viewModel.selectWorkspace(it)
+                        V15DeepNavigationState.clear()
                         addTypePreset = "EXPENSE"
                         tab = Tab.DASHBOARD
                     }
                 )
                 Spacer(Modifier.height(8.dp))
                 TrialNotice(trialStatus)
-                Spacer(Modifier.height(12.dp))
+                    Spacer(Modifier.height(12.dp))
+                }
+
                 Box(
                     modifier = Modifier
                         .fillMaxWidth()
@@ -1148,6 +1169,11 @@ private fun BakiScreen(
     var selectedId by remember { mutableStateOf<Long?>(null) }
     val selected = selectedId?.let { id -> people.firstOrNull { it.id == id } }
 
+    TrackV15DeepScreen(
+        owner = "baki-ledger",
+        active = selected != null
+    )
+
     BackHandler(enabled = selected != null) { selectedId = null }
     BackHandler(enabled = selected == null) { onExit() }
 
@@ -1160,13 +1186,22 @@ private fun BakiScreen(
             onSelect = { selectedId = it.id }
         )
     } else {
-        BakiEntryScreen(
-            person = selected,
-            viewModel = viewModel,
-            workspace = workspace,
-            canWrite = canWrite,
-            onBack = { selectedId = null }
-        )
+        V15DeepScreenContainer(
+            title = selected.name,
+            onBack = {
+                selectedId = null
+            }
+        ) {
+            BakiEntryScreen(
+                person = selected,
+                viewModel = viewModel,
+                workspace = workspace,
+                canWrite = canWrite,
+                onBack = {
+                    selectedId = null
+                }
+            )
+        }
     }
 }
 

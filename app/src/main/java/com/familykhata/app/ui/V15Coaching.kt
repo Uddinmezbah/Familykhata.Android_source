@@ -69,6 +69,11 @@ internal fun V15CoachingScreen(
         vm.setWorkspace(workspace)
     }
 
+    TrackV15DeepScreen(
+        owner = "coaching-student",
+        active = selected != null
+    )
+
     BackHandler(enabled = selected != null) {
         selected = null
     }
@@ -78,17 +83,27 @@ internal fun V15CoachingScreen(
     }
 
     if (selected != null) {
-        CoachingStudentLedger(
-            summary = selected!!,
-            batch = batches.firstOrNull {
-                it.id == selected!!.batchId
-            },
-            viewModel = vm,
-            canWrite = canWrite,
+        V15DeepScreenContainer(
+            title = v15Text(
+                "শিক্ষার্থী হিসাব",
+                "Student account"
+            ),
             onBack = {
                 selected = null
             }
-        )
+        ) {
+            CoachingStudentLedger(
+                summary = selected!!,
+                batch = batches.firstOrNull {
+                    it.id == selected!!.batchId
+                },
+                viewModel = vm,
+                canWrite = canWrite,
+                onBack = {
+                    selected = null
+                }
+            )
+        }
 
         return
     }

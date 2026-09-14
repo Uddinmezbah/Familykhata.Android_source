@@ -130,6 +130,7 @@ internal fun V15InventoryScreen(
     workspace: String,
     shopType: String,
     canWrite: Boolean,
+    nestedEntry: Boolean = false,
     onExit: () -> Unit
 ) {
     val vm: InventoryViewModel = viewModel()
@@ -146,24 +147,62 @@ internal fun V15InventoryScreen(
             shopType = shopType
         )
     }
+    TrackV15DeepScreen(
+        owner = "inventory-product",
+        active =
+            selected != null ||
+                nestedEntry
+    )
+
     BackHandler(enabled = selected != null) { selectedId = null }
     BackHandler(enabled = selected == null) { onExit() }
 
     if (selected == null) {
-        ProductListScreen(
-            products = products,
-            workspace = workspace,
-            canWrite = canWrite,
-            viewModel = vm,
-            onSelect = { selectedId = it.id }
-        )
+        if (nestedEntry) {
+            V15DeepScreenContainer(
+                title = v15Text(
+                    "পণ্য ও স্টক",
+                    "Products & Stock"
+                ),
+                onBack = onExit
+            ) {
+                ProductListScreen(
+                    products = products,
+                    workspace = workspace,
+                    canWrite = canWrite,
+                    viewModel = vm,
+                    onSelect = {
+                        selectedId = it.id
+                    }
+                )
+            }
+        } else {
+            ProductListScreen(
+                products = products,
+                workspace = workspace,
+                canWrite = canWrite,
+                viewModel = vm,
+                onSelect = {
+                    selectedId = it.id
+                }
+            )
+        }
     } else {
-        ProductDetailScreen(
-            product = selected,
-            canWrite = canWrite,
-            viewModel = vm,
-            onDeleted = { selectedId = null }
-        )
+        V15DeepScreenContainer(
+            title = selected.name,
+            onBack = {
+                selectedId = null
+            }
+        ) {
+            ProductDetailScreen(
+                product = selected,
+                canWrite = canWrite,
+                viewModel = vm,
+                onDeleted = {
+                    selectedId = null
+                }
+            )
+        }
     }
 }
 

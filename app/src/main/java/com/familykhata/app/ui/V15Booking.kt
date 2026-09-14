@@ -80,6 +80,11 @@ internal fun V15BookingScreen(
             }
         }
 
+    TrackV15DeepScreen(
+        owner = "booking-detail",
+        active = selected != null
+    )
+
     BackHandler(
         enabled = selectedId != null
     ) {
@@ -93,15 +98,25 @@ internal fun V15BookingScreen(
     }
 
     if (selected != null) {
-        BookingLedger(
-            item = selected,
-            shopType = shopType,
-            viewModel = vm,
-            canWrite = canWrite,
+        V15DeepScreenContainer(
+            title = v15Text(
+                "বুকিং বিস্তারিত",
+                "Booking details"
+            ),
             onBack = {
                 selectedId = null
             }
-        )
+        ) {
+            BookingLedger(
+                item = selected,
+                shopType = shopType,
+                viewModel = vm,
+                canWrite = canWrite,
+                onBack = {
+                    selectedId = null
+                }
+            )
+        }
         return
     }
 

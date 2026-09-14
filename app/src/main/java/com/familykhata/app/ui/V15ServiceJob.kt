@@ -77,6 +77,11 @@ internal fun V15ServiceJobScreen(
             }
         }
 
+    TrackV15DeepScreen(
+        owner = "service-job",
+        active = selectedJob != null
+    )
+
     BackHandler(
         enabled = selectedJobId != null
     ) {
@@ -90,15 +95,25 @@ internal fun V15ServiceJobScreen(
     }
 
     if (selectedJob != null) {
-        ServiceJobLedger(
-            job = selectedJob,
-            viewModel = vm,
-            shopType = shopType,
-            canWrite = canWrite,
+        V15DeepScreenContainer(
+            title = v15Text(
+                "কাজের বিস্তারিত",
+                "Job details"
+            ),
             onBack = {
                 selectedJobId = null
             }
-        )
+        ) {
+            ServiceJobLedger(
+                job = selectedJob,
+                viewModel = vm,
+                shopType = shopType,
+                canWrite = canWrite,
+                onBack = {
+                    selectedJobId = null
+                }
+            )
+        }
         return
     }
 

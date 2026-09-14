@@ -73,6 +73,11 @@ internal fun V15AgencyScreen(
         vm.setWorkspace(workspace)
     }
 
+    TrackV15DeepScreen(
+        owner = "agency-project",
+        active = selectedProject != null
+    )
+
     BackHandler(enabled = selectedProject != null) {
         selectedProject = null
     }
@@ -82,14 +87,24 @@ internal fun V15AgencyScreen(
     }
 
     if (selectedProject != null) {
-        AgencyProjectLedger(
-            project = selectedProject!!,
-            viewModel = vm,
-            canWrite = canWrite,
+        V15DeepScreenContainer(
+            title = v15Text(
+                "প্রজেক্ট বিস্তারিত",
+                "Project details"
+            ),
             onBack = {
                 selectedProject = null
             }
-        )
+        ) {
+            AgencyProjectLedger(
+                project = selectedProject!!,
+                viewModel = vm,
+                canWrite = canWrite,
+                onBack = {
+                    selectedProject = null
+                }
+            )
+        }
 
         return
     }

@@ -79,15 +79,19 @@ internal fun V15ProductionScreen(
         )
     }
 
-    if (showInventory) {
-        BackHandler {
-            showInventory = false
-        }
+    TrackV15DeepScreen(
+        owner = "production-detail",
+        active =
+            showInventory ||
+                selectedBatch != null
+    )
 
+    if (showInventory) {
         V15InventoryScreen(
             workspace = workspace,
             shopType = shopType,
             canWrite = canWrite,
+            nestedEntry = true,
             onExit = {
                 showInventory = false
             }
@@ -100,13 +104,23 @@ internal fun V15ProductionScreen(
             selectedBatch = null
         }
 
-        ProductionBatchDetails(
-            batch = selectedBatch!!,
-            viewModel = vm,
+        V15DeepScreenContainer(
+            title = v15Text(
+                "উৎপাদন ব্যাচ",
+                "Production batch"
+            ),
             onBack = {
                 selectedBatch = null
             }
-        )
+        ) {
+            ProductionBatchDetails(
+                batch = selectedBatch!!,
+                viewModel = vm,
+                onBack = {
+                    selectedBatch = null
+                }
+            )
+        }
         return
     }
 

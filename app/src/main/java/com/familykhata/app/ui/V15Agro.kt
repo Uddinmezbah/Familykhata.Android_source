@@ -85,15 +85,19 @@ internal fun V15AgroScreen(
         )
     }
 
-    if (showInventory) {
-        BackHandler {
-            showInventory = false
-        }
+    TrackV15DeepScreen(
+        owner = "agro-detail",
+        active =
+            showInventory ||
+                selectedCycle != null
+    )
 
+    if (showInventory) {
         V15InventoryScreen(
             workspace = workspace,
             shopType = shopType,
             canWrite = canWrite,
+            nestedEntry = true,
             onExit = {
                 showInventory = false
             }
@@ -106,15 +110,25 @@ internal fun V15AgroScreen(
             selectedCycle = null
         }
 
-        AgroCycleDetails(
-            cycle = selectedCycle!!,
-            products = products,
-            viewModel = vm,
-            canWrite = canWrite,
+        V15DeepScreenContainer(
+            title = v15Text(
+                "ব্যাচ / চক্র বিস্তারিত",
+                "Cycle details"
+            ),
             onBack = {
                 selectedCycle = null
             }
-        )
+        ) {
+            AgroCycleDetails(
+                cycle = selectedCycle!!,
+                products = products,
+                viewModel = vm,
+                canWrite = canWrite,
+                onBack = {
+                    selectedCycle = null
+                }
+            )
+        }
         return
     }
 

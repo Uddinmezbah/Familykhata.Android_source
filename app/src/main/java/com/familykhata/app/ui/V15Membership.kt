@@ -83,6 +83,11 @@ internal fun V15MembershipScreen(
             }
         }
 
+    TrackV15DeepScreen(
+        owner = "membership-detail",
+        active = selected != null
+    )
+
     BackHandler(
         enabled = selectedId != null
     ) {
@@ -96,15 +101,25 @@ internal fun V15MembershipScreen(
     }
 
     if (selected != null) {
-        MembershipLedger(
-            item = selected,
-            plans = plans,
-            viewModel = vm,
-            canWrite = canWrite,
+        V15DeepScreenContainer(
+            title = v15Text(
+                "সদস্য হিসাব",
+                "Member account"
+            ),
             onBack = {
                 selectedId = null
             }
-        )
+        ) {
+            MembershipLedger(
+                item = selected,
+                plans = plans,
+                viewModel = vm,
+                canWrite = canWrite,
+                onBack = {
+                    selectedId = null
+                }
+            )
+        }
         return
     }
 

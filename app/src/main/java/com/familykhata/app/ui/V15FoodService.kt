@@ -95,15 +95,20 @@ internal fun V15FoodServiceScreen(
         )
     }
 
-    if (showInventory) {
-        BackHandler {
-            showInventory = false
-        }
+    TrackV15DeepScreen(
+        owner = "food-service-detail",
+        active =
+            showInventory ||
+                selectedMenu != null ||
+                selectedOrder != null
+    )
 
+    if (showInventory) {
         V15InventoryScreen(
             workspace = workspace,
             shopType = shopType,
             canWrite = canWrite,
+            nestedEntry = true,
             onExit = {
                 showInventory = false
             }
@@ -116,15 +121,25 @@ internal fun V15FoodServiceScreen(
             selectedMenu = null
         }
 
-        FoodMenuRecipeScreen(
-            menu = selectedMenu!!,
-            products = products,
-            viewModel = vm,
-            canWrite = canWrite,
+        V15DeepScreenContainer(
+            title = v15Text(
+                "রেসিপি / মেনু",
+                "Recipe / Menu"
+            ),
             onBack = {
                 selectedMenu = null
             }
-        )
+        ) {
+            FoodMenuRecipeScreen(
+                menu = selectedMenu!!,
+                products = products,
+                viewModel = vm,
+                canWrite = canWrite,
+                onBack = {
+                    selectedMenu = null
+                }
+            )
+        }
         return
     }
 
@@ -133,14 +148,24 @@ internal fun V15FoodServiceScreen(
             selectedOrder = null
         }
 
-        FoodOrderDetailsScreen(
-            order = selectedOrder!!,
-            viewModel = vm,
-            canWrite = canWrite,
+        V15DeepScreenContainer(
+            title = v15Text(
+                "অর্ডার বিস্তারিত",
+                "Order details"
+            ),
             onBack = {
                 selectedOrder = null
             }
-        )
+        ) {
+            FoodOrderDetailsScreen(
+                order = selectedOrder!!,
+                viewModel = vm,
+                canWrite = canWrite,
+                onBack = {
+                    selectedOrder = null
+                }
+            )
+        }
         return
     }
 

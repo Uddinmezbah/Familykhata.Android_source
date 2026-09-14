@@ -80,15 +80,19 @@ internal fun V15DealershipScreen(
         )
     }
 
-    if (showInventory) {
-        BackHandler {
-            showInventory = false
-        }
+    TrackV15DeepScreen(
+        owner = "dealership-detail",
+        active =
+            showInventory ||
+                selectedInvoice != null
+    )
 
+    if (showInventory) {
         V15InventoryScreen(
             workspace = workspace,
             shopType = shopType,
             canWrite = canWrite,
+            nestedEntry = true,
             onExit = {
                 showInventory = false
             }
@@ -101,14 +105,24 @@ internal fun V15DealershipScreen(
             selectedInvoice = null
         }
 
-        DealershipInvoiceLedger(
-            invoice = selectedInvoice!!,
-            viewModel = vm,
-            canWrite = canWrite,
+        V15DeepScreenContainer(
+            title = v15Text(
+                "ইনভয়েস বিস্তারিত",
+                "Invoice details"
+            ),
             onBack = {
                 selectedInvoice = null
             }
-        )
+        ) {
+            DealershipInvoiceLedger(
+                invoice = selectedInvoice!!,
+                viewModel = vm,
+                canWrite = canWrite,
+                onBack = {
+                    selectedInvoice = null
+                }
+            )
+        }
         return
     }
 

@@ -253,16 +253,69 @@ fun FamilyKhataApp(viewModel: FamilyKhataViewModel) {
                     )
 
                     if (tab == Tab.DASHBOARD) {
-                        Text(
-                            v15Text(
-                                "হিসাবী খাতা",
-                                "Hisabi Khata"
-                            ),
-                            style =
-                                MaterialTheme.typography.headlineMedium,
-                            fontWeight =
-                                FontWeight.ExtraBold
-                        )
+                        Row(
+                            modifier =
+                                Modifier.fillMaxWidth(),
+                            horizontalArrangement =
+                                Arrangement.SpaceBetween,
+                            verticalAlignment =
+                                Alignment.CenterVertically
+                        ) {
+                            Text(
+                                v15Text(
+                                    "হিসাবী খাতা",
+                                    "Hisabi Khata"
+                                ),
+                                style =
+                                    MaterialTheme.typography.headlineMedium,
+                                fontWeight =
+                                    FontWeight.ExtraBold
+                            )
+
+                            if (trialStatus.premiumUnlocked) {
+                                Text(
+                                    v15Text(
+                                        "Premium ✓",
+                                        "Premium ✓"
+                                    ),
+                                    style =
+                                        MaterialTheme.typography.labelLarge,
+                                    fontWeight =
+                                        FontWeight.ExtraBold,
+                                    color = IncomeAccent
+                                )
+                            } else {
+                                TextButton(
+                                    onClick = {
+                                        V15DeepNavigationState.clear()
+                                        tab = Tab.MORE
+                                    }
+                                ) {
+                                    Text(
+                                        if (trialStatus.expired) {
+                                            v15Text(
+                                                "Get Premium",
+                                                "Get Premium"
+                                            )
+                                        } else {
+                                            v15Text(
+                                                "Get Premium • ${trialStatus.daysRemaining} দিন বাকি",
+                                                "Get Premium • ${trialStatus.daysRemaining} days left"
+                                            )
+                                        },
+                                        fontWeight =
+                                            FontWeight.ExtraBold,
+                                        color =
+                                            if (trialStatus.expired)
+                                                ExpenseAccent
+                                            else
+                                                workspaceAccent(
+                                                    workspace
+                                                )
+                                    )
+                                }
+                            }
+                        }
 
                         Spacer(
                             Modifier.height(8.dp)

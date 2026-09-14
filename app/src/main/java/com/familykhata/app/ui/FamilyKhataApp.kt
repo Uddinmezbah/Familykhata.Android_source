@@ -1656,6 +1656,7 @@ private fun BakiScreen(
     val people by viewModel.bakiPeople.collectAsState()
     var selectedId by remember { mutableStateOf<Long?>(null) }
     val selected = selectedId?.let { id -> people.firstOrNull { it.id == id } }
+    var showStatement by remember(selectedId) { mutableStateOf(false) }
 
     TrackV15DeepScreen(
         owner = "baki-ledger",
@@ -1673,6 +1674,14 @@ private fun BakiScreen(
             canWrite = canWrite,
             onSelect = { selectedId = it.id }
         )
+    } else if (showStatement) {
+        LedgerStatementScreen(
+            personId = selected.id,
+            personName = selected.name,
+            workspace = workspace,
+            viewModel = viewModel,
+            onBack = { showStatement = false }
+        )
     } else {
         V15DeepScreenContainer(
             title = selected.name,
@@ -1685,6 +1694,7 @@ private fun BakiScreen(
                 viewModel = viewModel,
                 workspace = workspace,
                 canWrite = canWrite,
+                onStatement = { showStatement = true },
                 onBack = {
                     selectedId = null
                 }
@@ -1812,6 +1822,7 @@ private fun BakiEntryScreen(
     viewModel: FamilyKhataViewModel,
     workspace: String,
     canWrite: Boolean,
+    onStatement: () -> Unit,
     onBack: () -> Unit
 ) {
     val context = LocalContext.current
@@ -1855,6 +1866,10 @@ private fun BakiEntryScreen(
                 fontWeight = FontWeight.Bold,
                 color = balanceTone
             )
+        }
+
+        OutlinedButton(onClick = onStatement, modifier = Modifier.fillMaxWidth()) {
+            Text(v15Text("PDF হিসাব বিবরণী", "PDF ledger statement"))
         }
 
         PersonManagementActions(

@@ -47,7 +47,7 @@ jobs:
         env:
           RELEASE_STORE_FILE: ${{ runner.temp }}/hisabikhata-release.jks
           RELEASE_KEYSTORE_PASSWORD: ${{ secrets.RELEASE_KEYSTORE_PASSWORD }}
-        run: gradle :app:assembleRelease :app:bundleRelease --stacktrace
+        run: gradle :app:testReleaseUnitTest :app:assembleRelease :app:bundleRelease --stacktrace
 
       - name: Verify APK signature
         run: |

@@ -260,6 +260,25 @@ class FamilyKhataViewModel(application: Application) : AndroidViewModel(applicat
     fun observeBakiEntries(personId: Long): Flow<List<BakiEntryEntity>> =
         dao.observeBakiEntries(personId)
 
+    suspend fun loadLedgerStatement(
+        personId: Long,
+        workspace: String,
+        startInclusive: Long,
+        endExclusive: Long
+    ): com.familykhata.app.report.LedgerStatement =
+        kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+            require(workspace in allowedWorkspaces)
+            // One database snapshot prevents mixing a person's details and edited ledger entries.
+            database.withTransaction {
+                val person = requireNotNull(dao.getStatementPerson(personId, workspace)) {
+                    "Ledger no longer exists in this workspace"
+                }
+                com.familykhata.app.report.buildLedgerStatement(
+                    person, dao.getStatementEntries(personId), startInclusive, endExclusive
+                )
+            }
+        }
+
 
 
     private data class ReceivableLot(

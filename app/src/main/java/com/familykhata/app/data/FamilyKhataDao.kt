@@ -101,6 +101,12 @@ interface FamilyKhataDao {
     @Query("SELECT * FROM baki_entries WHERE personId = :personId ORDER BY createdAt DESC")
     fun observeBakiEntries(personId: Long): Flow<List<BakiEntryEntity>>
 
+    @Query("SELECT * FROM baki_people WHERE id = :personId AND workspace = :workspace LIMIT 1")
+    suspend fun getStatementPerson(personId: Long, workspace: String): BakiPersonEntity?
+
+    @Query("SELECT * FROM baki_entries WHERE personId = :personId ORDER BY createdAt ASC, id ASC")
+    suspend fun getStatementEntries(personId: Long): List<BakiEntryEntity>
+
     @Query(
         """
         SELECT e.*

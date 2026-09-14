@@ -56,6 +56,7 @@ import com.familykhata.app.detectBusinessMode
 import com.familykhata.app.data.BakiEntryEntity
 import com.familykhata.app.data.BakiPersonSummary
 import com.familykhata.app.data.TransactionEntity
+import org.json.JSONObject
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
@@ -2073,8 +2074,43 @@ private fun ActionButton(
 @Composable
 private fun MoreScreen(viewModel: FamilyKhataViewModel) {
     val context = LocalContext.current
+    val backupPrefs = remember(context) {
+        context.getSharedPreferences(
+            "hisabi_khata_backup_meta",
+            Context.MODE_PRIVATE
+        )
+    }
+
+    var lastBackupAt by remember {
+        mutableStateOf(
+            backupPrefs.getLong(
+                "last_successful_backup_at",
+                0L
+            )
+        )
+    }
+
     var backupJson by remember { mutableStateOf<String?>(null) }
     var pendingRestoreJson by remember { mutableStateOf<String?>(null) }
+
+    val backupReminderNeeded =
+        lastBackupAt == 0L ||
+            (
+                System.currentTimeMillis() - lastBackupAt
+            ).coerceAtLeast(0L) >= 7L * 24L * 60L * 60L * 1000L
+
+    val lastBackupText =
+        if (lastBackupAt > 0L) {
+            SimpleDateFormat(
+                "dd MMM yyyy, h:mm a",
+                Locale.getDefault()
+            ).format(Date(lastBackupAt))
+        } else {
+            v15Text(
+                "এখনও কোনো সফল ব্যাকআপ নেই",
+                "No successful backup yet"
+            )
+        }
 
     val createBackupFile = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.CreateDocument("application/json")
@@ -2087,7 +2123,22 @@ private fun MoreScreen(viewModel: FamilyKhataViewModel) {
                     writer.write(json)
                 } ?: error(v15Text("ফাইল লেখা যায়নি", "Unable to write file"))
             }.onSuccess {
-                toast(context, v15Text("ব্যাকআপ সেভ হয়েছে", "Backup saved"))
+                val savedAt = System.currentTimeMillis()
+                backupPrefs.edit()
+                    .putLong(
+                        "last_successful_backup_at",
+                        savedAt
+                    )
+                    .apply()
+                lastBackupAt = savedAt
+
+                toast(
+                    context,
+                    v15Text(
+                        "ব্যাকআপ সেভ হয়েছে",
+                        "Backup saved"
+                    )
+                )
             }.onFailure {
                 toast(context, it.message ?: v15Text("ব্যাকআপ সেভ করা যায়নি", "Unable to save backup"))
             }
@@ -2103,7 +2154,39 @@ private fun MoreScreen(viewModel: FamilyKhataViewModel) {
                     reader.readText()
                 } ?: error(v15Text("ফাইল পড়া যায়নি", "Unable to read file"))
             }.onSuccess { json ->
-                pendingRestoreJson = json
+                runCatching {
+                    val root = JSONObject(json)
+
+                    require(
+                        root.optString("format") ==
+                            "hisabi-khata-backup"
+                    ) {
+                        v15Text(
+                            "এটি হিসাবী খাতার সঠিক ব্যাকআপ ফাইল নয়",
+                            "This is not a valid Hisabi Khata backup"
+                        )
+                    }
+
+                    val version = root.optInt("version")
+                    require(version in 1..5) {
+                        v15Text(
+                            "এই ব্যাকআপ ভার্সনটি সমর্থিত নয়",
+                            "This backup version is not supported"
+                        )
+                    }
+
+                    json
+                }.onSuccess {
+                    pendingRestoreJson = it
+                }.onFailure {
+                    toast(
+                        context,
+                        it.message ?: v15Text(
+                            "ব্যাকআপ ফাইলটি সঠিক নয়",
+                            "Invalid backup file"
+                        )
+                    )
+                }
             }.onFailure {
                 toast(context, it.message ?: v15Text("ব্যাকআপ ফাইল পড়া যায়নি", "Unable to read backup file"))
             }
@@ -2131,6 +2214,52 @@ private fun MoreScreen(viewModel: FamilyKhataViewModel) {
         PurchaseAndTutorialSection()
 
         MoreSectionTitle(v15Text("ডেটা নিরাপত্তা","Data safety"))
+
+        Surface(
+            modifier = Modifier.fillMaxWidth(),
+            shape = RoundedCornerShape(16.dp),
+            color = MaterialTheme.colorScheme.surfaceVariant
+        ) {
+            Column(
+                modifier = Modifier.padding(14.dp),
+                verticalArrangement = Arrangement.spacedBy(5.dp)
+            ) {
+                Text(
+                    v15Text(
+                        "ব্যাকআপ অবস্থা",
+                        "Backup status"
+                    ),
+                    fontWeight = FontWeight.Bold
+                )
+
+                Text(
+                    v15Text(
+                        "শেষ সফল ব্যাকআপ: $lastBackupText",
+                        "Last successful backup: $lastBackupText"
+                    ),
+                    style = MaterialTheme.typography.bodySmall
+                )
+
+                if (backupReminderNeeded) {
+                    Text(
+                        if (lastBackupAt == 0L) {
+                            v15Text(
+                                "ডেটা নিরাপদ রাখতে এখন একটি ব্যাকআপ তৈরি করুন।",
+                                "Create a backup now to keep your data safe."
+                            )
+                        } else {
+                            v15Text(
+                                "শেষ ব্যাকআপের ৭ দিন বা বেশি হয়েছে। নতুন ব্যাকআপ নেওয়া ভালো।",
+                                "It has been 7 days or more since the last backup. A new backup is recommended."
+                            )
+                        },
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.error
+                    )
+                }
+            }
+        }
+
         MoreActionCard(
             symbol = "⇩",
             title = v15Text("ব্যাকআপ তৈরি করুন","Create backup"),
@@ -2218,14 +2347,103 @@ private fun MoreScreen(viewModel: FamilyKhataViewModel) {
     }
 
     pendingRestoreJson?.let { json ->
+        val previewRoot = remember(json) {
+            JSONObject(json)
+        }
+
+        val previewVersion =
+            previewRoot.optInt("version")
+
+        val previewCreatedAt =
+            previewRoot.optLong("createdAt", 0L)
+
+        val previewCreatedText =
+            if (previewCreatedAt > 0L) {
+                SimpleDateFormat(
+                    "dd MMM yyyy, h:mm a",
+                    Locale.getDefault()
+                ).format(Date(previewCreatedAt))
+            } else {
+                v15Text("অজানা", "Unknown")
+            }
+
+        val previewTransactions =
+            previewRoot.optJSONArray("transactions")
+                ?.length() ?: 0
+
+        val previewPeople =
+            previewRoot.optJSONArray("people")
+                ?.length() ?: 0
+
+        val previewEntries =
+            previewRoot.optJSONArray("entries")
+                ?.length() ?: 0
+
+        val previewProducts =
+            previewRoot.optJSONArray("inventoryProducts")
+                ?.length() ?: 0
+
+        val previewBatches =
+            previewRoot.optJSONArray("inventoryBatches")
+                ?.length() ?: 0
+
+        val hasBusinessData =
+            previewRoot.optJSONObject("businessData") != null
+
         AlertDialog(
             onDismissRequest = { pendingRestoreJson = null },
             title = { Text(v15Text("ব্যাকআপ রিস্টোর করবেন?","Restore backup?")) },
             text = {
-                Text(
-                    v15Text("বর্তমান অ্যাপের সব হিসাব মুছে ব্যাকআপ ফাইলের ডেটা বসবে। ","All current app data will be replaced by the backup data. ") +
-                        v15Text("নিশ্চিত হওয়ার আগে চাইলে বর্তমান ডেটার একটি ব্যাকআপ তৈরি করুন।","Create a backup of your current data first if needed.")
-                )
+                Column(
+                    verticalArrangement =
+                        Arrangement.spacedBy(7.dp)
+                ) {
+                    Text(
+                        v15Text(
+                            "ব্যাকআপের তারিখ: $previewCreatedText",
+                            "Backup date: $previewCreatedText"
+                        ),
+                        fontWeight = FontWeight.Bold
+                    )
+
+                    Text(
+                        v15Text(
+                            "ব্যাকআপ ভার্সন: $previewVersion",
+                            "Backup version: $previewVersion"
+                        )
+                    )
+
+                    Text(
+                        v15Text(
+                            "আয়-খরচ: $previewTransactions • বাকি খাতা: $previewPeople • বাকি লেনদেন: $previewEntries",
+                            "Transactions: $previewTransactions • Ledgers: $previewPeople • Ledger entries: $previewEntries"
+                        )
+                    )
+
+                    Text(
+                        v15Text(
+                            "পণ্য: $previewProducts • স্টক ব্যাচ: $previewBatches",
+                            "Products: $previewProducts • Stock batches: $previewBatches"
+                        )
+                    )
+
+                    if (hasBusinessData) {
+                        Text(
+                            v15Text(
+                                "ব্যবসার অতিরিক্ত ডেটাও এই ব্যাকআপে আছে।",
+                                "Additional business data is also included."
+                            )
+                        )
+                    }
+
+                    Text(
+                        v15Text(
+                            "রিস্টোর করলে বর্তমান অ্যাপের হিসাব মুছে এই ব্যাকআপের ডেটা বসবে। আগে বর্তমান ডেটার ব্যাকআপ রাখা নিরাপদ।",
+                            "Restoring will replace the current app data with this backup. Keeping a backup of the current data first is safer."
+                        ),
+                        color = MaterialTheme.colorScheme.error
+                    )
+                }
             },
             confirmButton = {
                 TextButton(

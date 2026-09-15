@@ -54,6 +54,11 @@ interface DealershipDao {
         item: DealershipPaymentEntity
     ): Long
 
+    @Insert(onConflict = OnConflictStrategy.ABORT)
+    suspend fun insertReturn(
+        item: DealershipReturnEntity
+    ): Long
+
     @Query("""
         SELECT *
         FROM dealership_suppliers
@@ -106,6 +111,35 @@ interface DealershipDao {
 
     @Query("""
         SELECT *
+        FROM dealership_returns
+        WHERE invoiceId = :invoiceId
+        ORDER BY returnedAt DESC, id DESC
+    """)
+    fun observeReturns(
+        invoiceId: Long
+    ): Flow<List<DealershipReturnEntity>>
+
+    @Query("""
+        SELECT COALESCE(SUM(quantity), 0)
+        FROM dealership_returns
+        WHERE invoiceLineId = :invoiceLineId
+    """)
+    suspend fun getReturnedQuantity(
+        invoiceLineId: Long
+    ): Int
+
+    @Query("""
+        SELECT *
+        FROM dealership_returns
+        WHERE invoiceLineId = :invoiceLineId
+        ORDER BY returnedAt ASC, id ASC
+    """)
+    suspend fun getReturnsForLineOnce(
+        invoiceLineId: Long
+    ): List<DealershipReturnEntity>
+
+    @Query("""
+        SELECT *
         FROM dealership_stock_receipts
         WHERE workspace = :workspace
         ORDER BY receivedAt DESC, id DESC
@@ -155,6 +189,26 @@ interface DealershipDao {
     ): DealershipInvoiceEntity?
 
     @Query("""
+        SELECT *
+        FROM dealership_invoice_lines
+        WHERE id = :invoiceLineId
+        LIMIT 1
+    """)
+    suspend fun getInvoiceLineOnce(
+        invoiceLineId: Long
+    ): DealershipInvoiceLineEntity?
+
+    @Query("""
+        SELECT *
+        FROM dealership_stock_allocations
+        WHERE invoiceLineId = :invoiceLineId
+        ORDER BY id ASC
+    """)
+    suspend fun getStockAllocationsForLineOnce(
+        invoiceLineId: Long
+    ): List<DealershipStockAllocationEntity>
+
+    @Query("""
         SELECT COALESCE(SUM(lineTotal), 0)
         FROM dealership_invoice_lines
         WHERE invoiceId = :invoiceId
@@ -173,22 +227,43 @@ interface DealershipDao {
     ): Double
 
     @Query("""
+        SELECT COALESCE(SUM(totalRefund), 0)
+        FROM dealership_returns
+        WHERE invoiceId = :invoiceId
+    """)
+    suspend fun getInvoiceReturnTotal(
+        invoiceId: Long
+    ): Double
+
+    @Query("""
         SELECT COALESCE(
             SUM(
-                COALESCE(
-                    (
-                        SELECT SUM(l.lineTotal)
-                        FROM dealership_invoice_lines l
-                        WHERE l.invoiceId = i.id
-                    ),
-                    0
-                )
-                -
-                COALESCE(
-                    (
-                        SELECT SUM(p.amount)
-                        FROM dealership_payments p
-                        WHERE p.invoiceId = i.id
+                MAX(
+                    COALESCE(
+                        (
+                            SELECT SUM(l.lineTotal)
+                            FROM dealership_invoice_lines l
+                            WHERE l.invoiceId = i.id
+                        ),
+                        0
+                    )
+                    -
+                    COALESCE(
+                        (
+                            SELECT SUM(r.totalRefund)
+                            FROM dealership_returns r
+                            WHERE r.invoiceId = i.id
+                        ),
+                        0
+                    )
+                    -
+                    COALESCE(
+                        (
+                            SELECT SUM(p.amount)
+                            FROM dealership_payments p
+                            WHERE p.invoiceId = i.id
+                        ),
+                        0
                     ),
                     0
                 )
@@ -214,11 +289,23 @@ interface DealershipDao {
             i.soldAt AS soldAt,
             i.status AS status,
 
-            COALESCE(
-                (
-                    SELECT SUM(l.lineTotal)
-                    FROM dealership_invoice_lines l
-                    WHERE l.invoiceId = i.id
+            MAX(
+                COALESCE(
+                    (
+                        SELECT SUM(l.lineTotal)
+                        FROM dealership_invoice_lines l
+                        WHERE l.invoiceId = i.id
+                    ),
+                    0
+                )
+                -
+                COALESCE(
+                    (
+                        SELECT SUM(r.totalRefund)
+                        FROM dealership_returns r
+                        WHERE r.invoiceId = i.id
+                    ),
+                    0
                 ),
                 0
             ) AS totalAmount,
@@ -232,51 +319,101 @@ interface DealershipDao {
                 0
             ) AS totalPaid,
 
-            COALESCE(
-                (
-                    SELECT SUM(l.lineTotal)
-                    FROM dealership_invoice_lines l
-                    WHERE l.invoiceId = i.id
-                ),
-                0
-            )
-            -
-            COALESCE(
-                (
-                    SELECT SUM(p.amount)
-                    FROM dealership_payments p
-                    WHERE p.invoiceId = i.id
+            MAX(
+                COALESCE(
+                    (
+                        SELECT SUM(l.lineTotal)
+                        FROM dealership_invoice_lines l
+                        WHERE l.invoiceId = i.id
+                    ),
+                    0
+                )
+                -
+                COALESCE(
+                    (
+                        SELECT SUM(r.totalRefund)
+                        FROM dealership_returns r
+                        WHERE r.invoiceId = i.id
+                    ),
+                    0
+                )
+                -
+                COALESCE(
+                    (
+                        SELECT SUM(p.amount)
+                        FROM dealership_payments p
+                        WHERE p.invoiceId = i.id
+                    ),
+                    0
                 ),
                 0
             ) AS dueAmount,
 
-            COALESCE(
-                (
-                    SELECT SUM(a.totalCost)
-                    FROM dealership_stock_allocations a
-                    INNER JOIN dealership_invoice_lines l
-                        ON l.id = a.invoiceLineId
-                    WHERE l.invoiceId = i.id
+            MAX(
+                COALESCE(
+                    (
+                        SELECT SUM(a.totalCost)
+                        FROM dealership_stock_allocations a
+                        INNER JOIN dealership_invoice_lines l
+                            ON l.id = a.invoiceLineId
+                        WHERE l.invoiceId = i.id
+                    ),
+                    0
+                )
+                -
+                COALESCE(
+                    (
+                        SELECT SUM(r.totalCost)
+                        FROM dealership_returns r
+                        WHERE r.invoiceId = i.id
+                          AND r.returnType = 'RESTOCK'
+                    ),
+                    0
                 ),
                 0
             ) AS totalCost,
 
-            COALESCE(
-                (
-                    SELECT SUM(l.lineTotal)
-                    FROM dealership_invoice_lines l
-                    WHERE l.invoiceId = i.id
+            MAX(
+                COALESCE(
+                    (
+                        SELECT SUM(l.lineTotal)
+                        FROM dealership_invoice_lines l
+                        WHERE l.invoiceId = i.id
+                    ),
+                    0
+                )
+                -
+                COALESCE(
+                    (
+                        SELECT SUM(r.totalRefund)
+                        FROM dealership_returns r
+                        WHERE r.invoiceId = i.id
+                    ),
+                    0
                 ),
                 0
             )
             -
-            COALESCE(
-                (
-                    SELECT SUM(a.totalCost)
-                    FROM dealership_stock_allocations a
-                    INNER JOIN dealership_invoice_lines l
-                        ON l.id = a.invoiceLineId
-                    WHERE l.invoiceId = i.id
+            MAX(
+                COALESCE(
+                    (
+                        SELECT SUM(a.totalCost)
+                        FROM dealership_stock_allocations a
+                        INNER JOIN dealership_invoice_lines l
+                            ON l.id = a.invoiceLineId
+                        WHERE l.invoiceId = i.id
+                    ),
+                    0
+                )
+                -
+                COALESCE(
+                    (
+                        SELECT SUM(r.totalCost)
+                        FROM dealership_returns r
+                        WHERE r.invoiceId = i.id
+                          AND r.returnType = 'RESTOCK'
+                    ),
+                    0
                 ),
                 0
             ) AS grossProfit
@@ -334,4 +471,9 @@ interface DealershipDao {
     @Query("SELECT * FROM dealership_payments ORDER BY id")
     suspend fun getAllPayments():
         List<DealershipPaymentEntity>
+
+
+    @Query("SELECT * FROM dealership_returns ORDER BY id")
+    suspend fun getAllReturns():
+        List<DealershipReturnEntity>
 }

@@ -606,6 +606,8 @@ class FamilyKhataViewModel(application: Application) : AndroidViewModel(applicat
                                 put("color", product.color)
                                 put("warrantyMonths", product.warrantyMonths)
                                 put("sellingPrice", product.sellingPrice)
+                                put("mrp", product.mrp)
+                                put("rackLocation", product.rackLocation)
                                 put("lowStockLevel", product.lowStockLevel)
                                 put("note", product.note)
                                 put("workspace", product.workspace)
@@ -748,6 +750,8 @@ class FamilyKhataViewModel(application: Application) : AndroidViewModel(applicat
                             color = item.optString("color", ""),
                             warrantyMonths = item.optInt("warrantyMonths", 0).coerceAtLeast(0),
                             sellingPrice = item.optDouble("sellingPrice", 0.0).coerceAtLeast(0.0),
+                            mrp = item.optDouble("mrp", 0.0).coerceAtLeast(0.0),
+                            rackLocation = item.optString("rackLocation", ""),
                             lowStockLevel = item.optInt("lowStockLevel", 0).coerceAtLeast(0),
                             note = item.optString("note", ""),
                             workspace = workspace,

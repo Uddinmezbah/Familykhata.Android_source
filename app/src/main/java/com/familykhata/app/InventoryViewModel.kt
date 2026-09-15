@@ -96,6 +96,8 @@ class InventoryViewModel(application: Application) : AndroidViewModel(applicatio
         color: String,
         warrantyMonths: Int,
         sellingPrice: Double,
+        mrp: Double,
+        rackLocation: String,
         lowStockLevel: Int,
         note: String,
         workspace: String,
@@ -124,6 +126,8 @@ class InventoryViewModel(application: Application) : AndroidViewModel(applicatio
                         color = color.trim(),
                         warrantyMonths = warrantyMonths.coerceAtLeast(0),
                         sellingPrice = sellingPrice.coerceAtLeast(0.0),
+                        mrp = mrp.coerceAtLeast(0.0),
+                        rackLocation = rackLocation.trim(),
                         lowStockLevel = lowStockLevel.coerceAtLeast(0),
                         note = note.trim(),
                         workspace = workspace,
@@ -162,6 +166,8 @@ class InventoryViewModel(application: Application) : AndroidViewModel(applicatio
         color: String,
         warrantyMonths: Int,
         sellingPrice: Double,
+        mrp: Double,
+        rackLocation: String,
         lowStockLevel: Int,
         note: String
     ) {
@@ -182,6 +188,8 @@ class InventoryViewModel(application: Application) : AndroidViewModel(applicatio
                 color = color.trim(),
                 warrantyMonths = warrantyMonths.coerceAtLeast(0),
                 sellingPrice = sellingPrice.coerceAtLeast(0.0),
+                mrp = mrp.coerceAtLeast(0.0),
+                rackLocation = rackLocation.trim(),
                 lowStockLevel = lowStockLevel.coerceAtLeast(0),
                 note = note.trim()
             )

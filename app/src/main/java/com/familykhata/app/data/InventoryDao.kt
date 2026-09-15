@@ -27,6 +27,8 @@ interface InventoryDao {
             color = :color,
             warrantyMonths = :warrantyMonths,
             sellingPrice = :sellingPrice,
+            mrp = :mrp,
+            rackLocation = :rackLocation,
             lowStockLevel = :lowStockLevel,
             note = :note
         WHERE id = :productId
@@ -46,6 +48,8 @@ interface InventoryDao {
         color: String,
         warrantyMonths: Int,
         sellingPrice: Double,
+        mrp: Double,
+        rackLocation: String,
         lowStockLevel: Int,
         note: String
     )
@@ -68,6 +72,8 @@ interface InventoryDao {
                p.color AS color,
                p.warrantyMonths AS warrantyMonths,
                p.sellingPrice AS sellingPrice,
+               p.mrp AS mrp,
+               p.rackLocation AS rackLocation,
                p.lowStockLevel AS lowStockLevel,
                p.note AS note,
                p.workspace AS workspace,

@@ -104,6 +104,8 @@ private data class ProductDetailsInput(
     val color: String,
     val warrantyMonths: Int,
     val sellingPrice: Double,
+    val mrp: Double,
+    val rackLocation: String,
     val lowStockLevel: Int,
     val note: String
 )
@@ -266,8 +268,39 @@ private fun ProductListScreen(
     securityViewModel: FamilyKhataViewModel,
     onSelect: (ProductStockSummary) -> Unit
 ) {
-    var query by remember { mutableStateOf("") }
-    var showAdd by remember { mutableStateOf(false) }
+    val context = LocalContext.current
+
+    val prefs = remember {
+        context.getSharedPreferences(
+            "hisabi_khata_v14_settings",
+            android.content.Context.MODE_PRIVATE
+        )
+    }
+
+    val shopType = remember {
+        prefs.getString(
+            "business_type",
+            ""
+        ) ?: ""
+    }
+
+    val isPharmacy =
+        remember(shopType) {
+            productFormMode(shopType) ==
+                ProductFormMode.PHARMACY
+        }
+
+    var query by remember {
+        mutableStateOf("")
+    }
+
+    var stockFilter by remember {
+        mutableStateOf("ALL")
+    }
+
+    var showAdd by remember {
+        mutableStateOf(false)
+    }
 
     var editingProduct by remember {
         mutableStateOf<ProductStockSummary?>(null)
@@ -284,9 +317,57 @@ private fun ProductListScreen(
     val stockValue = products.sumOf { it.stockValue }
     val saleValue = products.sumOf { it.saleValue }
     val potentialProfit = products.sumOf { it.potentialProfit }
-    val filtered = products.filter {
-        query.isBlank() || it.name.contains(query, true) || it.category.contains(query, true) || it.sku.contains(query, true)
-    }
+    val filtered =
+        products.filter { item ->
+            val matchesQuery =
+                query.isBlank() ||
+                    item.name.contains(
+                        query,
+                        true
+                    ) ||
+                    item.category.contains(
+                        query,
+                        true
+                    ) ||
+                    item.sku.contains(
+                        query,
+                        true
+                    ) ||
+                    item.genericName.contains(
+                        query,
+                        true
+                    ) ||
+                    item.brand.contains(
+                        query,
+                        true
+                    ) ||
+                    item.rackLocation.contains(
+                        query,
+                        true
+                    )
+
+            val matchesFilter =
+                when (stockFilter) {
+                    "LOW" ->
+                        item.totalStock <=
+                            item.lowStockLevel
+
+                    "EXPIRING" ->
+                        item.nextExpiry != null &&
+                            item.nextExpiry in
+                                now..nearLimit
+
+                    "EXPIRED" ->
+                        item.nextExpiry != null &&
+                            item.nextExpiry < now
+
+                    else ->
+                        true
+                }
+
+            matchesQuery &&
+                matchesFilter
+        }
 
     Column(
         modifier = Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(bottom = 24.dp),
@@ -334,10 +415,93 @@ private fun ProductListScreen(
         OutlinedTextField(
             value = query,
             onValueChange = { query = it },
-            label = { Text(v15Text("নাম / ক্যাটাগরি / বারকোড দিয়ে খুঁজুন", "Search name / category / barcode")) },
+            label = {
+                Text(
+                    v15Text(
+                        "নাম / জেনেরিক / কোম্পানি / বারকোড / র‍্যাক",
+                        "Name / generic / company / barcode / rack"
+                    )
+                )
+            },
             singleLine = true,
             modifier = Modifier.fillMaxWidth()
         )
+
+        Row(
+            modifier =
+                Modifier.fillMaxWidth(),
+            horizontalArrangement =
+                Arrangement.spacedBy(8.dp)
+        ) {
+            InventoryFilterButton(
+                selected =
+                    stockFilter == "ALL",
+                label =
+                    v15Text(
+                        "সব",
+                        "All"
+                    ),
+                onClick = {
+                    stockFilter = "ALL"
+                },
+                modifier =
+                    Modifier.weight(1f)
+            )
+
+            InventoryFilterButton(
+                selected =
+                    stockFilter == "LOW",
+                label =
+                    v15Text(
+                        "লো স্টক ($lowCount)",
+                        "Low stock ($lowCount)"
+                    ),
+                onClick = {
+                    stockFilter = "LOW"
+                },
+                modifier =
+                    Modifier.weight(1f)
+            )
+        }
+
+        Row(
+            modifier =
+                Modifier.fillMaxWidth(),
+            horizontalArrangement =
+                Arrangement.spacedBy(8.dp)
+        ) {
+            InventoryFilterButton(
+                selected =
+                    stockFilter == "EXPIRING",
+                label =
+                    v15Text(
+                        "৩০ দিনে মেয়াদ ($expiringCount)",
+                        "30-day expiry ($expiringCount)"
+                    ),
+                onClick = {
+                    stockFilter =
+                        "EXPIRING"
+                },
+                modifier =
+                    Modifier.weight(1f)
+            )
+
+            InventoryFilterButton(
+                selected =
+                    stockFilter == "EXPIRED",
+                label =
+                    v15Text(
+                        "মেয়াদ শেষ ($expiredCount)",
+                        "Expired ($expiredCount)"
+                    ),
+                onClick = {
+                    stockFilter =
+                        "EXPIRED"
+                },
+                modifier =
+                    Modifier.weight(1f)
+            )
+        }
 
         if (filtered.isEmpty()) {
             Text(v15Text("এখনও কোনো পণ্য নেই।", "No products yet."), color = MaterialTheme.colorScheme.onSurfaceVariant)
@@ -345,6 +509,8 @@ private fun ProductListScreen(
             filtered.forEach { item ->
                 ProductCard(
                     item = item,
+                    isPharmacy =
+                        isPharmacy,
                     canWrite = canWrite,
                     onSelect = {
                         onSelect(item)
@@ -394,6 +560,9 @@ private fun ProductListScreen(
                     input.warrantyMonths,
                 sellingPrice =
                     input.sellingPrice,
+                mrp = input.mrp,
+                rackLocation =
+                    input.rackLocation,
                 lowStockLevel =
                     input.lowStockLevel,
                 note = input.note
@@ -464,6 +633,8 @@ private fun ProductListScreen(
                     color = p.color,
                     warrantyMonths = p.warrantyMonths,
                     sellingPrice = p.sellingPrice,
+                    mrp = p.mrp,
+                    rackLocation = p.rackLocation,
                     lowStockLevel = p.lowStockLevel,
                     note = p.note,
                     workspace = workspace,
@@ -490,8 +661,39 @@ private fun InventoryMetric(title: String, value: String, accent: Color, modifie
 }
 
 @Composable
+private fun InventoryFilterButton(
+    selected: Boolean,
+    label: String,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    if (selected) {
+        Button(
+            onClick = onClick,
+            modifier = modifier
+        ) {
+            Text(
+                label,
+                maxLines = 1
+            )
+        }
+    } else {
+        OutlinedButton(
+            onClick = onClick,
+            modifier = modifier
+        ) {
+            Text(
+                label,
+                maxLines = 1
+            )
+        }
+    }
+}
+
+@Composable
 private fun ProductCard(
     item: ProductStockSummary,
+    isPharmacy: Boolean,
     canWrite: Boolean,
     onSelect: () -> Unit,
     onEdit: () -> Unit,
@@ -574,9 +776,44 @@ private fun ProductCard(
 
             if (item.brand.isNotBlank()) {
                 Text(
+                    if (isPharmacy) {
+                        v15Text(
+                            "কোম্পানি: ${item.brand}",
+                            "Company: ${item.brand}"
+                        )
+                    } else {
+                        v15Text(
+                            "ব্র্যান্ড: ${item.brand}",
+                            "Brand: ${item.brand}"
+                        )
+                    },
+                    style =
+                        MaterialTheme.typography.bodySmall
+                )
+            }
+
+            if (
+                isPharmacy &&
+                item.genericName.isNotBlank()
+            ) {
+                Text(
                     v15Text(
-                        "ব্র্যান্ড: ${item.brand}",
-                        "Brand: ${item.brand}"
+                        "জেনেরিক: ${item.genericName}",
+                        "Generic: ${item.genericName}"
+                    ),
+                    style =
+                        MaterialTheme.typography.bodySmall
+                )
+            }
+
+            if (
+                isPharmacy &&
+                item.rackLocation.isNotBlank()
+            ) {
+                Text(
+                    v15Text(
+                        "র‍্যাক: ${item.rackLocation}",
+                        "Rack: ${item.rackLocation}"
                     ),
                     style =
                         MaterialTheme.typography.bodySmall
@@ -617,6 +854,22 @@ private fun ProductCard(
                 fontWeight =
                     FontWeight.SemiBold
             )
+
+            if (
+                isPharmacy &&
+                item.mrp > 0.0
+            ) {
+                Text(
+                    v15Text(
+                        "MRP: ${V14DisplayState.currencySymbol} ${v15Money(item.mrp)}",
+                        "MRP: ${V14DisplayState.currencySymbol} ${v15Money(item.mrp)}"
+                    ),
+                    style =
+                        MaterialTheme.typography.bodySmall,
+                    fontWeight =
+                        FontWeight.SemiBold
+                )
+            }
 
             Text(
                 v15Text(
@@ -710,7 +963,33 @@ private fun ProductDetailScreen(
     onDeleted: () -> Unit
 ) {
     val context = LocalContext.current
-    val batchesFlow = remember(product.id) { viewModel.observeBatches(product.id) }
+
+    val prefs = remember {
+        context.getSharedPreferences(
+            "hisabi_khata_v14_settings",
+            android.content.Context.MODE_PRIVATE
+        )
+    }
+
+    val shopType = remember {
+        prefs.getString(
+            "business_type",
+            ""
+        ) ?: ""
+    }
+
+    val isPharmacy =
+        remember(shopType) {
+            productFormMode(shopType) ==
+                ProductFormMode.PHARMACY
+        }
+
+    val batchesFlow =
+        remember(product.id) {
+            viewModel.observeBatches(
+                product.id
+            )
+        }
     val batches by batchesFlow.collectAsState(initial = emptyList())
     var showAddBatch by remember { mutableStateOf(false) }
     var showReduce by remember { mutableStateOf(false) }
@@ -731,10 +1010,40 @@ private fun ProductDetailScreen(
                 )
 
                 if (product.brand.isNotBlank()) {
-                    Text(v15Text("ব্র্যান্ড: ${product.brand}", "Brand: ${product.brand}"))
+                    Text(
+                        if (isPharmacy) {
+                            v15Text(
+                                "কোম্পানি: ${product.brand}",
+                                "Company: ${product.brand}"
+                            )
+                        } else {
+                            v15Text(
+                                "ব্র্যান্ড: ${product.brand}",
+                                "Brand: ${product.brand}"
+                            )
+                        }
+                    )
                 }
+
                 if (product.genericName.isNotBlank()) {
-                    Text(v15Text("জেনেরিক: ${product.genericName}", "Generic: ${product.genericName}"))
+                    Text(
+                        v15Text(
+                            "জেনেরিক: ${product.genericName}",
+                            "Generic: ${product.genericName}"
+                        )
+                    )
+                }
+
+                if (
+                    isPharmacy &&
+                    product.rackLocation.isNotBlank()
+                ) {
+                    Text(
+                        v15Text(
+                            "র‍্যাক / লোকেশন: ${product.rackLocation}",
+                            "Rack / location: ${product.rackLocation}"
+                        )
+                    )
                 }
                 if (product.modelName.isNotBlank()) {
                     Text(v15Text("মডেল: ${product.modelName}", "Model: ${product.modelName}"))
@@ -770,6 +1079,20 @@ private fun ProductDetailScreen(
                         "Selling price: ${V14DisplayState.currencySymbol} ${v15Money(product.sellingPrice)}"
                     )
                 )
+
+                if (
+                    isPharmacy &&
+                    product.mrp > 0.0
+                ) {
+                    Text(
+                        v15Text(
+                            "MRP: ${V14DisplayState.currencySymbol} ${v15Money(product.mrp)}",
+                            "MRP: ${V14DisplayState.currencySymbol} ${v15Money(product.mrp)}"
+                        ),
+                        fontWeight =
+                            FontWeight.Bold
+                    )
+                }
 
                 Text(
                     v15Text(
@@ -861,6 +1184,8 @@ private fun ProductDetailScreen(
                 color = input.color,
                 warrantyMonths = input.warrantyMonths,
                 sellingPrice = input.sellingPrice,
+                mrp = input.mrp,
+                rackLocation = input.rackLocation,
                 lowStockLevel = input.lowStockLevel,
                 note = input.note
             )
@@ -962,6 +1287,8 @@ private fun AddProductDialog(
     var warranty by remember { mutableStateOf("") }
 
     var sell by remember { mutableStateOf("") }
+    var mrp by remember { mutableStateOf("") }
+    var rackLocation by remember { mutableStateOf("") }
     var low by remember { mutableStateOf("5") }
     var note by remember { mutableStateOf("") }
 
@@ -1067,7 +1394,24 @@ private fun AddProductDialog(
                 OutlinedTextField(
                     brand,
                     { brand = it },
-                    label = { Text(v15Text("ব্র্যান্ড", "Brand")) },
+                    label = {
+                        Text(
+                            if (
+                                mode ==
+                                    ProductFormMode.PHARMACY
+                            ) {
+                                v15Text(
+                                    "কোম্পানি / প্রস্তুতকারক",
+                                    "Company / Manufacturer"
+                                )
+                            } else {
+                                v15Text(
+                                    "ব্র্যান্ড",
+                                    "Brand"
+                                )
+                            }
+                        )
+                    },
                     singleLine = true,
                     modifier = Modifier.fillMaxWidth()
                 )
@@ -1077,7 +1421,42 @@ private fun AddProductDialog(
                         genericName,
                         { genericName = it },
                         label = {
-                            Text(v15Text("জেনেরিক নাম", "Generic name"))
+                            Text(
+                                v15Text(
+                                    "জেনেরিক নাম",
+                                    "Generic name"
+                                )
+                            )
+                        },
+                        singleLine = true,
+                        modifier = Modifier.fillMaxWidth()
+                    )
+
+                    OutlinedTextField(
+                        rackLocation,
+                        { rackLocation = it },
+                        label = {
+                            Text(
+                                v15Text(
+                                    "র‍্যাক / লোকেশন",
+                                    "Rack / location"
+                                )
+                            )
+                        },
+                        singleLine = true,
+                        modifier = Modifier.fillMaxWidth()
+                    )
+
+                    OutlinedTextField(
+                        mrp,
+                        { mrp = it },
+                        label = {
+                            Text(
+                                v15Text(
+                                    "MRP / সর্বোচ্চ খুচরা মূল্য",
+                                    "MRP / maximum retail price"
+                                )
+                            )
                         },
                         singleLine = true,
                         modifier = Modifier.fillMaxWidth()
@@ -1219,9 +1598,21 @@ private fun AddProductDialog(
         confirmButton = {
             TextButton(
                 onClick = {
-                    val selling = sell.v15InventoryDoubleOrNull() ?: 0.0
-                    val purchase = buy.v15InventoryDoubleOrNull() ?: 0.0
-                    val quantity = qty.v15InventoryIntOrNull() ?: 0
+                    val selling =
+                        sell.v15InventoryDoubleOrNull()
+                            ?: 0.0
+
+                    val mrpValue =
+                        mrp.v15InventoryDoubleOrNull()
+                            ?: 0.0
+
+                    val purchase =
+                        buy.v15InventoryDoubleOrNull()
+                            ?: 0.0
+
+                    val quantity =
+                        qty.v15InventoryIntOrNull()
+                            ?: 0
                     val lowValue = low.v15InventoryIntOrNull() ?: 0
                     val warrantyMonths = warranty.v15InventoryIntOrNull() ?: 0
 
@@ -1233,6 +1624,7 @@ private fun AddProductDialog(
                             )
 
                         selling < 0 ||
+                            mrpValue < 0 ||
                             purchase < 0 ||
                             quantity < 0 ||
                             lowValue < 0 ||
@@ -1258,6 +1650,9 @@ private fun AddProductDialog(
                                         color = color.trim(),
                                         warrantyMonths = warrantyMonths,
                                         sellingPrice = selling,
+                                        mrp = mrpValue,
+                                        rackLocation =
+                                            rackLocation.trim(),
                                         lowStockLevel = lowValue,
                                         note = note.trim()
                                     ),
@@ -1453,9 +1848,35 @@ private fun EditProductDialog(
     var serialOrImei by remember { mutableStateOf(product.serialOrImei) }
     var size by remember { mutableStateOf(product.size) }
     var color by remember { mutableStateOf(product.color) }
-    var warranty by remember { mutableStateOf(product.warrantyMonths.toString()) }
-    var sell by remember { mutableStateOf(v15Money(product.sellingPrice)) }
-    var low by remember { mutableStateOf(product.lowStockLevel.toString()) }
+    var warranty by remember {
+        mutableStateOf(
+            product.warrantyMonths.toString()
+        )
+    }
+
+    var sell by remember {
+        mutableStateOf(
+            v15Money(product.sellingPrice)
+        )
+    }
+
+    var mrp by remember {
+        mutableStateOf(
+            v15Money(product.mrp)
+        )
+    }
+
+    var rackLocation by remember {
+        mutableStateOf(
+            product.rackLocation
+        )
+    }
+
+    var low by remember {
+        mutableStateOf(
+            product.lowStockLevel.toString()
+        )
+    }
     var note by remember { mutableStateOf(product.note) }
     var showUnitPicker by remember { mutableStateOf(false) }
     var error by remember { mutableStateOf<String?>(null) }
@@ -1513,14 +1934,64 @@ private fun EditProductDialog(
                 OutlinedTextField(
                     brand,
                     { brand = it },
-                    label = { Text(v15Text("ব্র্যান্ড", "Brand")) }
+                    label = {
+                        Text(
+                            if (
+                                mode ==
+                                    ProductFormMode.PHARMACY
+                            ) {
+                                v15Text(
+                                    "কোম্পানি / প্রস্তুতকারক",
+                                    "Company / Manufacturer"
+                                )
+                            } else {
+                                v15Text(
+                                    "ব্র্যান্ড",
+                                    "Brand"
+                                )
+                            }
+                        )
+                    }
                 )
 
                 if (mode == ProductFormMode.PHARMACY) {
                     OutlinedTextField(
                         genericName,
                         { genericName = it },
-                        label = { Text(v15Text("জেনেরিক নাম", "Generic name")) }
+                        label = {
+                            Text(
+                                v15Text(
+                                    "জেনেরিক নাম",
+                                    "Generic name"
+                                )
+                            )
+                        }
+                    )
+
+                    OutlinedTextField(
+                        rackLocation,
+                        { rackLocation = it },
+                        label = {
+                            Text(
+                                v15Text(
+                                    "র‍্যাক / লোকেশন",
+                                    "Rack / location"
+                                )
+                            )
+                        }
+                    )
+
+                    OutlinedTextField(
+                        mrp,
+                        { mrp = it },
+                        label = {
+                            Text(
+                                v15Text(
+                                    "MRP / সর্বোচ্চ খুচরা মূল্য",
+                                    "MRP / maximum retail price"
+                                )
+                            )
+                        }
                     )
                 }
 
@@ -1721,6 +2192,10 @@ private fun EditProductDialog(
                         warranty.v15InventoryIntOrNull()
                     val sellingPrice =
                         sell.v15InventoryDoubleOrNull()
+
+                    val mrpValue =
+                        mrp.v15InventoryDoubleOrNull()
+
                     val lowStockLevel =
                         low.v15InventoryIntOrNull()
 
@@ -1730,6 +2205,8 @@ private fun EditProductDialog(
                         warrantyMonths < 0 ||
                         sellingPrice == null ||
                         sellingPrice < 0 ||
+                        mrpValue == null ||
+                        mrpValue < 0 ||
                         lowStockLevel == null ||
                         lowStockLevel < 0
                     ) {
@@ -1802,6 +2279,9 @@ private fun EditProductDialog(
                                 warrantyMonths,
                             sellingPrice =
                                 sellingPrice,
+                            mrp = mrpValue,
+                            rackLocation =
+                                rackLocation.trim(),
                             lowStockLevel =
                                 lowStockLevel,
                             note = note.trim()

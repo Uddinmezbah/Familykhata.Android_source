@@ -116,6 +116,7 @@ object V15BusinessBackupBridge {
                     "dealership_invoice_lines",
                     "dealership_stock_allocations",
                     "dealership_payments",
+                    "dealership_returns",
 
                     // Agro
                     "agro_cycles",

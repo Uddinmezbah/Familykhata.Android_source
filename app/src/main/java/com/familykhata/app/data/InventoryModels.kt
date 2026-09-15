@@ -33,6 +33,10 @@ data class ProductEntity(
     val color: String = "",
     val warrantyMonths: Int = 0,
     val sellingPrice: Double = 0.0,
+    @ColumnInfo(defaultValue = "0")
+    val mrp: Double = 0.0,
+    @ColumnInfo(defaultValue = "''")
+    val rackLocation: String = "",
     val lowStockLevel: Int = 5,
     val note: String = "",
     @ColumnInfo(defaultValue = "'SHOP'") val workspace: String = "SHOP",
@@ -78,6 +82,8 @@ data class ProductStockSummary(
     val color: String,
     val warrantyMonths: Int,
     val sellingPrice: Double,
+    val mrp: Double,
+    val rackLocation: String,
     val lowStockLevel: Int,
     val note: String,
     val workspace: String,

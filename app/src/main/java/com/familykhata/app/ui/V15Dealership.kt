@@ -145,6 +145,21 @@ internal fun V15DealershipScreen(
             it.grossProfit
         }
 
+    val dueInvoiceCount =
+        invoices.count {
+            it.dueAmount > 0.0
+        }
+
+    val overdue30Count =
+        invoices.count { invoice ->
+            invoice.dueAmount > 0.0 &&
+                (
+                    System.currentTimeMillis() -
+                        invoice.soldAt
+                ).coerceAtLeast(0L) >=
+                    30L * 86_400_000L
+        }
+
     Column(
         modifier = Modifier
             .fillMaxSize()
@@ -243,6 +258,27 @@ internal fun V15DealershipScreen(
                 dealershipMoney(grossProfit),
             modifier =
                 Modifier.fillMaxWidth()
+        )
+
+        Text(
+            v15Text(
+                "বকেয়া ইনভয়েস: $dueInvoiceCount • ৩০+ দিনের বকেয়া: $overdue30Count",
+                "Outstanding invoices: $dueInvoiceCount • 30+ days overdue: $overdue30Count"
+            ),
+            style =
+                MaterialTheme.typography.bodySmall,
+            color =
+                if (overdue30Count > 0) {
+                    MaterialTheme.colorScheme.error
+                } else {
+                    MaterialTheme.colorScheme.onSurfaceVariant
+                },
+            fontWeight =
+                if (overdue30Count > 0) {
+                    FontWeight.Bold
+                } else {
+                    FontWeight.Normal
+                }
         )
 
         OutlinedButton(
@@ -397,6 +433,33 @@ internal fun V15DealershipScreen(
                         dealer.territoryId
                 }
 
+            val dealerOpenInvoices =
+                invoices.filter {
+                    it.dealerId == dealer.id &&
+                        it.dueAmount > 0.0
+                }
+
+            val dealerOutstanding =
+                dealerOpenInvoices.sumOf {
+                    it.dueAmount.coerceAtLeast(0.0)
+                }
+
+            val oldestDueDays =
+                dealerOpenInvoices
+                    .minOfOrNull {
+                        it.soldAt
+                    }
+                    ?.let { oldestSoldAt ->
+                        (
+                            (
+                                System.currentTimeMillis() -
+                                    oldestSoldAt
+                            ).coerceAtLeast(0L) /
+                                86_400_000L
+                        ).toInt()
+                    }
+                    ?: 0
+
             Card(
                 modifier =
                     Modifier.fillMaxWidth()
@@ -444,6 +507,48 @@ internal fun V15DealershipScreen(
                             )
                         )
                     }
+
+                    if (dealerOutstanding > 0.0) {
+                        Text(
+                            v15Text(
+                                "মোট বকেয়া: ${dealershipMoney(dealerOutstanding)}",
+                                "Outstanding: ${dealershipMoney(dealerOutstanding)}"
+                            ),
+                            fontWeight = FontWeight.Bold,
+                            color =
+                                if (oldestDueDays >= 30) {
+                                    MaterialTheme.colorScheme.error
+                                } else {
+                                    MaterialTheme.colorScheme.onSurface
+                                }
+                        )
+
+                        Text(
+                            v15Text(
+                                "সবচেয়ে পুরোনো বকেয়া: $oldestDueDays দিন",
+                                "Oldest due: $oldestDueDays days"
+                            ),
+                            style =
+                                MaterialTheme.typography.bodySmall,
+                            color =
+                                if (oldestDueDays >= 30) {
+                                    MaterialTheme.colorScheme.error
+                                } else {
+                                    MaterialTheme.colorScheme.onSurfaceVariant
+                                }
+                        )
+                    } else {
+                        Text(
+                            v15Text(
+                                "কোনো বকেয়া নেই",
+                                "No outstanding due"
+                            ),
+                            style =
+                                MaterialTheme.typography.bodySmall,
+                            color =
+                                MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
                 }
             }
         }
@@ -466,6 +571,19 @@ internal fun V15DealershipScreen(
         }
 
         invoices.forEach { invoice ->
+            val dueDays =
+                if (invoice.dueAmount > 0.0) {
+                    (
+                        (
+                            System.currentTimeMillis() -
+                                invoice.soldAt
+                        ).coerceAtLeast(0L) /
+                            86_400_000L
+                    ).toInt()
+                } else {
+                    0
+                }
+
             Card(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -509,6 +627,27 @@ internal fun V15DealershipScreen(
                             invoice.soldAt
                         )
                     )
+
+                    if (invoice.dueAmount > 0.0) {
+                        Text(
+                            v15Text(
+                                "বকেয়ার বয়স: $dueDays দিন",
+                                "Due age: $dueDays days"
+                            ),
+                            color =
+                                if (dueDays >= 30) {
+                                    MaterialTheme.colorScheme.error
+                                } else {
+                                    MaterialTheme.colorScheme.onSurfaceVariant
+                                },
+                            fontWeight =
+                                if (dueDays >= 30) {
+                                    FontWeight.Bold
+                                } else {
+                                    FontWeight.Normal
+                                }
+                        )
+                    }
 
                     Text(
                         v15Text(
@@ -1945,6 +2084,29 @@ private fun DealershipInvoiceLedger(
             initial = emptyList()
         )
 
+    val returns by
+        viewModel.observeReturns(
+            invoice.invoiceId
+        ).collectAsState(
+            initial = emptyList()
+        )
+
+    var selectedReturnLineId by remember {
+        mutableStateOf<Long?>(null)
+    }
+
+    var returnQuantity by remember {
+        mutableStateOf("")
+    }
+
+    var returnType by remember {
+        mutableStateOf("RESTOCK")
+    }
+
+    var returnNote by remember {
+        mutableStateOf("")
+    }
+
     var paymentAmount by remember {
         mutableStateOf("")
     }
@@ -1957,10 +2119,21 @@ private fun DealershipInvoiceLedger(
         mutableStateOf("")
     }
 
-    val liveTotal =
+    val originalTotal =
         lines.sumOf {
             it.lineTotal
         }
+
+    val returnedValue =
+        returns.sumOf {
+            it.totalRefund
+        }
+
+    val liveTotal =
+        (
+            originalTotal -
+                returnedValue
+            ).coerceAtLeast(0.0)
 
     val livePaid =
         payments.sumOf {
@@ -1972,6 +2145,19 @@ private fun DealershipInvoiceLedger(
             liveTotal -
                 livePaid
             ).coerceAtLeast(0.0)
+
+    val customerCredit =
+        (
+            livePaid -
+                liveTotal
+            ).coerceAtLeast(0.0)
+
+    val selectedReturnLine =
+        selectedReturnLineId?.let { id ->
+            lines.firstOrNull {
+                it.id == id
+            }
+        }
 
     Column(
         modifier = Modifier
@@ -2013,9 +2199,27 @@ private fun DealershipInvoiceLedger(
 
         Text(
             v15Text(
-                "মোট: ${dealershipMoney(liveTotal)}",
-                "Total: ${dealershipMoney(liveTotal)}"
+                "মূল বিক্রি: ${dealershipMoney(originalTotal)}",
+                "Original sale: ${dealershipMoney(originalTotal)}"
             )
+        )
+
+        if (returnedValue > 0.0) {
+            Text(
+                v15Text(
+                    "রিটার্ন সমন্বয়: -${dealershipMoney(returnedValue)}",
+                    "Return adjustment: -${dealershipMoney(returnedValue)}"
+                )
+            )
+        }
+
+        Text(
+            v15Text(
+                "নেট মোট: ${dealershipMoney(liveTotal)}",
+                "Net total: ${dealershipMoney(liveTotal)}"
+            ),
+            fontWeight =
+                FontWeight.Bold
         )
 
         Text(
@@ -2034,6 +2238,19 @@ private fun DealershipInvoiceLedger(
                 FontWeight.Bold
         )
 
+        if (customerCredit > 0.009) {
+            Text(
+                v15Text(
+                    "গ্রাহককে ফেরত/ক্রেডিট দিতে হবে: ${dealershipMoney(customerCredit)}",
+                    "Customer refund / credit due: ${dealershipMoney(customerCredit)}"
+                ),
+                color =
+                    MaterialTheme.colorScheme.error,
+                fontWeight =
+                    FontWeight.Bold
+            )
+        }
+
         Text(
             v15Text(
                 "পণ্য",
@@ -2044,13 +2261,31 @@ private fun DealershipInvoiceLedger(
         )
 
         lines.forEach { line ->
+            val returnedQuantity =
+                returns
+                    .filter {
+                        it.invoiceLineId ==
+                            line.id
+                    }
+                    .sumOf {
+                        it.quantity
+                    }
+
+            val returnableQuantity =
+                (
+                    line.quantity -
+                        returnedQuantity
+                    ).coerceAtLeast(0)
+
             Card(
                 modifier =
                     Modifier.fillMaxWidth()
             ) {
                 Column(
                     modifier =
-                        Modifier.padding(10.dp)
+                        Modifier.padding(10.dp),
+                    verticalArrangement =
+                        Arrangement.spacedBy(4.dp)
                 ) {
                     Text(
                         line.productNameSnapshot,
@@ -2061,6 +2296,43 @@ private fun DealershipInvoiceLedger(
                     Text(
                         "${line.quantity} × ${dealershipMoney(line.unitPrice)} = ${dealershipMoney(line.lineTotal)}"
                     )
+
+                    if (returnedQuantity > 0) {
+                        Text(
+                            v15Text(
+                                "রিটার্ন: $returnedQuantity • কার্যকর বিক্রি: $returnableQuantity",
+                                "Returned: $returnedQuantity • Net sold: $returnableQuantity"
+                            ),
+                            style =
+                                MaterialTheme.typography.bodySmall
+                        )
+                    }
+
+                    if (
+                        canWrite &&
+                        returnableQuantity > 0
+                    ) {
+                        OutlinedButton(
+                            onClick = {
+                                selectedReturnLineId =
+                                    line.id
+                                returnQuantity = ""
+                                returnType =
+                                    "RESTOCK"
+                                returnNote = ""
+                                message = ""
+                            },
+                            modifier =
+                                Modifier.fillMaxWidth()
+                        ) {
+                            Text(
+                                v15Text(
+                                    "রিটার্ন / ড্যামেজ",
+                                    "Return / damage"
+                                )
+                            )
+                        }
+                    }
                 }
             }
         }
@@ -2158,6 +2430,96 @@ private fun DealershipInvoiceLedger(
 
         Text(
             v15Text(
+                "রিটার্ন ইতিহাস",
+                "Return history"
+            ),
+            fontWeight =
+                FontWeight.Bold
+        )
+
+        if (returns.isEmpty()) {
+            Text(
+                v15Text(
+                    "কোনো রিটার্ন নেই।",
+                    "No returns yet."
+                )
+            )
+        }
+
+        returns.forEach { item ->
+            Card(
+                modifier =
+                    Modifier.fillMaxWidth()
+            ) {
+                Column(
+                    modifier =
+                        Modifier.padding(10.dp),
+                    verticalArrangement =
+                        Arrangement.spacedBy(2.dp)
+                ) {
+                    Row(
+                        modifier =
+                            Modifier.fillMaxWidth(),
+                        horizontalArrangement =
+                            Arrangement.SpaceBetween
+                    ) {
+                        Text(
+                            item.productNameSnapshot,
+                            fontWeight =
+                                FontWeight.Bold
+                        )
+
+                        Text(
+                            dealershipMoney(
+                                item.totalRefund
+                            ),
+                            fontWeight =
+                                FontWeight.Bold
+                        )
+                    }
+
+                    Text(
+                        v15Text(
+                            "পরিমাণ: ${item.quantity} • ${
+                                if (
+                                    item.returnType ==
+                                        "RESTOCK"
+                                ) {
+                                    "স্টকে ফেরত"
+                                } else {
+                                    "ড্যামেজ"
+                                }
+                            }",
+                            "Quantity: ${item.quantity} • ${
+                                if (
+                                    item.returnType ==
+                                        "RESTOCK"
+                                ) {
+                                    "Restocked"
+                                } else {
+                                    "Damaged"
+                                }
+                            }"
+                        )
+                    )
+
+                    Text(
+                        dealershipDate(
+                            item.returnedAt
+                        ),
+                        style =
+                            MaterialTheme.typography.bodySmall
+                    )
+
+                    if (item.note.isNotBlank()) {
+                        Text(item.note)
+                    }
+                }
+            }
+        }
+
+        Text(
+            v15Text(
                 "পেমেন্ট ইতিহাস",
                 "Payment history"
             ),
@@ -2214,6 +2576,243 @@ private fun DealershipInvoiceLedger(
                 }
             }
         }
+    }
+
+    selectedReturnLine?.let { line ->
+        val alreadyReturned =
+            returns
+                .filter {
+                    it.invoiceLineId ==
+                        line.id
+                }
+                .sumOf {
+                    it.quantity
+                }
+
+        val maxReturnable =
+            (
+                line.quantity -
+                    alreadyReturned
+                ).coerceAtLeast(0)
+
+        AlertDialog(
+            onDismissRequest = {
+                selectedReturnLineId = null
+            },
+            title = {
+                Text(
+                    v15Text(
+                        "রিটার্ন / ড্যামেজ",
+                        "Return / damage"
+                    )
+                )
+            },
+            text = {
+                Column(
+                    verticalArrangement =
+                        Arrangement.spacedBy(8.dp)
+                ) {
+                    Text(
+                        line.productNameSnapshot,
+                        fontWeight =
+                            FontWeight.Bold
+                    )
+
+                    Text(
+                        v15Text(
+                            "বিক্রি: ${line.quantity} • আগে রিটার্ন: $alreadyReturned • সর্বোচ্চ এখন: $maxReturnable",
+                            "Sold: ${line.quantity} • Already returned: $alreadyReturned • Maximum now: $maxReturnable"
+                        )
+                    )
+
+                    DealershipField(
+                        returnQuantity,
+                        {
+                            returnQuantity = it
+                            message = ""
+                        },
+                        v15Text(
+                            "রিটার্ন পরিমাণ",
+                            "Return quantity"
+                        )
+                    )
+
+                    Row(
+                        modifier =
+                            Modifier.fillMaxWidth(),
+                        horizontalArrangement =
+                            Arrangement.spacedBy(8.dp)
+                    ) {
+                        if (
+                            returnType ==
+                                "RESTOCK"
+                        ) {
+                            Button(
+                                onClick = {},
+                                modifier =
+                                    Modifier.weight(1f)
+                            ) {
+                                Text(
+                                    v15Text(
+                                        "✓ স্টকে ফেরত",
+                                        "✓ Restock"
+                                    )
+                                )
+                            }
+                        } else {
+                            OutlinedButton(
+                                onClick = {
+                                    returnType =
+                                        "RESTOCK"
+                                },
+                                modifier =
+                                    Modifier.weight(1f)
+                            ) {
+                                Text(
+                                    v15Text(
+                                        "স্টকে ফেরত",
+                                        "Restock"
+                                    )
+                                )
+                            }
+                        }
+
+                        if (
+                            returnType ==
+                                "DAMAGED"
+                        ) {
+                            Button(
+                                onClick = {},
+                                modifier =
+                                    Modifier.weight(1f)
+                            ) {
+                                Text(
+                                    v15Text(
+                                        "✓ ড্যামেজ",
+                                        "✓ Damaged"
+                                    )
+                                )
+                            }
+                        } else {
+                            OutlinedButton(
+                                onClick = {
+                                    returnType =
+                                        "DAMAGED"
+                                },
+                                modifier =
+                                    Modifier.weight(1f)
+                            ) {
+                                Text(
+                                    v15Text(
+                                        "ড্যামেজ",
+                                        "Damaged"
+                                    )
+                                )
+                            }
+                        }
+                    }
+
+                    Text(
+                        if (
+                            returnType ==
+                                "RESTOCK"
+                        ) {
+                            v15Text(
+                                "পণ্যটি বিক্রয়যোগ্য স্টকে ফেরত যাবে।",
+                                "The item will return to sellable stock."
+                            )
+                        } else {
+                            v15Text(
+                                "ড্যামেজ পণ্য বিক্রয়যোগ্য স্টকে ফেরত যাবে না।",
+                                "Damaged items will not return to sellable stock."
+                            ),
+                        style =
+                            MaterialTheme.typography.bodySmall
+                    )
+
+                    DealershipField(
+                        returnNote,
+                        {
+                            returnNote = it
+                        },
+                        v15Text(
+                            "নোট",
+                            "Note"
+                        )
+                    )
+                }
+            },
+            confirmButton = {
+                Button(
+                    enabled =
+                        (
+                            returnQuantity
+                                .toIntOrNull()
+                                ?: 0
+                        ) in 1..maxReturnable,
+                    onClick = {
+                        val quantity =
+                            returnQuantity
+                                .toIntOrNull()
+                                ?: 0
+
+                        viewModel.recordReturn(
+                            invoiceId =
+                                invoice.invoiceId,
+                            invoiceLineId =
+                                line.id,
+                            quantity =
+                                quantity,
+                            returnType =
+                                returnType,
+                            note =
+                                returnNote
+                        ) { success ->
+                            if (success) {
+                                selectedReturnLineId =
+                                    null
+                                returnQuantity = ""
+                                returnNote = ""
+
+                                message =
+                                    v15Text(
+                                        "রিটার্ন সেভ হয়েছে।",
+                                        "Return saved."
+                                    )
+                            } else {
+                                message =
+                                    v15Text(
+                                        "রিটার্ন সেভ করা যায়নি। পরিমাণ ও স্টক তথ্য পরীক্ষা করুন।",
+                                        "Return could not be saved. Check quantity and stock information."
+                                    )
+                            }
+                        }
+                    }
+                ) {
+                    Text(
+                        v15Text(
+                            "সেভ করুন",
+                            "Save"
+                        )
+                    )
+                }
+            },
+            dismissButton = {
+                TextButton(
+                    onClick = {
+                        selectedReturnLineId =
+                            null
+                    }
+                ) {
+                    Text(
+                        v15Text(
+                            "বাতিল",
+                            "Cancel"
+                        )
+                    )
+                }
+            }
+        )
     }
 }
 

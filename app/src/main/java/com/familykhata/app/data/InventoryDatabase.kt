@@ -25,6 +25,7 @@ import com.familykhata.app.dealership.DealershipInvoiceEntity
 import com.familykhata.app.dealership.DealershipInvoiceLineEntity
 import com.familykhata.app.dealership.DealershipPaymentEntity
 import com.familykhata.app.dealership.DealershipProductPolicyEntity
+import com.familykhata.app.dealership.DealershipReturnEntity
 import com.familykhata.app.dealership.DealershipStockAllocationEntity
 import com.familykhata.app.dealership.DealershipStockReceiptEntity
 import com.familykhata.app.dealership.DealershipSupplierEntity
@@ -52,6 +53,7 @@ import com.familykhata.app.production.ProductionItemRoleEntity
         DealershipInvoiceLineEntity::class,
         DealershipStockAllocationEntity::class,
         DealershipPaymentEntity::class,
+        DealershipReturnEntity::class,
         AgroCycleEntity::class,
         AgroCostEntity::class,
         AgroLossEntity::class,
@@ -63,7 +65,7 @@ import com.familykhata.app.production.ProductionItemRoleEntity
         FoodStockAllocationEntity::class,
         FoodPaymentEntity::class
     ],
-    version = 7,
+    version = 9,
     exportSchema = false
 )
 abstract class InventoryDatabase : RoomDatabase() {
@@ -1082,6 +1084,108 @@ abstract class InventoryDatabase : RoomDatabase() {
                 }
             }
 
+        private val MIGRATION_7_8 =
+            object : Migration(7, 8) {
+                override fun migrate(
+                    db: SupportSQLiteDatabase
+                ) {
+                    db.execSQL(
+                        """
+                        CREATE TABLE IF NOT EXISTS
+                        `dealership_returns` (
+                            `id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+                            `invoiceId` INTEGER NOT NULL,
+                            `invoiceLineId` INTEGER NOT NULL,
+                            `productId` INTEGER,
+                            `productNameSnapshot` TEXT NOT NULL,
+                            `quantity` INTEGER NOT NULL,
+                            `unitPrice` REAL NOT NULL,
+                            `totalRefund` REAL NOT NULL,
+                            `totalCost` REAL NOT NULL,
+                            `returnType` TEXT NOT NULL,
+                            `returnedAt` INTEGER NOT NULL,
+                            `note` TEXT NOT NULL,
+                            `workspace` TEXT NOT NULL,
+                            `createdAt` INTEGER NOT NULL,
+                            FOREIGN KEY(`invoiceId`)
+                                REFERENCES `dealership_invoices`(`id`)
+                                ON UPDATE NO ACTION
+                                ON DELETE CASCADE,
+                            FOREIGN KEY(`invoiceLineId`)
+                                REFERENCES `dealership_invoice_lines`(`id`)
+                                ON UPDATE NO ACTION
+                                ON DELETE CASCADE,
+                            FOREIGN KEY(`productId`)
+                                REFERENCES `inventory_products`(`id`)
+                                ON UPDATE NO ACTION
+                                ON DELETE SET NULL
+                        )
+                        """.trimIndent()
+                    )
+
+                    db.execSQL(
+                        """
+                        CREATE INDEX IF NOT EXISTS
+                        `index_dealership_returns_invoiceId`
+                        ON `dealership_returns`
+                        (`invoiceId`)
+                        """.trimIndent()
+                    )
+
+                    db.execSQL(
+                        """
+                        CREATE INDEX IF NOT EXISTS
+                        `index_dealership_returns_invoiceLineId`
+                        ON `dealership_returns`
+                        (`invoiceLineId`)
+                        """.trimIndent()
+                    )
+
+                    db.execSQL(
+                        """
+                        CREATE INDEX IF NOT EXISTS
+                        `index_dealership_returns_productId`
+                        ON `dealership_returns`
+                        (`productId`)
+                        """.trimIndent()
+                    )
+
+                    db.execSQL(
+                        """
+                        CREATE INDEX IF NOT EXISTS
+                        `index_dealership_returns_returnedAt`
+                        ON `dealership_returns`
+                        (`returnedAt`)
+                        """.trimIndent()
+                    )
+                }
+            }
+
+
+        private val MIGRATION_8_9 =
+            object : androidx.room.migration.Migration(
+                8,
+                9
+            ) {
+                override fun migrate(
+                    db: androidx.sqlite.db.SupportSQLiteDatabase
+                ) {
+                    db.execSQL(
+                        """
+                        ALTER TABLE inventory_products
+                        ADD COLUMN mrp REAL NOT NULL DEFAULT 0
+                        """.trimIndent()
+                    )
+
+                    db.execSQL(
+                        """
+                        ALTER TABLE inventory_products
+                        ADD COLUMN rackLocation TEXT NOT NULL DEFAULT ''
+                        """.trimIndent()
+                    )
+                }
+            }
+
         fun get(context: Context): InventoryDatabase = INSTANCE ?: synchronized(this) {
             INSTANCE ?: Room.databaseBuilder(
                 context.applicationContext,
@@ -1094,7 +1198,9 @@ abstract class InventoryDatabase : RoomDatabase() {
                     MIGRATION_3_4,
                     MIGRATION_4_5,
                     MIGRATION_5_6,
-                    MIGRATION_6_7
+                    MIGRATION_6_7,
+                    MIGRATION_7_8,
+                    MIGRATION_8_9
                 )
                 .build()
                 .also { INSTANCE = it }

@@ -649,6 +649,301 @@ class DealershipViewModel(
         }
     }
 
+    fun recordReturn(
+        invoiceId: Long,
+        invoiceLineId: Long,
+        quantity: Int,
+        returnType: String,
+        note: String,
+        onDone: (Boolean) -> Unit = {}
+    ) {
+        val normalizedType =
+            returnType
+                .trim()
+                .uppercase()
+
+        if (
+            invoiceId <= 0 ||
+            invoiceLineId <= 0 ||
+            quantity <= 0 ||
+            normalizedType !in
+                setOf(
+                    "RESTOCK",
+                    "DAMAGED"
+                )
+        ) {
+            onDone(false)
+            return
+        }
+
+        val currentWorkspace =
+            workspace.value
+
+        viewModelScope.launch {
+            val success =
+                runCatching {
+                    database.withTransaction {
+                        val invoice =
+                            dao.getInvoiceOnce(
+                                invoiceId
+                            ) ?: error(
+                                "Invoice not found"
+                            )
+
+                        require(
+                            invoice.workspace ==
+                                currentWorkspace
+                        )
+
+                        require(
+                            invoice.status !=
+                                "CANCELLED"
+                        )
+
+                        val line =
+                            dao.getInvoiceLineOnce(
+                                invoiceLineId
+                            ) ?: error(
+                                "Invoice line not found"
+                            )
+
+                        require(
+                            line.invoiceId ==
+                                invoice.id
+                        )
+
+                        val alreadyReturned =
+                            dao.getReturnedQuantity(
+                                invoiceLineId
+                            ).coerceAtLeast(0)
+
+                        require(
+                            alreadyReturned +
+                                quantity <=
+                                line.quantity
+                        )
+
+                        val allocations =
+                            dao.getStockAllocationsForLineOnce(
+                                invoiceLineId
+                            )
+
+                        require(
+                            allocations.sumOf {
+                                it.quantity
+                            } >=
+                                line.quantity
+                        )
+
+                        var skip =
+                            alreadyReturned
+
+                        var remaining =
+                            quantity
+
+                        var returnCost =
+                            0.0
+
+                        val restockByBatch =
+                            linkedMapOf<Long, Int>()
+
+                        for (
+                            allocation in
+                                allocations
+                        ) {
+                            if (remaining <= 0) {
+                                break
+                            }
+
+                            if (
+                                skip >=
+                                    allocation.quantity
+                            ) {
+                                skip -=
+                                    allocation.quantity
+                                continue
+                            }
+
+                            val available =
+                                allocation.quantity -
+                                    skip
+
+                            val used =
+                                min(
+                                    remaining,
+                                    available
+                                )
+
+                            returnCost +=
+                                used *
+                                    allocation.unitCost
+
+                            if (
+                                normalizedType ==
+                                    "RESTOCK"
+                            ) {
+                                val batchId =
+                                    allocation
+                                        .sourceStockBatchId
+                                        ?: error(
+                                            "Original stock batch is unavailable"
+                                        )
+
+                                restockByBatch[
+                                    batchId
+                                ] =
+                                    (
+                                        restockByBatch[
+                                            batchId
+                                        ] ?: 0
+                                    ) + used
+                            }
+
+                            remaining -= used
+                            skip = 0
+                        }
+
+                        require(
+                            remaining == 0
+                        )
+
+                        val refundAmount =
+                            quantity *
+                                line.unitPrice
+
+                        val originalTotal =
+                            dao.getInvoiceTotal(
+                                invoice.id
+                            )
+
+                        val previouslyReturnedTotal =
+                            dao.getInvoiceReturnTotal(
+                                invoice.id
+                            )
+
+                        val paidTotal =
+                            dao.getInvoicePaid(
+                                invoice.id
+                            )
+
+                        val proposedAdjustedTotal =
+                            (
+                                originalTotal -
+                                    previouslyReturnedTotal -
+                                    refundAmount
+                            ).coerceAtLeast(
+                                0.0
+                            )
+
+                        require(
+                            proposedAdjustedTotal +
+                                0.009 >=
+                                paidTotal
+                        ) {
+                            "Return value exceeds unpaid invoice balance"
+                        }
+
+                        if (
+                            normalizedType ==
+                                "RESTOCK"
+                        ) {
+                            val productId =
+                                line.productId
+                                    ?: error(
+                                        "Returned product is unavailable"
+                                    )
+
+                            val currentBatches =
+                                inventoryDao
+                                    .getBatchesOnce(
+                                        productId
+                                    )
+                                    .associateBy {
+                                        it.id
+                                    }
+
+                            restockByBatch
+                                .forEach {
+                                    (
+                                        batchId,
+                                        returnedQuantity
+                                    ) ->
+
+                                    val batch =
+                                        currentBatches[
+                                            batchId
+                                        ] ?: error(
+                                            "Original stock batch is unavailable"
+                                        )
+
+                                    inventoryDao
+                                        .updateBatchQuantity(
+                                            batchId =
+                                                batch.id,
+                                            quantity =
+                                                batch.quantity +
+                                                    returnedQuantity
+                                        )
+                                }
+                        }
+
+                        val returnId =
+                            dao.insertReturn(
+                                DealershipReturnEntity(
+                                    invoiceId =
+                                        invoice.id,
+                                    invoiceLineId =
+                                        line.id,
+                                    productId =
+                                        line.productId,
+                                    productNameSnapshot =
+                                        line.productNameSnapshot,
+                                    quantity =
+                                        quantity,
+                                    unitPrice =
+                                        line.unitPrice,
+                                    totalRefund =
+                                        refundAmount,
+                                    totalCost =
+                                        returnCost,
+                                    returnType =
+                                        normalizedType,
+                                    note =
+                                        note.trim(),
+                                    workspace =
+                                        currentWorkspace
+                                )
+                            )
+
+                        require(
+                            returnId > 0
+                        )
+
+                        val adjustedTotal =
+                            proposedAdjustedTotal
+
+                        dao.updateInvoiceStatus(
+                            invoiceId =
+                                invoice.id,
+                            status =
+                                if (
+                                    adjustedTotal -
+                                        paidTotal <=
+                                        0.009
+                                ) {
+                                    "PAID"
+                                } else {
+                                    "OPEN"
+                                }
+                        )
+                    }
+                }.isSuccess
+
+            onDone(success)
+        }
+    }
+
+
     fun addPayment(
         invoiceId: Long,
         amount: Double,
@@ -687,8 +982,13 @@ class DealershipViewModel(
                                 "CANCELLED"
                         )
 
-                        val total =
+                        val originalTotal =
                             dao.getInvoiceTotal(
+                                invoiceId
+                            )
+
+                        val returnedTotal =
+                            dao.getInvoiceReturnTotal(
                                 invoiceId
                             )
 
@@ -697,9 +997,15 @@ class DealershipViewModel(
                                 invoiceId
                             )
 
+                        val adjustedTotal =
+                            (
+                                originalTotal -
+                                    returnedTotal
+                                ).coerceAtLeast(0.0)
+
                         val remaining =
                             (
-                                total -
+                                adjustedTotal -
                                     paid
                                 ).coerceAtLeast(0.0)
 
@@ -755,6 +1061,14 @@ class DealershipViewModel(
         invoiceId: Long
     ): Flow<List<DealershipPaymentEntity>> =
         dao.observePayments(
+            invoiceId
+        )
+
+
+    fun observeReturns(
+        invoiceId: Long
+    ): Flow<List<DealershipReturnEntity>> =
+        dao.observeReturns(
             invoiceId
         )
 }

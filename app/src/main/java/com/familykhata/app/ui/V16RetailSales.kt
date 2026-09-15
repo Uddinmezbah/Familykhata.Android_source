@@ -82,6 +82,14 @@ internal fun V16RetailSalesScreen(
         mutableStateOf(false)
     }
 
+    var cancellingSale by remember {
+        mutableStateOf<RetailSaleEntity?>(null)
+    }
+
+    var cancellationBusy by remember {
+        mutableStateOf(false)
+    }
+
     LaunchedEffect(
         workspace,
         shopType
@@ -103,18 +111,23 @@ internal fun V16RetailSalesScreen(
         ),
         onBack = onExit
     ) {
+        val activeSales =
+            sales.filter {
+                it.status != "CANCELLED"
+            }
+
         val totalSales =
-            sales.sumOf {
+            activeSales.sumOf {
                 it.total
             }
 
         val collected =
-            sales.sumOf {
+            activeSales.sumOf {
                 it.paid
             }
 
         val due =
-            sales.sumOf {
+            activeSales.sumOf {
                 (
                     it.total -
                         it.paid
@@ -251,11 +264,113 @@ internal fun V16RetailSalesScreen(
             } else {
                 sales.forEach { sale ->
                     RetailSaleCard(
-                        sale = sale
+                        sale = sale,
+                        canWrite = canWrite,
+                        onCancel = {
+                            cancellingSale =
+                                sale
+                        }
                     )
                 }
             }
         }
+    }
+
+    cancellingSale?.let { sale ->
+        AlertDialog(
+            onDismissRequest = {
+                if (!cancellationBusy) {
+                    cancellingSale = null
+                }
+            },
+            title = {
+                Text(
+                    v15Text(
+                        "বিক্রি বাতিল করবেন?",
+                        "Cancel this sale?"
+                    )
+                )
+            },
+            text = {
+                Text(
+                    v15Text(
+                        "ইনভয়েস ${sale.invoiceNo} বাতিল করলে বিক্রিটি ইতিহাসে থাকবে, কিন্তু মোট বিক্রি/আদায়/বাকির হিসাবে ধরা হবে না। পণ্য ও স্টক এখনও থাকলে বিক্রি হওয়া স্টক আবার ফেরত যাবে।",
+                        "Invoice ${sale.invoiceNo} will remain in history but will no longer count toward sales, collections or dues. Sold stock will be restored when the product and stock batches still exist."
+                    )
+                )
+            },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        if (cancellationBusy) {
+                            return@Button
+                        }
+
+                        cancellationBusy = true
+
+                        vm.cancelRetailSale(
+                            sale.id
+                        ) { success ->
+                            cancellationBusy = false
+
+                            if (success) {
+                                cancellingSale = null
+
+                                Toast.makeText(
+                                    context,
+                                    v15Text(
+                                        "বিক্রি বাতিল হয়েছে",
+                                        "Sale cancelled"
+                                    ),
+                                    Toast.LENGTH_SHORT
+                                ).show()
+                            } else {
+                                Toast.makeText(
+                                    context,
+                                    v15Text(
+                                        "বিক্রি বাতিল করা যায়নি। স্টক তথ্য যাচাই করুন।",
+                                        "Could not cancel sale. Check the stock data."
+                                    ),
+                                    Toast.LENGTH_LONG
+                                ).show()
+                            }
+                        }
+                    },
+                    enabled =
+                        !cancellationBusy
+                ) {
+                    Text(
+                        if (cancellationBusy) {
+                            v15Text(
+                                "বাতিল হচ্ছে…",
+                                "Cancelling…"
+                            )
+                        } else {
+                            v15Text(
+                                "বিক্রি বাতিল করুন",
+                                "Cancel sale"
+                            )
+                        }
+                    )
+                }
+            },
+            dismissButton = {
+                TextButton(
+                    onClick = {
+                        cancellingSale = null
+                    },
+                    enabled =
+                        !cancellationBusy
+                ) {
+                    Text(
+                        v15Text(
+                            "ফিরে যান",
+                            "Go back"
+                        )
+                    )
+                }
+            }
+        )
     }
 
     if (showNewSale) {
@@ -365,7 +480,9 @@ private fun RetailSaleMetric(
 
 @Composable
 private fun RetailSaleCard(
-    sale: RetailSaleEntity
+    sale: RetailSaleEntity,
+    canWrite: Boolean,
+    onCancel: () -> Unit
 ) {
     val due =
         (
@@ -482,6 +599,22 @@ private fun RetailSaleCard(
                     MaterialTheme.colorScheme
                         .onSurfaceVariant
             )
+
+            if (
+                canWrite &&
+                sale.status != "CANCELLED"
+            ) {
+                TextButton(
+                    onClick = onCancel
+                ) {
+                    Text(
+                        v15Text(
+                            "বিক্রি বাতিল",
+                            "Cancel sale"
+                        )
+                    )
+                }
+            }
         }
     }
 }
@@ -1355,6 +1488,12 @@ private fun retailStatusLabel(
     status: String
 ): String =
     when (status) {
+        "CANCELLED" ->
+            v15Text(
+                "বাতিল",
+                "Cancelled"
+            )
+
         "PAID" ->
             v15Text(
                 "পরিশোধ",

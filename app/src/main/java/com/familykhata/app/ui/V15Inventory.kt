@@ -668,8 +668,22 @@ private fun ProductListScreen(
                 deletingProduct = null
             },
             onConfirmed = {
-                viewModel.deleteProduct(product.id)
                 deletingProduct = null
+
+                viewModel.deleteProduct(
+                    product.id
+                ) { deleted ->
+                    if (!deleted) {
+                        Toast.makeText(
+                            context,
+                            v15Text(
+                                "এই পণ্য দিয়ে সক্রিয় বিক্রি আছে। আগে সংশ্লিষ্ট বিক্রি বাতিল করুন।",
+                                "This product has active sales. Cancel those sales first."
+                            ),
+                            Toast.LENGTH_LONG
+                        ).show()
+                    }
+                }
             }
         )
     }

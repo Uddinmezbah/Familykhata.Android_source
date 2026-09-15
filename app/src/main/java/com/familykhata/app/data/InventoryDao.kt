@@ -284,4 +284,42 @@ interface InventoryDao {
         invoiceNo: String
     ): Int
 
+    @Query(
+        """
+        SELECT *
+        FROM retail_sale_stock_allocations
+        WHERE saleLineId = :saleLineId
+        ORDER BY id ASC
+        """
+    )
+    suspend fun getRetailSaleStockAllocationsOnce(
+        saleLineId: Long
+    ): List<RetailSaleStockAllocationEntity>
+
+    @Query(
+        """
+        UPDATE retail_sales
+        SET status = :status
+        WHERE id = :saleId
+        """
+    )
+    suspend fun updateRetailSaleStatus(
+        saleId: Long,
+        status: String
+    )
+
+    @Query(
+        """
+        SELECT COUNT(*)
+        FROM retail_sale_lines AS line
+        INNER JOIN retail_sales AS sale
+            ON sale.id = line.saleId
+        WHERE line.productId = :productId
+          AND sale.status != 'CANCELLED'
+        """
+    )
+    suspend fun activeRetailSaleCountForProduct(
+        productId: Long
+    ): Int
+
 }

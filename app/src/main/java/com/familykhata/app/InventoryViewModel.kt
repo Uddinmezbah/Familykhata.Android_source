@@ -225,8 +225,35 @@ class InventoryViewModel(application: Application) : AndroidViewModel(applicatio
         }
     }
 
-    fun deleteProduct(productId: Long) {
-        viewModelScope.launch { dao.deleteProductById(productId) }
+    fun deleteProduct(
+        productId: Long,
+        onDone: (Boolean) -> Unit = {}
+    ) {
+        if (productId <= 0L) {
+            onDone(false)
+            return
+        }
+
+        viewModelScope.launch {
+            val deleted =
+                runCatching {
+                    database.withTransaction {
+                        require(
+                            dao.activeRetailSaleCountForProduct(
+                                productId
+                            ) == 0
+                        ) {
+                            "Product has active sales"
+                        }
+
+                        dao.deleteProductById(
+                            productId
+                        )
+                    }
+                }.isSuccess
+
+            onDone(deleted)
+        }
     }
 
     fun addBatch(
@@ -618,6 +645,143 @@ class InventoryViewModel(application: Application) : AndroidViewModel(applicatio
                 }.getOrNull()
 
             onDone(saleId)
+        }
+    }
+
+    fun cancelRetailSale(
+        saleId: Long,
+        onDone: (Boolean) -> Unit = {}
+    ) {
+        if (saleId <= 0L) {
+            onDone(false)
+            return
+        }
+
+        val currentWorkspace = workspace.value
+        val currentBusinessKey = businessKey.value
+
+        viewModelScope.launch {
+            val result =
+                runCatching {
+                    database.withTransaction {
+                        val sale =
+                            requireNotNull(
+                                dao.getRetailSaleOnce(
+                                    saleId
+                                )
+                            ) {
+                                "Sale not found"
+                            }
+
+                        require(
+                            sale.workspace ==
+                                currentWorkspace
+                        ) {
+                            "Sale belongs to another workspace"
+                        }
+
+                        require(
+                            sale.businessKey ==
+                                currentBusinessKey
+                        ) {
+                            "Sale belongs to another business"
+                        }
+
+                        if (
+                            sale.status ==
+                            "CANCELLED"
+                        ) {
+                            return@withTransaction true
+                        }
+
+                        val lines =
+                            dao.getRetailSaleLinesOnce(
+                                saleId
+                            )
+
+                        for (line in lines) {
+                            val product =
+                                dao.getProductOnce(
+                                    line.productId
+                                )
+
+                            val allocations =
+                                dao.getRetailSaleStockAllocationsOnce(
+                                    line.id
+                                )
+
+                            /*
+                             * Older/test data may already have had its
+                             * product hard-deleted. In that case Room's
+                             * product -> batch cascade removed the stock
+                             * batches, so there is nowhere valid to restore
+                             * stock. We still allow the historical sale to
+                             * be cancelled.
+                             */
+                            if (product == null) {
+                                continue
+                            }
+
+                            require(
+                                product.workspace ==
+                                    currentWorkspace &&
+                                    product.businessKey ==
+                                        currentBusinessKey
+                            ) {
+                                "Product context mismatch"
+                            }
+
+                            require(
+                                allocations.sumOf {
+                                    it.quantity
+                                } == line.quantity
+                            ) {
+                                "Sale stock allocation mismatch"
+                            }
+
+                            for (
+                                allocation in
+                                allocations
+                            ) {
+                                val batch =
+                                    requireNotNull(
+                                        dao.getBatchOnce(
+                                            allocation.batchId
+                                        )
+                                    ) {
+                                        "Stock batch missing"
+                                    }
+
+                                val restored =
+                                    batch.quantity.toLong() +
+                                        allocation.quantity.toLong()
+
+                                require(
+                                    restored <=
+                                        Int.MAX_VALUE
+                                ) {
+                                    "Stock quantity overflow"
+                                }
+
+                                dao.updateBatchQuantity(
+                                    batchId =
+                                        batch.id,
+                                    quantity =
+                                        restored.toInt()
+                                )
+                            }
+                        }
+
+                        dao.updateRetailSaleStatus(
+                            saleId = saleId,
+                            status = "CANCELLED"
+                        )
+
+                        true
+                    }
+                }.getOrDefault(false)
+
+            onDone(result)
         }
     }
 

@@ -144,6 +144,9 @@ interface InventoryDao {
     @Query("SELECT * FROM inventory_batches WHERE productId = :productId ORDER BY purchaseDate ASC, id ASC")
     suspend fun getBatchesOnce(productId: Long): List<StockBatchEntity>
 
+    @Query("SELECT * FROM inventory_batches WHERE id = :batchId LIMIT 1")
+    suspend fun getBatchOnce(batchId: Long): StockBatchEntity?
+
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertBatch(item: StockBatchEntity): Long
 

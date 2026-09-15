@@ -14,7 +14,8 @@ enum class BusinessMode {
     AGRO,
     COACHING,
     DIGITAL_AGENCY,
-    DEALERSHIP
+    DEALERSHIP,
+    DEALER_BUSINESS
 }
 
 fun detectBusinessMode(shopType: String): BusinessMode {
@@ -35,6 +36,10 @@ fun detectBusinessMode(shopType: String): BusinessMode {
             "ডিজিটাল এজেন্সি"
         ).any { value.contains(it) } ->
             BusinessMode.DIGITAL_AGENCY
+
+        value.trim() == "dealer_business" ||
+            value.trim() == "ডিলার ব্যবসা / dealer business" ->
+            BusinessMode.DEALER_BUSINESS
 
         listOf(
             "dealership",

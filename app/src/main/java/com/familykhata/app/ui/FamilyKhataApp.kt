@@ -513,6 +513,16 @@ fun FamilyKhataApp(viewModel: FamilyKhataViewModel) {
                                         }
                                     )
 
+                                BusinessMode.DEALER_BUSINESS ->
+                                    V16DealerBusinessScreen(
+                                        workspace = workspace,
+                                        shopType = businessType,
+                                        canWrite = !trialStatus.expired,
+                                        onExit = {
+                                            tab = Tab.DASHBOARD
+                                        }
+                                    )
+
                                 BusinessMode.SERVICE_JOB ->
                                     V15ServiceJobScreen(
                                         workspace = workspace,
@@ -2970,6 +2980,9 @@ private fun tabLabel(
 
             BusinessMode.DEALERSHIP ->
                 v15Text("ডিলার", "Dealers")
+
+            BusinessMode.DEALER_BUSINESS ->
+                v15Text("ডিলার ব্যবসা", "Dealer")
 
             BusinessMode.SERVICE_JOB ->
                 v15Text("সার্ভিস", "Services")

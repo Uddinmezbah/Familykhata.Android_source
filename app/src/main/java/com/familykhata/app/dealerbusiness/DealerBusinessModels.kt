@@ -413,13 +413,15 @@ data class DealerSalesReturnEntity(
     ],
     indices = [
         Index("returnId"),
-        Index("sourceStockBatchId")
+        Index("sourceStockBatchId"),
+        Index("saleAllocationId")
     ]
 )
 data class DealerSalesReturnAllocationEntity(
     @PrimaryKey(autoGenerate = true)
     val id: Long = 0,
     val returnId: Long,
+    val saleAllocationId: Long? = null,
     val sourceStockBatchId: Long? = null,
     val batchNoSnapshot: String = "",
     val quantity: Int,

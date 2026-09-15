@@ -114,6 +114,11 @@ private val V15_SHOP_TYPES = listOf(
         "Distribution Business",
         "ডিলারশিপ / ডিস্ট্রিবিউশন / Dealership / Distribution"
     ),
+    ShopTypeChoice(
+        "ডিলার ব্যবসা",
+        "Dealer Business",
+        "dealer_business"
+    ),
     ShopTypeChoice("লন্ড্রি", "Laundry"),
     ShopTypeChoice("ট্রাভেল / টিকেট", "Travel / Ticket"),
     ShopTypeChoice("কার রেন্টাল", "Car Rental"),

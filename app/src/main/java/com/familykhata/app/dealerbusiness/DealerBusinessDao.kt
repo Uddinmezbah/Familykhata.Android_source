@@ -110,6 +110,36 @@ interface DealerBusinessDao {
         item: DealerExpenseEntity
     ): Int
 
+    @Update
+    suspend fun updatePurchase(
+        item: DealerPurchaseEntity
+    ): Int
+
+    @Update
+    suspend fun updateSale(
+        item: DealerSaleEntity
+    ): Int
+
+    @Update
+    suspend fun updateCollection(
+        item: DealerCollectionEntity
+    ): Int
+
+    @Update
+    suspend fun updateSupplierPayment(
+        item: DealerSupplierPaymentEntity
+    ): Int
+
+    @Update
+    suspend fun updateSalesReturn(
+        item: DealerSalesReturnEntity
+    ): Int
+
+    @Update
+    suspend fun updatePurchaseReturn(
+        item: DealerPurchaseReturnEntity
+    ): Int
+
     @Query("""
         SELECT *
         FROM dealer_business_companies
@@ -169,6 +199,26 @@ interface DealerBusinessDao {
     fun observeExpenses(
         workspace: String
     ): Flow<List<DealerExpenseEntity>>
+
+    @Query("""
+        SELECT *
+        FROM dealer_business_collections
+        WHERE workspace = :workspace
+        ORDER BY collectedAt DESC, id DESC
+    """)
+    fun observeAllCollections(
+        workspace: String
+    ): Flow<List<DealerCollectionEntity>>
+
+    @Query("""
+        SELECT *
+        FROM dealer_business_supplier_payments
+        WHERE workspace = :workspace
+        ORDER BY paidAt DESC, id DESC
+    """)
+    fun observeAllSupplierPayments(
+        workspace: String
+    ): Flow<List<DealerSupplierPaymentEntity>>
 
     @Query("""
         SELECT *
@@ -411,6 +461,177 @@ interface DealerBusinessDao {
     suspend fun getReturnedPurchaseQuantity(
         purchaseLineId: Long
     ): Int
+
+    @Query("""
+        SELECT *
+        FROM dealer_business_sales
+        WHERE customerId = :customerId
+          AND workspace = :workspace
+        ORDER BY soldAt ASC, id ASC
+    """)
+    suspend fun getSalesForCustomerOnce(
+        customerId: Long,
+        workspace: String
+    ): List<DealerSaleEntity>
+
+    @Query("""
+        SELECT *
+        FROM dealer_business_purchases
+        WHERE companyId = :companyId
+          AND workspace = :workspace
+        ORDER BY purchasedAt ASC, id ASC
+    """)
+    suspend fun getPurchasesForCompanyOnce(
+        companyId: Long,
+        workspace: String
+    ): List<DealerPurchaseEntity>
+
+    @Query("""
+        SELECT *
+        FROM dealer_business_collections
+        WHERE customerId = :customerId
+          AND workspace = :workspace
+        ORDER BY collectedAt ASC, id ASC
+    """)
+    suspend fun getCollectionsForCustomerOnce(
+        customerId: Long,
+        workspace: String
+    ): List<DealerCollectionEntity>
+
+    @Query("""
+        SELECT *
+        FROM dealer_business_supplier_payments
+        WHERE companyId = :companyId
+          AND workspace = :workspace
+        ORDER BY paidAt ASC, id ASC
+    """)
+    suspend fun getSupplierPaymentsForCompanyOnce(
+        companyId: Long,
+        workspace: String
+    ): List<DealerSupplierPaymentEntity>
+
+    @Query("""
+        SELECT COALESCE(SUM(amount), 0)
+        FROM dealer_business_collection_allocations
+        WHERE collectionId = :collectionId
+    """)
+    suspend fun getCollectionAllocated(
+        collectionId: Long
+    ): Double
+
+    @Query("""
+        SELECT COALESCE(SUM(amount), 0)
+        FROM dealer_business_supplier_payment_allocations
+        WHERE paymentId = :paymentId
+    """)
+    suspend fun getSupplierPaymentAllocated(
+        paymentId: Long
+    ): Double
+
+    @Query("""
+        SELECT *
+        FROM dealer_business_collection_allocations
+        WHERE collectionId = :collectionId
+        ORDER BY id
+    """)
+    suspend fun getCollectionAllocationsForCollectionOnce(
+        collectionId: Long
+    ): List<DealerCollectionAllocationEntity>
+
+    @Query("""
+        DELETE FROM dealer_business_collection_allocations
+        WHERE collectionId = :collectionId
+    """)
+    suspend fun deleteCollectionAllocationsByCollection(
+        collectionId: Long
+    )
+
+    @Query("""
+        SELECT *
+        FROM dealer_business_supplier_payment_allocations
+        WHERE paymentId = :paymentId
+        ORDER BY id
+    """)
+    suspend fun getSupplierPaymentAllocationsForPaymentOnce(
+        paymentId: Long
+    ): List<DealerSupplierPaymentAllocationEntity>
+
+    @Query("""
+        DELETE FROM dealer_business_supplier_payment_allocations
+        WHERE paymentId = :paymentId
+    """)
+    suspend fun deleteSupplierPaymentAllocationsByPayment(
+        paymentId: Long
+    )
+
+    @Query("""
+        SELECT COALESCE(SUM(ra.quantity), 0)
+        FROM dealer_business_sales_return_allocations ra
+        INNER JOIN dealer_business_sales_returns r
+            ON r.id = ra.returnId
+        WHERE r.saleLineId = :saleLineId
+          AND ra.saleAllocationId = :saleAllocationId
+    """)
+    suspend fun getReturnedAllocationQuantity(
+        saleLineId: Long,
+        saleAllocationId: Long
+    ): Int
+
+    @Query("""
+        SELECT *
+        FROM dealer_business_collection_allocations
+        WHERE saleId = :saleId
+        ORDER BY id DESC
+    """)
+    suspend fun getCollectionAllocationsForSaleOnce(
+        saleId: Long
+    ): List<DealerCollectionAllocationEntity>
+
+    @Query("""
+        UPDATE dealer_business_collection_allocations
+        SET amount = :amount
+        WHERE id = :allocationId
+    """)
+    suspend fun updateCollectionAllocationAmount(
+        allocationId: Long,
+        amount: Double
+    )
+
+    @Query("""
+        DELETE FROM dealer_business_collection_allocations
+        WHERE id = :allocationId
+    """)
+    suspend fun deleteCollectionAllocationById(
+        allocationId: Long
+    )
+
+    @Query("""
+        SELECT *
+        FROM dealer_business_supplier_payment_allocations
+        WHERE purchaseId = :purchaseId
+        ORDER BY id DESC
+    """)
+    suspend fun getSupplierPaymentAllocationsForPurchaseOnce(
+        purchaseId: Long
+    ): List<DealerSupplierPaymentAllocationEntity>
+
+    @Query("""
+        UPDATE dealer_business_supplier_payment_allocations
+        SET amount = :amount
+        WHERE id = :allocationId
+    """)
+    suspend fun updateSupplierPaymentAllocationAmount(
+        allocationId: Long,
+        amount: Double
+    )
+
+    @Query("""
+        DELETE FROM dealer_business_supplier_payment_allocations
+        WHERE id = :allocationId
+    """)
+    suspend fun deleteSupplierPaymentAllocationById(
+        allocationId: Long
+    )
 
     @Query("""
         UPDATE dealer_business_sales

@@ -183,8 +183,8 @@ internal fun V15DealershipScreen(
     ) {
         Text(
             v15Text(
-                "ডিলারশিপ / ডিস্ট্রিবিউশন",
-                "Dealership / Distribution"
+                "ডিস্ট্রিবিউশন ব্যবসা",
+                "Distribution Business"
             ),
             style =
                 MaterialTheme.typography.headlineSmall,
@@ -877,8 +877,8 @@ internal fun V15DealershipScreen(
         if (receipts.isEmpty()) {
             Text(
                 v15Text(
-                    "এখনো ডিলারশিপ স্টক রিসিভ নেই।",
-                    "No dealership stock receipts yet."
+                    "এখনো ডিস্ট্রিবিউশন স্টক রিসিভ নেই।",
+                    "No distribution stock receipts yet."
                 )
             )
         }

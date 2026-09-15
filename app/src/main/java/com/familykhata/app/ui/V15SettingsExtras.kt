@@ -57,10 +57,14 @@ private const val V15_SETTINGS_PREFS = "hisabi_khata_v14_settings"
 
 private data class ShopTypeChoice(
     val bn: String,
-    val en: String
+    val en: String,
+    val storedValue: String? = null
 ) {
     val display: String
         get() = "$bn / $en"
+
+    val value: String
+        get() = storedValue ?: display
 }
 
 private val V15_SHOP_TYPES = listOf(
@@ -105,7 +109,11 @@ private val V15_SHOP_TYPES = listOf(
     ShopTypeChoice("সার্ভিস ও রিপেয়ার", "Service & Repair"),
     ShopTypeChoice("কোচিং / শিক্ষা প্রতিষ্ঠান", "Coaching / Education"),
     ShopTypeChoice("ডিজিটাল এজেন্সি", "Digital Agency"),
-    ShopTypeChoice("ডিলারশিপ / ডিস্ট্রিবিউশন", "Dealership / Distribution"),
+    ShopTypeChoice(
+        "ডিস্ট্রিবিউশন ব্যবসা",
+        "Distribution Business",
+        "ডিলারশিপ / ডিস্ট্রিবিউশন / Dealership / Distribution"
+    ),
     ShopTypeChoice("লন্ড্রি", "Laundry"),
     ShopTypeChoice("ট্রাভেল / টিকেট", "Travel / Ticket"),
     ShopTypeChoice("কার রেন্টাল", "Car Rental"),
@@ -268,7 +276,13 @@ internal fun V15BusinessProfileDialog(
                                 "Select business type"
                             )
                         } else {
-                            businessType
+                            V15_SHOP_TYPES
+                                .firstOrNull {
+                                    it.value ==
+                                        businessType
+                                }
+                                ?.display
+                                ?: businessType
                         }
                     )
                 }
@@ -406,16 +420,20 @@ private fun V15ShopTypePicker(
                 filtered.forEach { type ->
                     val label = type.display
 
-                    if (current == label) {
+                    if (current == type.value) {
                         Button(
-                            onClick = { onSelect(label) },
+                            onClick = {
+                                onSelect(type.value)
+                            },
                             modifier = Modifier.fillMaxWidth()
                         ) {
                             Text("$label ✓")
                         }
                     } else {
                         OutlinedButton(
-                            onClick = { onSelect(label) },
+                            onClick = {
+                                onSelect(type.value)
+                            },
                             modifier = Modifier.fillMaxWidth()
                         ) {
                             Text(label)

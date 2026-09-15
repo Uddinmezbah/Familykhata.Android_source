@@ -582,33 +582,6 @@ private fun ReminderSwitch(label: String, checked: Boolean, onCheckedChange: (Bo
 }
 
 @Composable
-private fun PlanPurchaseDialog(context: Context, onDismiss: () -> Unit) {
-    var plan by remember { mutableStateOf(v15Text("মাসিক","Monthly")) }
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        title = { Text(v15Text("প্রিমিয়াম প্ল্যান","Premium plan")) },
-        text = {
-            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                listOf(v15Text("মাসিক","Monthly"), v15Text("বার্ষিক","Yearly"), "Lifetime").forEach { item ->
-                    if (plan == item) Button(onClick = { plan = item }, modifier = Modifier.fillMaxWidth()) { Text(item) }
-                    else OutlinedButton(onClick = { plan = item }, modifier = Modifier.fillMaxWidth()) { Text(item) }
-                }
-                Text(v15Text("৩০ দিনের trial শেষে পুরনো ডেটা থাকবে; নতুন Add/Edit সীমিত হবে। $plan প্ল্যানের দাম ও activation পেতে যোগাযোগ করুন।","After the 30-day trial, your existing data remains; new Add/Edit will be limited. Contact us for $plan pricing and activation."), style = MaterialTheme.typography.bodySmall)
-                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                    OutlinedButton(onClick = { purchaseWhatsAppV14(context, plan) }, modifier = Modifier.weight(1f)) { Text("WhatsApp") }
-                    OutlinedButton(onClick = { purchaseSmsV14(context, plan) }, modifier = Modifier.weight(1f)) { Text("SMS") }
-                }
-                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                    OutlinedButton(onClick = { purchaseMessengerV14(context, plan) }, modifier = Modifier.weight(1f)) { Text("Messenger") }
-                    OutlinedButton(onClick = { openUrlV14(context, WEBSITE_URL_V14) }, modifier = Modifier.weight(1f)) { Text("Website") }
-                }
-            }
-        },
-        confirmButton = { TextButton(onClick = onDismiss) { Text(v15Text("বন্ধ","Close")) } }
-    )
-}
-
-@Composable
 private fun PinSettingsDialog(viewModel: FamilyKhataViewModel, onDismiss: () -> Unit) {
     val configured = viewModel.isPinConfigured.value
     var current by remember { mutableStateOf("") }
@@ -645,37 +618,6 @@ private fun PinSettingsDialog(viewModel: FamilyKhataViewModel, onDismiss: () -> 
         },
         dismissButton = { TextButton(onClick = onDismiss) { Text(v15Text("বাতিল","Cancel")) } }
     )
-}
-
-private fun purchaseMessageV14(plan: String) = v15Text("আমি হিসাবী খাতা অ্যাপের $plan প্ল্যান নিতে চাই। পেমেন্ট ও activation নির্দেশনা দিন।","I want the $plan plan for Hisabi Khata. Please send payment and activation instructions.")
-
-private fun purchaseWhatsAppV14(context: Context, plan: String) {
-    openUrlV14(context, "https://wa.me/$SUPPORT_PHONE?text=${Uri.encode(purchaseMessageV14(plan))}")
-}
-
-private fun purchaseSmsV14(context: Context, plan: String) {
-    runCatching {
-        context.startActivity(Intent(Intent.ACTION_SENDTO).apply {
-            data = Uri.parse("smsto:$SUPPORT_PHONE")
-            putExtra("sms_body", purchaseMessageV14(plan))
-        })
-    }
-}
-
-private fun purchaseMessengerV14(context: Context, plan: String) {
-    val message = purchaseMessageV14(plan)
-    runCatching {
-        context.startActivity(Intent(Intent.ACTION_SEND).apply {
-            type = "text/plain"
-            putExtra(Intent.EXTRA_TEXT, message)
-            setPackage("com.facebook.orca")
-        })
-    }.recoverCatching {
-        context.startActivity(Intent.createChooser(Intent(Intent.ACTION_SEND).apply {
-            type = "text/plain"
-            putExtra(Intent.EXTRA_TEXT, message)
-        }, v15Text("যোগাযোগ করুন","Contact")))
-    }
 }
 
 private fun openSupportChooser(context: Context) {

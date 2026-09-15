@@ -216,6 +216,29 @@ class InventoryViewModel(application: Application) : AndroidViewModel(applicatio
         }
     }
 
+    fun updateBatch(
+        batchId: Long,
+        quantity: Int,
+        purchasePrice: Double,
+        purchaseDate: Long,
+        expiryDate: Long?,
+        batchNo: String
+    ) {
+        if (quantity < 0 || purchasePrice < 0) return
+
+        viewModelScope.launch {
+            dao.updateBatch(
+                batchId = batchId,
+                quantity = quantity,
+                purchasePrice =
+                    purchasePrice.coerceAtLeast(0.0),
+                purchaseDate = purchaseDate,
+                expiryDate = expiryDate,
+                batchNo = batchNo.trim()
+            )
+        }
+    }
+
     fun reduceStock(productId: Long, quantity: Int, onDone: (Boolean) -> Unit = {}) {
         if (quantity <= 0) {
             onDone(false)

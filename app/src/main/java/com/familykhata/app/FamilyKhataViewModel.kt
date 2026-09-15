@@ -137,6 +137,37 @@ class FamilyKhataViewModel(application: Application) : AndroidViewModel(applicat
         viewModelScope.launch { dao.deleteTransaction(item) }
     }
 
+    fun updateTransaction(
+        item: TransactionEntity,
+        type: String,
+        amount: Double,
+        category: String,
+        note: String
+    ) {
+        val cleanType = type.trim().uppercase(Locale.US)
+
+        if (
+            !canWriteNow() ||
+            cleanType !in setOf("INCOME", "EXPENSE") ||
+            amount <= 0
+        ) {
+            return
+        }
+
+        viewModelScope.launch {
+            dao.updateTransaction(
+                transactionId = item.id,
+                type = cleanType,
+                amount = amount,
+                category =
+                    category.trim().ifBlank {
+                        "অন্যান্য"
+                    },
+                note = note.trim()
+            )
+        }
+    }
+
     fun addBakiPerson(name: String, phone: String) {
         if (!canWriteNow() || name.isBlank()) return
         val workspace = _selectedWorkspace.value
@@ -190,15 +221,21 @@ class FamilyKhataViewModel(application: Application) : AndroidViewModel(applicat
 
     fun updateBakiEntry(
         item: BakiEntryEntity,
+        action: String,
         amount: Double,
         note: String,
         dueAt: Long?
     ) {
         if (!canWriteNow() || amount <= 0) return
-        val delta = balanceDelta(item.action, amount) ?: return
+
+        val delta =
+            balanceDelta(action, amount)
+                ?: return
+
         viewModelScope.launch {
             dao.updateBakiEntry(
                 entryId = item.id,
+                action = action,
                 amount = amount,
                 balanceDelta = delta,
                 note = note.trim(),
@@ -222,6 +259,25 @@ class FamilyKhataViewModel(application: Application) : AndroidViewModel(applicat
 
     fun observeBakiEntries(personId: Long): Flow<List<BakiEntryEntity>> =
         dao.observeBakiEntries(personId)
+
+    suspend fun loadLedgerStatement(
+        personId: Long,
+        workspace: String,
+        startInclusive: Long,
+        endExclusive: Long
+    ): com.familykhata.app.report.LedgerStatement =
+        kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+            require(workspace in allowedWorkspaces)
+            // One database snapshot prevents mixing a person's details and edited ledger entries.
+            database.withTransaction {
+                val person = requireNotNull(dao.getStatementPerson(personId, workspace)) {
+                    "Ledger no longer exists in this workspace"
+                }
+                com.familykhata.app.report.buildLedgerStatement(
+                    person, dao.getStatementEntries(personId), startInclusive, endExclusive
+                )
+            }
+        }
 
 
 
@@ -277,7 +333,11 @@ class FamilyKhataViewModel(application: Application) : AndroidViewModel(applicat
     }
 
     private fun calculateTrialStatus(now: Long = System.currentTimeMillis()): TrialStatus {
-        val premiumUnlocked = preferences.getBoolean("premium_unlocked", false)
+        val premiumUnlocked =
+            preferences.getBoolean(
+                PremiumBillingManager.KEY_PLAY_PREMIUM_UNLOCKED,
+                false
+            )
         val expiresAt = trialStartedAt + TRIAL_DAYS * DAY_MS
         val remainingMillis = (expiresAt - now).coerceAtLeast(0L)
         val daysRemaining = if (premiumUnlocked) {

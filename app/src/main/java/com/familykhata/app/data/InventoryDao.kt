@@ -144,6 +144,26 @@ interface InventoryDao {
     @Query("UPDATE inventory_batches SET quantity = :quantity WHERE id = :batchId")
     suspend fun updateBatchQuantity(batchId: Long, quantity: Int)
 
+    @Query(
+        """
+        UPDATE inventory_batches
+        SET quantity = :quantity,
+            purchasePrice = :purchasePrice,
+            purchaseDate = :purchaseDate,
+            expiryDate = :expiryDate,
+            batchNo = :batchNo
+        WHERE id = :batchId
+        """
+    )
+    suspend fun updateBatch(
+        batchId: Long,
+        quantity: Int,
+        purchasePrice: Double,
+        purchaseDate: Long,
+        expiryDate: Long?,
+        batchNo: String
+    )
+
     @Delete
     suspend fun deleteBatch(item: StockBatchEntity)
 

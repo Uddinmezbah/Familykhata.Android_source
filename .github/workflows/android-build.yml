@@ -2,7 +2,7 @@ name: Build Play-Ready Android Release
 
 on:
   push:
-    branches: [ "main", "v1.4-test", "v1.5-test" ]
+    branches: [ "main", "v1.4-test", "v1.5-test", "v1.6-test" ]
   workflow_dispatch:
 
 jobs:
@@ -47,7 +47,7 @@ jobs:
         env:
           RELEASE_STORE_FILE: ${{ runner.temp }}/hisabikhata-release.jks
           RELEASE_KEYSTORE_PASSWORD: ${{ secrets.RELEASE_KEYSTORE_PASSWORD }}
-        run: gradle :app:assembleRelease :app:bundleRelease --stacktrace
+        run: gradle :app:testReleaseUnitTest :app:assembleRelease :app:bundleRelease --stacktrace
 
       - name: Verify APK signature
         run: |

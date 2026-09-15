@@ -1,7 +1,9 @@
 package com.familykhata.app.ui
 
 import android.Manifest
+import android.app.Activity
 import android.content.Context
+import android.content.ContextWrapper
 import android.content.Intent
 import android.net.Uri
 import android.os.Build
@@ -31,6 +33,8 @@ import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -44,10 +48,12 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.platform.LocalContext
 import coil.compose.AsyncImage
 import com.familykhata.app.InventoryReminderScheduler
+import com.familykhata.app.PremiumBillingManager
+import com.familykhata.app.PremiumPlan
+import com.android.billingclient.api.BillingClient
 import java.io.File
 
 private const val V15_SETTINGS_PREFS = "hisabi_khata_v14_settings"
-private const val V15_SUPPORT_PHONE = "8801886665676"
 
 private data class ShopTypeChoice(
     val bn: String,
@@ -652,8 +658,23 @@ internal fun V15PremiumDialog(
     onDismiss: () -> Unit
 ) {
     val context = LocalContext.current
+
+    val billingManager =
+        remember(context.applicationContext) {
+            PremiumBillingManager.get(
+                context.applicationContext
+            )
+        }
+
+    val billingState by
+        billingManager.state.collectAsState()
+
     var selectedPlan by remember {
-        mutableStateOf("YEARLY")
+        mutableStateOf(PremiumPlan.YEARLY)
+    }
+
+    LaunchedEffect(Unit) {
+        billingManager.start()
     }
 
     AlertDialog(
@@ -661,7 +682,7 @@ internal fun V15PremiumDialog(
         title = {
             Text(
                 v15Text(
-                    v15Text("হিসাবী খাতা Premium","Hisabi Khata Premium"),
+                    "হিসাবী খাতা Premium",
                     "Hisabi Khata Premium"
                 )
             )
@@ -669,81 +690,146 @@ internal fun V15PremiumDialog(
         text = {
             Column(
                 modifier = Modifier
-                    .heightIn(max = 540.dp)
+                    .heightIn(max = 560.dp)
                     .verticalScroll(rememberScrollState()),
-                verticalArrangement = Arrangement.spacedBy(10.dp)
+                verticalArrangement =
+                    Arrangement.spacedBy(10.dp)
             ) {
                 Surface(
                     modifier = Modifier.fillMaxWidth(),
                     shape = RoundedCornerShape(18.dp),
-                    color = MaterialTheme.colorScheme.primaryContainer
+                    color =
+                        MaterialTheme.colorScheme
+                            .primaryContainer
                 ) {
                     Column(
-                        modifier = Modifier.padding(14.dp)
+                        modifier = Modifier.padding(14.dp),
+                        verticalArrangement =
+                            Arrangement.spacedBy(4.dp)
                     ) {
                         Text(
                             v15Text(
-                                v15Text("৩০ দিন Full Premium Trial","30-day Full Premium Trial"),
+                                "৩০ দিন Full Premium Trial",
                                 "30-day Full Premium Trial"
                             ),
-                            fontWeight = FontWeight.ExtraBold
+                            fontWeight =
+                                FontWeight.ExtraBold
                         )
 
                         Text(
                             v15Text(
-                                v15Text("Trial শেষে আপনার ডেটা থাকবে।","Your data remains after the trial."),
+                                "Trial শেষে আপনার ডেটা থাকবে।",
                                 "Your data remains after the trial."
                             ),
-                            style = MaterialTheme.typography.bodySmall
+                            style =
+                                MaterialTheme.typography.bodySmall
                         )
                     }
                 }
 
-                V15PlanCard(
-                    selected = selectedPlan == "MONTHLY",
-                    title = v15Text("মাসিক", "Monthly"),
-                    price = "৳99",
-                    subtitle = v15Text(
-                        v15Text("১ মাস Premium","1 month Premium"),
-                        "1 month Premium"
-                    )
-                ) {
-                    selectedPlan = "MONTHLY"
+                if (billingState.active) {
+                    Surface(
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = RoundedCornerShape(16.dp),
+                        color =
+                            MaterialTheme.colorScheme
+                                .secondaryContainer
+                    ) {
+                        Column(
+                            modifier =
+                                Modifier.padding(12.dp)
+                        ) {
+                            Text(
+                                if (
+                                    billingState
+                                        .lifetimeActive
+                                ) {
+                                    v15Text(
+                                        "✓ Lifetime Premium সক্রিয়",
+                                        "✓ Lifetime Premium active"
+                                    )
+                                } else {
+                                    v15Text(
+                                        "✓ Premium সক্রিয়",
+                                        "✓ Premium active"
+                                    )
+                                },
+                                fontWeight =
+                                    FontWeight.Bold
+                            )
+
+                            Text(
+                                v15Text(
+                                    "Google Play purchase পাওয়া গেছে।",
+                                    "Google Play purchase found."
+                                ),
+                                style =
+                                    MaterialTheme.typography
+                                        .bodySmall
+                            )
+                        }
+                    }
                 }
 
                 V15PlanCard(
-                    selected = selectedPlan == "YEARLY",
-                    title = v15Text(
-                        v15Text("বার্ষিক • Best Value","Yearly • Best Value"),
-                        "Yearly • Best Value"
-                    ),
-                    price = "৳699",
-                    subtitle = v15Text(
-                        v15Text("প্রায় ৪১% সাশ্রয়","Save about 41%"),
-                        "Save about 41%"
-                    )
+                    selected =
+                        selectedPlan ==
+                            PremiumPlan.MONTHLY,
+                    title =
+                        v15Text("মাসিক", "Monthly"),
+                    price =
+                        billingState.monthlyPrice,
+                    subtitle =
+                        v15Text(
+                            "১ মাস Premium",
+                            "1 month Premium"
+                        )
                 ) {
-                    selectedPlan = "YEARLY"
+                    selectedPlan =
+                        PremiumPlan.MONTHLY
                 }
 
                 V15PlanCard(
-                    selected = selectedPlan == "LIFETIME",
-                    title = v15Text(
-                        "Lifetime • Launch Offer",
-                        "Lifetime • Launch Offer"
-                    ),
-                    price = "৳1,499",
-                    subtitle = v15Text(
-                        "Regular ৳1,999",
-                        "Regular ৳1,999"
-                    )
+                    selected =
+                        selectedPlan ==
+                            PremiumPlan.YEARLY,
+                    title =
+                        v15Text(
+                            "বার্ষিক • Best Value",
+                            "Yearly • Best Value"
+                        ),
+                    price =
+                        billingState.yearlyPrice,
+                    subtitle =
+                        v15Text(
+                            "প্রায় ২৪% সাশ্রয়",
+                            "Save about 24%"
+                        )
                 ) {
-                    selectedPlan = "LIFETIME"
+                    selectedPlan =
+                        PremiumPlan.YEARLY
+                }
+
+                V15PlanCard(
+                    selected =
+                        selectedPlan ==
+                            PremiumPlan.LIFETIME,
+                    title = "Lifetime",
+                    price =
+                        billingState.lifetimePrice,
+                    subtitle =
+                        v15Text(
+                            "একবার কিনলেই স্থায়ী Premium",
+                            "One-time purchase"
+                        )
+                ) {
+                    selectedPlan =
+                        PremiumPlan.LIFETIME
                 }
 
                 Text(
                     v15Text(
-                        v15Text("Premium সুবিধা","Premium features"),
+                        "Premium সুবিধা",
                         "Premium features"
                     ),
                     fontWeight = FontWeight.Bold
@@ -751,72 +837,152 @@ internal fun V15PremiumDialog(
 
                 listOf(
                     v15Text(
-                        v15Text("✓ Unlimited খাতা ও লেনদেন","✓ Unlimited ledgers & transactions"),
-                        "✓ Unlimited ledgers & entries"
+                        "✓ Unlimited খাতা ও লেনদেন",
+                        "✓ Unlimited ledgers & transactions"
                     ),
                     v15Text(
-                        v15Text("✓ Product, stock ও expiry","✓ Products, stock & expiry"),
-                        "✓ Product, stock & expiry"
+                        "✓ Product, stock ও expiry",
+                        "✓ Products, stock & expiry"
                     ),
                     v15Text(
-                        v15Text("✓ Low-stock ও expiry alerts","✓ Low-stock & expiry alerts"),
+                        "✓ Low-stock ও expiry alerts",
                         "✓ Low-stock & expiry alerts"
                     ),
+                    "✓ Backup / Restore / Report",
+                    "✓ PIN lock",
                     v15Text(
-                        "✓ Backup / Restore / Report",
-                        "✓ Backup / Restore / Report"
-                    ),
-                    v15Text(
-                        "✓ PIN lock",
-                        "✓ PIN lock"
-                    ),
-                    v15Text(
-                        v15Text("✓ বাংলা + English","✓ Bangla + English"),
+                        "✓ বাংলা + English",
                         "✓ Bangla + English"
                     )
                 ).forEach {
                     Text(
                         it,
-                        style = MaterialTheme.typography.bodySmall
+                        style =
+                            MaterialTheme.typography.bodySmall
                     )
                 }
 
                 Text(
                     v15Text(
-                        v15Text("কোনো auto-renewal নয়। Activation-এর জন্য যোগাযোগ করুন।","No auto-renewal. Contact us for activation."),
-                        "No auto-renewal. Contact us for activation."
+                        "মাসিক ও বার্ষিক প্ল্যানে auto-renewal নেই। পেমেন্ট Google Play-এর মাধ্যমে হবে।",
+                        "Monthly and yearly plans do not auto-renew. Payment is handled by Google Play."
                     ),
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                    style =
+                        MaterialTheme.typography.bodySmall,
+                    color =
+                        MaterialTheme.colorScheme
+                            .onSurfaceVariant
                 )
 
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp)
-                ) {
-                    Button(
-                        onClick = {
-                            V15PremiumContact.whatsApp(
-                                context,
-                                selectedPlan
-                            )
-                        },
-                        modifier = Modifier.weight(1f)
-                    ) {
-                        Text("WhatsApp")
+                billingState.message
+                    ?.takeIf { it.isNotBlank() }
+                    ?.let { message ->
+                        Text(
+                            message,
+                            style =
+                                MaterialTheme.typography
+                                    .bodySmall,
+                            color =
+                                MaterialTheme.colorScheme
+                                    .onSurfaceVariant
+                        )
                     }
 
-                    OutlinedButton(
-                        onClick = {
-                            V15PremiumContact.sms(
+                Button(
+                    onClick = {
+                        val activity =
+                            context.v15FindActivity()
+
+                        if (activity == null) {
+                            Toast.makeText(
                                 context,
-                                selectedPlan
+                                v15Text(
+                                    "Google Play purchase খোলা যায়নি",
+                                    "Unable to open Google Play purchase"
+                                ),
+                                Toast.LENGTH_SHORT
+                            ).show()
+                        } else {
+                            val result =
+                                billingManager
+                                    .launchPurchase(
+                                        activity,
+                                        selectedPlan
+                                    )
+
+                            if (
+                                result.responseCode !=
+                                BillingClient
+                                    .BillingResponseCode.OK
+                            ) {
+                                Toast.makeText(
+                                    context,
+                                    result.debugMessage
+                                        .ifBlank {
+                                            v15Text(
+                                                "Google Play প্রস্তুত হচ্ছে। আবার চেষ্টা করুন।",
+                                                "Google Play is getting ready. Try again."
+                                            )
+                                        },
+                                    Toast.LENGTH_SHORT
+                                ).show()
+                            }
+                        }
+                    },
+                    enabled =
+                        billingState.ready &&
+                            !billingState.loading &&
+                            !billingState.restoring &&
+                            !billingState.active,
+                    modifier =
+                        Modifier.fillMaxWidth()
+                ) {
+                    Text(
+                        when {
+                            billingState.loading ->
+                                v15Text(
+                                    "Google Play প্রস্তুত হচ্ছে…",
+                                    "Preparing Google Play…"
+                                )
+
+                            billingState.active ->
+                                v15Text(
+                                    "Premium সক্রিয়",
+                                    "Premium active"
+                                )
+
+                            else ->
+                                v15Text(
+                                    "Google Play-এ কিনুন",
+                                    "Buy with Google Play"
+                                )
+                        }
+                    )
+                }
+
+                OutlinedButton(
+                    onClick = {
+                        billingManager.restorePurchases()
+                    },
+                    enabled =
+                        !billingState.loading &&
+                            !billingState.restoring,
+                    modifier =
+                        Modifier.fillMaxWidth()
+                ) {
+                    Text(
+                        if (billingState.restoring) {
+                            v15Text(
+                                "Purchase যাচাই হচ্ছে…",
+                                "Checking purchases…"
                             )
-                        },
-                        modifier = Modifier.weight(1f)
-                    ) {
-                        Text("SMS")
-                    }
+                        } else {
+                            v15Text(
+                                "আগের Purchase Restore করুন",
+                                "Restore purchases"
+                            )
+                        }
+                    )
                 }
             }
         },
@@ -883,60 +1049,10 @@ private fun V15PlanCard(
     }
 }
 
-private object V15PremiumContact {
-
-    fun whatsApp(
-        context: Context,
-        plan: String
-    ) {
-        val message =
-            "Hisabi Khata Premium activation. Plan: $plan"
-
-        val url =
-            "https://wa.me/$V15_SUPPORT_PHONE?text=" +
-                Uri.encode(message)
-
-        runCatching {
-            context.startActivity(
-                Intent(
-                    Intent.ACTION_VIEW,
-                    Uri.parse(url)
-                )
-            )
-        }.onFailure {
-            Toast.makeText(
-                context,
-                v15Text("WhatsApp খোলা যায়নি","Unable to open WhatsApp"),
-                Toast.LENGTH_SHORT
-            ).show()
-        }
+private tailrec fun Context.v15FindActivity(): Activity? =
+    when (this) {
+        is Activity -> this
+        is ContextWrapper ->
+            baseContext.v15FindActivity()
+        else -> null
     }
-
-    fun sms(
-        context: Context,
-        plan: String
-    ) {
-        val intent =
-            Intent(Intent.ACTION_SENDTO).apply {
-                data =
-                    Uri.parse(
-                        "smsto:$V15_SUPPORT_PHONE"
-                    )
-
-                putExtra(
-                    "sms_body",
-                    "Hisabi Khata Premium activation. Plan: $plan"
-                )
-            }
-
-        runCatching {
-            context.startActivity(intent)
-        }.onFailure {
-            Toast.makeText(
-                context,
-                v15Text("SMS app খোলা যায়নি","Unable to open SMS app"),
-                Toast.LENGTH_SHORT
-            ).show()
-        }
-    }
-}

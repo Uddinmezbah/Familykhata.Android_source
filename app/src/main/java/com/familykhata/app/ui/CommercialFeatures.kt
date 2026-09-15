@@ -489,25 +489,30 @@ internal fun PersonManagementActions(
             person.balance < 0 -> v15Text("এই $personLabel-কে আপনি ${V14DisplayState.currencySymbol} ${commercialMoney(abs(person.balance))} দেবেন।","You owe this $personLabel ${V14DisplayState.currencySymbol} ${commercialMoney(abs(person.balance))}.")
             else -> v15Text("এই $personLabel-এর বর্তমান হিসাব সমান।","This $personLabel account is settled.")
         }
-        AlertDialog(
-            onDismissRequest = { showDelete = false },
-            title = { Text(v15Text("$personLabel ডিলিট করবেন?","Delete $personLabel?")) },
-            text = {
-                Text(
-                    v15Text("$balanceWarning\n\n${person.name}-এর সব বাকি/পাওনা এন্ট্রিও স্থায়ীভাবে মুছে যাবে। আগে প্রয়োজন হলে ব্যাকআপ তৈরি করুন।","$balanceWarning\n\nAll due entries for ${person.name} will also be permanently deleted. Create a backup first if needed.")
-                )
+        ProtectedDeleteDialog(
+            viewModel = viewModel,
+            title =
+                v15Text(
+                    "$personLabel ডিলিট করবেন?",
+                    "Delete $personLabel?"
+                ),
+            message =
+                v15Text(
+                    "$balanceWarning\n\n${person.name}-এর সব বাকি/পাওনা এন্ট্রিও স্থায়ীভাবে মুছে যাবে। আগে প্রয়োজন হলে ব্যাকআপ তৈরি করুন।",
+                    "$balanceWarning\n\nAll due entries for ${person.name} will also be permanently deleted. Create a backup first if needed."
+                ),
+            confirmLabel =
+                v15Text(
+                    "স্থায়ীভাবে ডিলিট",
+                    "Delete permanently"
+                ),
+            onDismiss = {
+                showDelete = false
             },
-            confirmButton = {
-                TextButton(
-                    onClick = {
-                        viewModel.deleteBakiPerson(person.id)
-                        showDelete = false
-                        onDeleted()
-                    }
-                ) { Text(v15Text("স্থায়ীভাবে ডিলিট","Delete permanently")) }
-            },
-            dismissButton = {
-                TextButton(onClick = { showDelete = false }) { Text(v15Text("বাতিল","Cancel")) }
+            onConfirmed = {
+                viewModel.deleteBakiPerson(person.id)
+                showDelete = false
+                onDeleted()
             }
         )
     }

@@ -8,6 +8,7 @@ import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -51,11 +52,13 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import com.familykhata.app.FamilyKhataViewModel
+import com.familykhata.app.PremiumBillingManager
 import com.familykhata.app.BusinessMode
 import com.familykhata.app.detectBusinessMode
 import com.familykhata.app.data.BakiEntryEntity
 import com.familykhata.app.data.BakiPersonSummary
 import com.familykhata.app.data.TransactionEntity
+import org.json.JSONObject
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
@@ -89,10 +92,30 @@ private enum class Tab(val label: String) {
 fun FamilyKhataApp(viewModel: FamilyKhataViewModel) {
     var tab by remember { mutableStateOf(Tab.DASHBOARD) }
     var addTypePreset by remember { mutableStateOf("EXPENSE") }
+    var bakiFilterPreset by remember { mutableStateOf("ALL") }
+    var historyFilterPreset by remember { mutableStateOf("ALL") }
     val workspace by viewModel.selectedWorkspace.collectAsState()
     val trialStatus by viewModel.trialStatus.collectAsState()
     val isAppUnlocked by viewModel.isAppUnlocked.collectAsState()
     val appContext = LocalContext.current
+
+    val premiumBillingManager =
+        remember(appContext) {
+            PremiumBillingManager.get(
+                appContext.applicationContext
+            )
+        }
+
+    val premiumBillingState by
+        premiumBillingManager.state.collectAsState()
+
+    LaunchedEffect(Unit) {
+        premiumBillingManager.start()
+    }
+
+    LaunchedEffect(premiumBillingState.active) {
+        viewModel.refreshTrialStatus()
+    }
 
     var appRefreshToken by remember {
         mutableStateOf(0L)
@@ -158,6 +181,15 @@ fun FamilyKhataApp(viewModel: FamilyKhataViewModel) {
                             selected = tab == item,
                             onClick = {
                                 V15DeepNavigationState.clear()
+
+                                if (item == Tab.BAKI) {
+                                    bakiFilterPreset = "ALL"
+                                }
+
+                                if (item == Tab.HISTORY) {
+                                    historyFilterPreset = "ALL"
+                                }
+
                                 tab = item
                             },
                             colors = NavigationBarItemDefaults.colors(
@@ -253,16 +285,94 @@ fun FamilyKhataApp(viewModel: FamilyKhataViewModel) {
                     )
 
                     if (tab == Tab.DASHBOARD) {
-                        Text(
-                            v15Text(
-                                "হিসাবী খাতা",
-                                "Hisabi Khata"
-                            ),
-                            style =
-                                MaterialTheme.typography.headlineMedium,
-                            fontWeight =
-                                FontWeight.ExtraBold
-                        )
+                        Row(
+                            modifier =
+                                Modifier.fillMaxWidth(),
+                            horizontalArrangement =
+                                Arrangement.SpaceBetween,
+                            verticalAlignment =
+                                Alignment.Top
+                        ) {
+                            Text(
+                                v15Text(
+                                    "হিসাবী খাতা",
+                                    "Hisabi Khata"
+                                ),
+                                style =
+                                    MaterialTheme.typography.headlineMedium,
+                                fontWeight =
+                                    FontWeight.ExtraBold
+                            )
+
+                            if (trialStatus.premiumUnlocked) {
+                                Text(
+                                    v15Text(
+                                        "Premium ✓",
+                                        "Premium ✓"
+                                    ),
+                                    style =
+                                        MaterialTheme.typography.labelLarge,
+                                    fontWeight =
+                                        FontWeight.ExtraBold,
+                                    color = IncomeAccent
+                                )
+                            } else {
+                                TextButton(
+                                    onClick = {
+                                        V15DeepNavigationState.clear()
+                                        tab = Tab.MORE
+                                    },
+                                    modifier =
+                                        Modifier.padding(end = 4.dp),
+                                    contentPadding =
+                                        androidx.compose.foundation.layout.PaddingValues(
+                                            0.dp
+                                        )
+                                ) {
+                                    Column(
+                                        horizontalAlignment =
+                                            Alignment.End
+                                    ) {
+                                        Text(
+                                            v15Text(
+                                                "Get Premium",
+                                                "Get Premium"
+                                            ),
+                                            fontWeight =
+                                                FontWeight.ExtraBold,
+                                            color =
+                                                if (trialStatus.expired)
+                                                    ExpenseAccent
+                                                else
+                                                    workspaceAccent(
+                                                        workspace
+                                                    )
+                                        )
+
+                                        Text(
+                                            if (trialStatus.expired) {
+                                                v15Text(
+                                                    "Trial শেষ",
+                                                    "Trial ended"
+                                                )
+                                            } else {
+                                                v15Text(
+                                                    "${trialStatus.daysRemaining} দিন বাকি",
+                                                    "${trialStatus.daysRemaining} days left"
+                                                )
+                                            },
+                                            style =
+                                                MaterialTheme.typography.labelSmall,
+                                            color =
+                                                MaterialTheme.colorScheme
+                                                    .onSurfaceVariant,
+                                            textAlign =
+                                                TextAlign.End
+                                        )
+                                    }
+                                }
+                            }
+                        }
 
                         Spacer(
                             Modifier.height(8.dp)
@@ -305,8 +415,30 @@ fun FamilyKhataApp(viewModel: FamilyKhataViewModel) {
                                 addTypePreset = "EXPENSE"
                                 tab = Tab.ADD
                             },
-                            onLedger = { tab = Tab.BAKI },
-                            onHistory = { tab = Tab.HISTORY }
+                            onLedger = {
+                                bakiFilterPreset = "ALL"
+                                tab = Tab.BAKI
+                            },
+                            onReceivable = {
+                                bakiFilterPreset = "RECEIVABLE"
+                                tab = Tab.BAKI
+                            },
+                            onPayable = {
+                                bakiFilterPreset = "PAYABLE"
+                                tab = Tab.BAKI
+                            },
+                            onHistory = {
+                                historyFilterPreset = "ALL"
+                                tab = Tab.HISTORY
+                            },
+                            onIncomeHistory = {
+                                historyFilterPreset = "INCOME"
+                                tab = Tab.HISTORY
+                            },
+                            onExpenseHistory = {
+                                historyFilterPreset = "EXPENSE"
+                                tab = Tab.HISTORY
+                            }
                         )
                         Tab.ADD -> AddTransactionScreen(
                             viewModel = viewModel,
@@ -318,6 +450,7 @@ fun FamilyKhataApp(viewModel: FamilyKhataViewModel) {
                             viewModel = viewModel,
                             workspace = workspace,
                             canWrite = !trialStatus.expired,
+                            initialFilter = bakiFilterPreset,
                             onExit = { tab = Tab.DASHBOARD }
                         )
                         Tab.PRODUCTS -> {
@@ -420,7 +553,13 @@ fun FamilyKhataApp(viewModel: FamilyKhataViewModel) {
                                     )
                             }
                         }
-                        Tab.HISTORY -> HistoryScreen(viewModel, workspace)
+                        Tab.HISTORY ->
+                            HistoryScreen(
+                                viewModel = viewModel,
+                                workspace = workspace,
+                                canWrite = !trialStatus.expired,
+                                initialFilter = historyFilterPreset
+                            )
                         Tab.MORE -> MoreScreen(viewModel)
                     }
                 }
@@ -594,7 +733,11 @@ private fun DashboardScreen(
     onCashIn: () -> Unit,
     onCashOut: () -> Unit,
     onLedger: () -> Unit,
-    onHistory: () -> Unit
+    onReceivable: () -> Unit,
+    onPayable: () -> Unit,
+    onHistory: () -> Unit,
+    onIncomeHistory: () -> Unit,
+    onExpenseHistory: () -> Unit
 ) {
     val totals by viewModel.totals.collectAsState()
     val bakiPeople by viewModel.bakiPeople.collectAsState()
@@ -615,7 +758,11 @@ private fun DashboardScreen(
             onCashIn = onCashIn,
             onCashOut = onCashOut,
             onLedger = onLedger,
-            onHistory = onHistory
+            onReceivable = onReceivable,
+            onPayable = onPayable,
+            onHistory = onHistory,
+            onIncomeHistory = onIncomeHistory,
+            onExpenseHistory = onExpenseHistory
         )
         return
     }
@@ -627,7 +774,10 @@ private fun DashboardScreen(
         verticalArrangement = Arrangement.spacedBy(12.dp)
     ) {
         Surface(
-            modifier = Modifier.fillMaxWidth(),
+            modifier =
+                Modifier
+                    .fillMaxWidth()
+                    .clickable { onHistory() },
             shape = RoundedCornerShape(24.dp),
             color = accent
         ) {
@@ -662,13 +812,15 @@ private fun DashboardScreen(
                 title = v15Text("মোট আয়", "Total income"),
                 amount = totals.income,
                 modifier = Modifier.weight(1f),
-                accentColor = IncomeAccent
+                accentColor = IncomeAccent,
+                onClick = onIncomeHistory
             )
             MetricCard(
                 title = v15Text("মোট খরচ", "Total expense"),
                 amount = totals.expense,
                 modifier = Modifier.weight(1f),
-                accentColor = ExpenseAccent
+                accentColor = ExpenseAccent,
+                onClick = onExpenseHistory
             )
         }
 
@@ -680,13 +832,15 @@ private fun DashboardScreen(
                 title = v15Text("পাবো", "Receivable"),
                 amount = receivable,
                 modifier = Modifier.weight(1f),
-                accentColor = ReceivableAccent
+                accentColor = ReceivableAccent,
+                onClick = onReceivable
             )
             MetricCard(
                 title = v15Text("দেবো", "Payable"),
                 amount = payable,
                 modifier = Modifier.weight(1f),
-                accentColor = PayableAccent
+                accentColor = PayableAccent,
+                onClick = onPayable
             )
         }
 
@@ -726,7 +880,11 @@ private fun BusinessDashboard(
     onCashIn: () -> Unit,
     onCashOut: () -> Unit,
     onLedger: () -> Unit,
-    onHistory: () -> Unit
+    onReceivable: () -> Unit,
+    onPayable: () -> Unit,
+    onHistory: () -> Unit,
+    onIncomeHistory: () -> Unit,
+    onExpenseHistory: () -> Unit
 ) {
     Column(
         modifier = Modifier
@@ -736,7 +894,10 @@ private fun BusinessDashboard(
         verticalArrangement = Arrangement.spacedBy(12.dp)
     ) {
         Surface(
-            modifier = Modifier.fillMaxWidth(),
+            modifier =
+                Modifier
+                    .fillMaxWidth()
+                    .clickable { onHistory() },
             shape = RoundedCornerShape(24.dp),
             color = ShopAccent
         ) {
@@ -771,13 +932,15 @@ private fun BusinessDashboard(
                 title = v15Text("মোট ক্যাশ ইন", "Total cash in"),
                 amount = income,
                 modifier = Modifier.weight(1f),
-                accentColor = IncomeAccent
+                accentColor = IncomeAccent,
+                onClick = onIncomeHistory
             )
             MetricCard(
                 title = v15Text("মোট ক্যাশ আউট", "Total cash out"),
                 amount = expense,
                 modifier = Modifier.weight(1f),
-                accentColor = ExpenseAccent
+                accentColor = ExpenseAccent,
+                onClick = onExpenseHistory
             )
         }
 
@@ -789,13 +952,15 @@ private fun BusinessDashboard(
                 title = v15Text("পাবো", "Receivable"),
                 amount = receivable,
                 modifier = Modifier.weight(1f),
-                accentColor = ReceivableAccent
+                accentColor = ReceivableAccent,
+                onClick = onReceivable
             )
             MetricCard(
                 title = v15Text("দেবো", "Payable"),
                 amount = payable,
                 modifier = Modifier.weight(1f),
-                accentColor = PayableAccent
+                accentColor = PayableAccent,
+                onClick = onPayable
             )
         }
 
@@ -855,7 +1020,10 @@ private fun BusinessDashboard(
         }
 
         Surface(
-            modifier = Modifier.fillMaxWidth(),
+            modifier =
+                Modifier
+                    .fillMaxWidth()
+                    .clickable { onLedger() },
             shape = RoundedCornerShape(18.dp),
             color = ShopAccent.copy(alpha = 0.09f)
         ) {
@@ -930,10 +1098,16 @@ private fun MetricCard(
     title: String,
     amount: Double,
     modifier: Modifier = Modifier,
-    accentColor: Color = NeutralAccent
+    accentColor: Color = NeutralAccent,
+    onClick: (() -> Unit)? = null
 ) {
     Surface(
-        modifier = modifier,
+        modifier =
+            if (onClick != null) {
+                modifier.clickable { onClick.invoke() }
+            } else {
+                modifier
+            },
         shape = RoundedCornerShape(20.dp),
         color = accentColor.copy(alpha = 0.12f),
         border = BorderStroke(1.dp, accentColor.copy(alpha = 0.22f))
@@ -1103,36 +1277,157 @@ private fun TransactionTypeCard(
 }
 
 @Composable
-private fun HistoryScreen(viewModel: FamilyKhataViewModel, workspace: String) {
-    val transactions by viewModel.transactions.collectAsState()
-    val isBusiness = workspace == "SHOP"
+private fun HistoryScreen(
+    viewModel: FamilyKhataViewModel,
+    workspace: String,
+    canWrite: Boolean,
+    initialFilter: String
+) {
+    val transactions by
+        viewModel.transactions.collectAsState()
+
+    val isBusiness =
+        workspace == "SHOP"
+
+    var typeFilter by remember(initialFilter) {
+        mutableStateOf(initialFilter)
+    }
+
+    val filteredTransactions =
+        transactions.filter { item ->
+            when (typeFilter) {
+                "INCOME" -> item.type == "INCOME"
+                "EXPENSE" -> item.type == "EXPENSE"
+                else -> true
+            }
+        }
 
     if (transactions.isEmpty()) {
-        Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+        Column(
+            verticalArrangement =
+                Arrangement.spacedBy(6.dp)
+        ) {
             Text(
-                if (isBusiness) v15Text("ব্যবসার লেনদেন", "Business transactions") else v15Text("আয়-খরচের ইতিহাস", "Income & expense history"),
-                style = MaterialTheme.typography.titleMedium,
-                fontWeight = FontWeight.Bold
+                if (isBusiness)
+                    v15Text(
+                        "ব্যবসার লেনদেন",
+                        "Business transactions"
+                    )
+                else
+                    v15Text(
+                        "আয়-খরচের ইতিহাস",
+                        "Income & expense history"
+                    ),
+                style =
+                    MaterialTheme.typography.titleMedium,
+                fontWeight =
+                    FontWeight.Bold
             )
-            Text(if (isBusiness) v15Text("এখনও কোনো ক্যাশ লেনদেন যোগ করা হয়নি।", "No cash transaction has been added yet.") else v15Text("এখনও কোনো আয়/খরচ যোগ করা হয়নি।", "No income or expense has been added yet."))
+
+            Text(
+                if (isBusiness)
+                    v15Text(
+                        "এখনও কোনো ক্যাশ লেনদেন যোগ করা হয়নি।",
+                        "No cash transaction has been added yet."
+                    )
+                else
+                    v15Text(
+                        "এখনও কোনো আয়/খরচ যোগ করা হয়নি।",
+                        "No income or expense has been added yet."
+                    )
+            )
         }
+
         return
     }
 
-    LazyColumn(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+    LazyColumn(
+        verticalArrangement =
+            Arrangement.spacedBy(8.dp)
+    ) {
         item {
             Text(
-                if (isBusiness) v15Text("ব্যবসার লেনদেন", "Business transactions") else v15Text("আয়-খরচের ইতিহাস", "Income & expense history"),
-                style = MaterialTheme.typography.titleMedium,
-                fontWeight = FontWeight.Bold
+                if (isBusiness)
+                    v15Text(
+                        "ব্যবসার লেনদেন",
+                        "Business transactions"
+                    )
+                else
+                    v15Text(
+                        "আয়-খরচের ইতিহাস",
+                        "Income & expense history"
+                    ),
+                style =
+                    MaterialTheme.typography.titleMedium,
+                fontWeight =
+                    FontWeight.Bold
             )
         }
-        items(transactions, key = { it.id }) { item ->
-            TransactionRow(
-                item = item,
-                isBusiness = isBusiness,
-                onDelete = { viewModel.deleteTransaction(item) }
-            )
+
+        item {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement =
+                    Arrangement.spacedBy(6.dp)
+            ) {
+                listOf(
+                    "ALL" to v15Text("সব", "All"),
+                    "INCOME" to
+                        if (isBusiness)
+                            v15Text("ক্যাশ ইন", "Cash in")
+                        else
+                            v15Text("আয়", "Income"),
+                    "EXPENSE" to
+                        if (isBusiness)
+                            v15Text("ক্যাশ আউট", "Cash out")
+                        else
+                            v15Text("খরচ", "Expense")
+                ).forEach { (value, label) ->
+                    OutlinedButton(
+                        onClick = { typeFilter = value },
+                        modifier = Modifier.weight(1f)
+                    ) {
+                        Text(
+                            label,
+                            fontWeight =
+                                if (typeFilter == value)
+                                    FontWeight.ExtraBold
+                                else
+                                    FontWeight.Normal,
+                            textAlign = TextAlign.Center
+                        )
+                    }
+                }
+            }
+        }
+
+        if (filteredTransactions.isEmpty()) {
+            item {
+                Text(
+                    v15Text(
+                        "এই ধরনের কোনো লেনদেন পাওয়া যায়নি।",
+                        "No transactions found for this filter."
+                    ),
+                    color =
+                        MaterialTheme.colorScheme
+                            .onSurfaceVariant
+                )
+            }
+        } else {
+            items(
+                filteredTransactions,
+                key = { it.id }
+            ) { item ->
+                TransactionRow(
+                    item = item,
+                    isBusiness = isBusiness,
+                    canWrite = canWrite,
+                    viewModel = viewModel,
+                    onDelete = {
+                        viewModel.deleteTransaction(item)
+                    }
+                )
+            }
         }
     }
 }
@@ -1141,51 +1436,428 @@ private fun HistoryScreen(viewModel: FamilyKhataViewModel, workspace: String) {
 private fun TransactionRow(
     item: TransactionEntity,
     isBusiness: Boolean,
+    canWrite: Boolean,
+    viewModel: FamilyKhataViewModel,
     onDelete: () -> Unit
 ) {
-    val accent = if (item.type == "INCOME") IncomeAccent else ExpenseAccent
+    val accent =
+        if (item.type == "INCOME")
+            IncomeAccent
+        else
+            ExpenseAccent
+
+    var showEdit by remember(
+        item.id,
+        item.type,
+        item.amount,
+        item.category,
+        item.note
+    ) {
+        mutableStateOf(false)
+    }
+
+    var showDelete by remember(item.id) {
+        mutableStateOf(false)
+    }
+
     Card(
-        modifier = Modifier.fillMaxWidth(),
-        colors = CardDefaults.cardColors(
-            containerColor = accent.copy(alpha = 0.09f)
-        ),
-        border = BorderStroke(1.dp, accent.copy(alpha = 0.20f))
+        modifier =
+            Modifier.fillMaxWidth(),
+        colors =
+            CardDefaults.cardColors(
+                containerColor =
+                    accent.copy(alpha = 0.09f)
+            ),
+        border =
+            BorderStroke(
+                1.dp,
+                accent.copy(alpha = 0.20f)
+            )
     ) {
         Column(
-            modifier = Modifier.padding(14.dp),
-            verticalArrangement = Arrangement.spacedBy(3.dp)
+            modifier =
+                Modifier.padding(14.dp),
+            verticalArrangement =
+                Arrangement.spacedBy(5.dp)
         ) {
-            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+            Row(
+                Modifier.fillMaxWidth(),
+                horizontalArrangement =
+                    Arrangement.SpaceBetween
+            ) {
                 Text(
                     if (isBusiness) {
-                        if (item.type == "INCOME") v15Text("ক্যাশ ইন", "Cash in") else v15Text("ক্যাশ আউট", "Cash out")
+                        if (item.type == "INCOME")
+                            v15Text(
+                                "ক্যাশ ইন",
+                                "Cash in"
+                            )
+                        else
+                            v15Text(
+                                "ক্যাশ আউট",
+                                "Cash out"
+                            )
                     } else {
-                        if (item.type == "INCOME") v15Text("আয়", "Income") else v15Text("খরচ", "Expense")
+                        if (item.type == "INCOME")
+                            v15Text(
+                                "আয়",
+                                "Income"
+                            )
+                        else
+                            v15Text(
+                                "খরচ",
+                                "Expense"
+                            )
                     },
-                    fontWeight = FontWeight.Bold,
+                    fontWeight =
+                        FontWeight.Bold,
                     color = accent
                 )
+
                 Text(
                     "${V14DisplayState.currencySymbol} ${money(item.amount)}",
-                    fontWeight = FontWeight.ExtraBold,
+                    fontWeight =
+                        FontWeight.ExtraBold,
                     color = accent
                 )
             }
-            Text(item.category, fontWeight = FontWeight.SemiBold)
+
+            Text(
+                item.category,
+                fontWeight =
+                    FontWeight.SemiBold
+            )
+
             if (item.note.isNotBlank()) {
                 Text(
                     item.note,
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                    style =
+                        MaterialTheme.typography.bodySmall,
+                    color =
+                        MaterialTheme.colorScheme
+                            .onSurfaceVariant
                 )
             }
+
             Text(
                 formatDate(item.createdAt),
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
+                style =
+                    MaterialTheme.typography.bodySmall,
+                color =
+                    MaterialTheme.colorScheme
+                        .onSurfaceVariant
             )
-            TextButton(onClick = onDelete) { Text(v15Text("মুছুন", "Delete")) }
+
+            if (canWrite) {
+                Row(
+                    modifier =
+                        Modifier.fillMaxWidth(),
+                    horizontalArrangement =
+                        Arrangement.spacedBy(8.dp)
+                ) {
+                    OutlinedButton(
+                        onClick = {
+                            showEdit = true
+                        },
+                        modifier =
+                            Modifier.weight(1f)
+                    ) {
+                        Text(
+                            v15Text(
+                                "এডিট",
+                                "Edit"
+                            )
+                        )
+                    }
+
+                    OutlinedButton(
+                        onClick = {
+                            showDelete = true
+                        },
+                        modifier =
+                            Modifier.weight(1f)
+                    ) {
+                        Text(
+                            v15Text(
+                                "মুছুন",
+                                "Delete"
+                            )
+                        )
+                    }
+                }
+            }
         }
+    }
+
+    if (showDelete) {
+        ProtectedDeleteDialog(
+            viewModel = viewModel,
+            title =
+                v15Text(
+                    "লেনদেন মুছবেন?",
+                    "Delete transaction?"
+                ),
+            message =
+                v15Text(
+                    "এই লেনদেন স্থায়ীভাবে মুছে যাবে।",
+                    "This transaction will be permanently deleted."
+                ),
+            confirmLabel =
+                v15Text(
+                    "মুছুন",
+                    "Delete"
+                ),
+            onDismiss = {
+                showDelete = false
+            },
+            onConfirmed = {
+                onDelete()
+                showDelete = false
+            }
+        )
+    }
+
+    if (showEdit) {
+        var type by remember(
+            item.id,
+            item.type
+        ) {
+            mutableStateOf(item.type)
+        }
+
+        var amount by remember(
+            item.id,
+            item.amount
+        ) {
+            mutableStateOf(
+                money(item.amount)
+            )
+        }
+
+        var category by remember(
+            item.id,
+            item.category
+        ) {
+            mutableStateOf(item.category)
+        }
+
+        var note by remember(
+            item.id,
+            item.note
+        ) {
+            mutableStateOf(item.note)
+        }
+
+        var error by remember {
+            mutableStateOf<String?>(null)
+        }
+
+        AlertDialog(
+            onDismissRequest = {
+                showEdit = false
+            },
+            title = {
+                Text(
+                    if (isBusiness)
+                        v15Text(
+                            "ক্যাশ লেনদেন এডিট",
+                            "Edit cash transaction"
+                        )
+                    else
+                        v15Text(
+                            "আয়/খরচ এডিট",
+                            "Edit income/expense"
+                        )
+                )
+            },
+            text = {
+                Column(
+                    verticalArrangement =
+                        Arrangement.spacedBy(8.dp)
+                ) {
+                    Text(
+                        v15Text(
+                            "লেনদেনের ধরন",
+                            "Transaction type"
+                        ),
+                        fontWeight =
+                            FontWeight.Bold
+                    )
+
+                    Row(
+                        modifier =
+                            Modifier.fillMaxWidth(),
+                        horizontalArrangement =
+                            Arrangement.spacedBy(8.dp)
+                    ) {
+                        OutlinedButton(
+                            onClick = {
+                                type = "INCOME"
+                                error = null
+                            },
+                            modifier =
+                                Modifier.weight(1f)
+                        ) {
+                            Text(
+                                (
+                                    if (type == "INCOME")
+                                        "✓ "
+                                    else
+                                        ""
+                                ) +
+                                    if (isBusiness)
+                                        v15Text(
+                                            "ক্যাশ ইন",
+                                            "Cash in"
+                                        )
+                                    else
+                                        v15Text(
+                                            "আয়",
+                                            "Income"
+                                        )
+                            )
+                        }
+
+                        OutlinedButton(
+                            onClick = {
+                                type = "EXPENSE"
+                                error = null
+                            },
+                            modifier =
+                                Modifier.weight(1f)
+                        ) {
+                            Text(
+                                (
+                                    if (type == "EXPENSE")
+                                        "✓ "
+                                    else
+                                        ""
+                                ) +
+                                    if (isBusiness)
+                                        v15Text(
+                                            "ক্যাশ আউট",
+                                            "Cash out"
+                                        )
+                                    else
+                                        v15Text(
+                                            "খরচ",
+                                            "Expense"
+                                        )
+                            )
+                        }
+                    }
+
+                    OutlinedTextField(
+                        value = amount,
+                        onValueChange = {
+                            amount = it
+                            error = null
+                        },
+                        label = {
+                            Text(
+                                v15Text(
+                                    "টাকার পরিমাণ",
+                                    "Amount"
+                                )
+                            )
+                        },
+                        singleLine = true,
+                        modifier =
+                            Modifier.fillMaxWidth()
+                    )
+
+                    OutlinedTextField(
+                        value = category,
+                        onValueChange = {
+                            category = it
+                        },
+                        label = {
+                            Text(
+                                v15Text(
+                                    "ক্যাটাগরি",
+                                    "Category"
+                                )
+                            )
+                        },
+                        singleLine = true,
+                        modifier =
+                            Modifier.fillMaxWidth()
+                    )
+
+                    OutlinedTextField(
+                        value = note,
+                        onValueChange = {
+                            note = it
+                        },
+                        label = {
+                            Text(
+                                v15Text(
+                                    "নোট",
+                                    "Note"
+                                )
+                            )
+                        },
+                        modifier =
+                            Modifier.fillMaxWidth()
+                    )
+
+                    error?.let {
+                        Text(
+                            it,
+                            color =
+                                MaterialTheme.colorScheme.error
+                        )
+                    }
+                }
+            },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        val parsed =
+                            parseAmount(amount)
+
+                        if (parsed == null) {
+                            error =
+                                v15Text(
+                                    "সঠিক টাকার পরিমাণ লিখুন",
+                                    "Enter a valid amount"
+                                )
+                        } else {
+                            viewModel.updateTransaction(
+                                item = item,
+                                type = type,
+                                amount = parsed,
+                                category = category,
+                                note = note
+                            )
+
+                            showEdit = false
+                        }
+                    }
+                ) {
+                    Text(
+                        v15Text(
+                            "সেভ করুন",
+                            "Save"
+                        )
+                    )
+                }
+            },
+            dismissButton = {
+                TextButton(
+                    onClick = {
+                        showEdit = false
+                    }
+                ) {
+                    Text(
+                        v15Text(
+                            "বাতিল",
+                            "Cancel"
+                        )
+                    )
+                }
+            }
+        )
     }
 }
 
@@ -1194,11 +1866,13 @@ private fun BakiScreen(
     viewModel: FamilyKhataViewModel,
     workspace: String,
     canWrite: Boolean,
+    initialFilter: String,
     onExit: () -> Unit
 ) {
     val people by viewModel.bakiPeople.collectAsState()
     var selectedId by remember { mutableStateOf<Long?>(null) }
     val selected = selectedId?.let { id -> people.firstOrNull { it.id == id } }
+    var showStatement by remember(selectedId) { mutableStateOf(false) }
 
     TrackV15DeepScreen(
         owner = "baki-ledger",
@@ -1214,7 +1888,16 @@ private fun BakiScreen(
             viewModel = viewModel,
             workspace = workspace,
             canWrite = canWrite,
+            initialFilter = initialFilter,
             onSelect = { selectedId = it.id }
+        )
+    } else if (showStatement) {
+        LedgerStatementScreen(
+            personId = selected.id,
+            personName = selected.name,
+            workspace = workspace,
+            viewModel = viewModel,
+            onBack = { showStatement = false }
         )
     } else {
         V15DeepScreenContainer(
@@ -1228,6 +1911,7 @@ private fun BakiScreen(
                 viewModel = viewModel,
                 workspace = workspace,
                 canWrite = canWrite,
+                onStatement = { showStatement = true },
                 onBack = {
                     selectedId = null
                 }
@@ -1242,9 +1926,13 @@ private fun BakiPeopleScreen(
     viewModel: FamilyKhataViewModel,
     workspace: String,
     canWrite: Boolean,
+    initialFilter: String,
     onSelect: (BakiPersonSummary) -> Unit
 ) {
     var query by remember { mutableStateOf("") }
+    var balanceFilter by remember(initialFilter) {
+        mutableStateOf(initialFilter)
+    }
     var showAdd by remember { mutableStateOf(false) }
     val personLabel = if (workspace == "SHOP") v15Text("কাস্টমার/সাপ্লায়ার", "Customer/Supplier") else v15Text("ব্যক্তি", "Person")
     val sectionTitle = if (workspace == "SHOP") v15Text("কাস্টমার/সাপ্লায়ার", "Customers & Suppliers") else v15Text("বাকি/পাওনা", "Due Accounts")
@@ -1273,8 +1961,48 @@ private fun BakiPeopleScreen(
             modifier = Modifier.fillMaxWidth()
         )
 
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(6.dp)
+        ) {
+            listOf(
+                "ALL" to v15Text("সব", "All"),
+                "RECEIVABLE" to v15Text("পাবো", "Receivable"),
+                "PAYABLE" to v15Text("দেবো", "Payable")
+            ).forEach { (value, label) ->
+                OutlinedButton(
+                    onClick = { balanceFilter = value },
+                    modifier = Modifier.weight(1f)
+                ) {
+                    Text(
+                        label,
+                        fontWeight =
+                            if (balanceFilter == value)
+                                FontWeight.ExtraBold
+                            else
+                                FontWeight.Normal
+                    )
+                }
+            }
+        }
+
         val filteredPeople = people.filter { person ->
-            query.isBlank() || person.name.contains(query, ignoreCase = true) || person.phone.contains(query)
+            val matchesQuery =
+                query.isBlank() ||
+                    person.name.contains(
+                        query,
+                        ignoreCase = true
+                    ) ||
+                    person.phone.contains(query)
+
+            val matchesBalance =
+                when (balanceFilter) {
+                    "RECEIVABLE" -> person.balance > 0
+                    "PAYABLE" -> person.balance < 0
+                    else -> true
+                }
+
+            matchesQuery && matchesBalance
         }
         if (filteredPeople.isEmpty()) {
             Text(v15Text("কোনো $personLabel পাওয়া যায়নি।", "No $personLabel found."))
@@ -1355,6 +2083,7 @@ private fun BakiEntryScreen(
     viewModel: FamilyKhataViewModel,
     workspace: String,
     canWrite: Boolean,
+    onStatement: () -> Unit,
     onBack: () -> Unit
 ) {
     val context = LocalContext.current
@@ -1398,6 +2127,10 @@ private fun BakiEntryScreen(
                 fontWeight = FontWeight.Bold,
                 color = balanceTone
             )
+        }
+
+        OutlinedButton(onClick = onStatement, modifier = Modifier.fillMaxWidth()) {
+            Text(v15Text("PDF হিসাব বিবরণী", "PDF ledger statement"))
         }
 
         PersonManagementActions(
@@ -1487,25 +2220,30 @@ private fun BakiEntryScreen(
     }
 
     pendingDelete?.let { entry ->
-        AlertDialog(
-            onDismissRequest = { pendingDelete = null },
-            title = { Text(v15Text("এন্ট্রি মুছবেন?", "Delete entry?")) },
-            text = {
-                Text(
-                    "${actionLabel(entry.action)} — ${V14DisplayState.currencySymbol} ${money(entry.amount)}\n" +
-                        v15Text("মুছে দিলে ব্যক্তির বর্তমান হিসাবও স্বয়ংক্রিয়ভাবে বদলে যাবে।", "Deleting this entry will automatically update the current balance.")
-                )
+        ProtectedDeleteDialog(
+            viewModel = viewModel,
+            title =
+                v15Text(
+                    "এন্ট্রি মুছবেন?",
+                    "Delete entry?"
+                ),
+            message =
+                "${actionLabel(entry.action)} — ${V14DisplayState.currencySymbol} ${money(entry.amount)}\n" +
+                    v15Text(
+                        "মুছে দিলে ব্যক্তির বর্তমান হিসাবও স্বয়ংক্রিয়ভাবে বদলে যাবে।",
+                        "Deleting this entry will automatically update the current balance."
+                    ),
+            confirmLabel =
+                v15Text(
+                    "মুছুন",
+                    "Delete"
+                ),
+            onDismiss = {
+                pendingDelete = null
             },
-            confirmButton = {
-                TextButton(
-                    onClick = {
-                        viewModel.deleteBakiEntry(entry)
-                        pendingDelete = null
-                    }
-                ) { Text(v15Text("মুছুন", "Delete")) }
-            },
-            dismissButton = {
-                TextButton(onClick = { pendingDelete = null }) { Text(v15Text("বাতিল", "Cancel")) }
+            onConfirmed = {
+                viewModel.deleteBakiEntry(entry)
+                pendingDelete = null
             }
         )
     }
@@ -1601,8 +2339,43 @@ private fun ActionButton(
 @Composable
 private fun MoreScreen(viewModel: FamilyKhataViewModel) {
     val context = LocalContext.current
+    val backupPrefs = remember(context) {
+        context.getSharedPreferences(
+            "hisabi_khata_backup_meta",
+            Context.MODE_PRIVATE
+        )
+    }
+
+    var lastBackupAt by remember {
+        mutableStateOf(
+            backupPrefs.getLong(
+                "last_successful_backup_at",
+                0L
+            )
+        )
+    }
+
     var backupJson by remember { mutableStateOf<String?>(null) }
     var pendingRestoreJson by remember { mutableStateOf<String?>(null) }
+
+    val backupReminderNeeded =
+        lastBackupAt == 0L ||
+            (
+                System.currentTimeMillis() - lastBackupAt
+            ).coerceAtLeast(0L) >= 7L * 24L * 60L * 60L * 1000L
+
+    val lastBackupText =
+        if (lastBackupAt > 0L) {
+            SimpleDateFormat(
+                "dd MMM yyyy, h:mm a",
+                Locale.getDefault()
+            ).format(Date(lastBackupAt))
+        } else {
+            v15Text(
+                "এখনও কোনো সফল ব্যাকআপ নেই",
+                "No successful backup yet"
+            )
+        }
 
     val createBackupFile = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.CreateDocument("application/json")
@@ -1615,7 +2388,22 @@ private fun MoreScreen(viewModel: FamilyKhataViewModel) {
                     writer.write(json)
                 } ?: error(v15Text("ফাইল লেখা যায়নি", "Unable to write file"))
             }.onSuccess {
-                toast(context, v15Text("ব্যাকআপ সেভ হয়েছে", "Backup saved"))
+                val savedAt = System.currentTimeMillis()
+                backupPrefs.edit()
+                    .putLong(
+                        "last_successful_backup_at",
+                        savedAt
+                    )
+                    .apply()
+                lastBackupAt = savedAt
+
+                toast(
+                    context,
+                    v15Text(
+                        "ব্যাকআপ সেভ হয়েছে",
+                        "Backup saved"
+                    )
+                )
             }.onFailure {
                 toast(context, it.message ?: v15Text("ব্যাকআপ সেভ করা যায়নি", "Unable to save backup"))
             }
@@ -1631,7 +2419,39 @@ private fun MoreScreen(viewModel: FamilyKhataViewModel) {
                     reader.readText()
                 } ?: error(v15Text("ফাইল পড়া যায়নি", "Unable to read file"))
             }.onSuccess { json ->
-                pendingRestoreJson = json
+                runCatching {
+                    val root = JSONObject(json)
+
+                    require(
+                        root.optString("format") ==
+                            "hisabi-khata-backup"
+                    ) {
+                        v15Text(
+                            "এটি হিসাবী খাতার সঠিক ব্যাকআপ ফাইল নয়",
+                            "This is not a valid Hisabi Khata backup"
+                        )
+                    }
+
+                    val version = root.optInt("version")
+                    require(version in 1..5) {
+                        v15Text(
+                            "এই ব্যাকআপ ভার্সনটি সমর্থিত নয়",
+                            "This backup version is not supported"
+                        )
+                    }
+
+                    json
+                }.onSuccess {
+                    pendingRestoreJson = it
+                }.onFailure {
+                    toast(
+                        context,
+                        it.message ?: v15Text(
+                            "ব্যাকআপ ফাইলটি সঠিক নয়",
+                            "Invalid backup file"
+                        )
+                    )
+                }
             }.onFailure {
                 toast(context, it.message ?: v15Text("ব্যাকআপ ফাইল পড়া যায়নি", "Unable to read backup file"))
             }
@@ -1659,6 +2479,52 @@ private fun MoreScreen(viewModel: FamilyKhataViewModel) {
         PurchaseAndTutorialSection()
 
         MoreSectionTitle(v15Text("ডেটা নিরাপত্তা","Data safety"))
+
+        Surface(
+            modifier = Modifier.fillMaxWidth(),
+            shape = RoundedCornerShape(16.dp),
+            color = MaterialTheme.colorScheme.surfaceVariant
+        ) {
+            Column(
+                modifier = Modifier.padding(14.dp),
+                verticalArrangement = Arrangement.spacedBy(5.dp)
+            ) {
+                Text(
+                    v15Text(
+                        "ব্যাকআপ অবস্থা",
+                        "Backup status"
+                    ),
+                    fontWeight = FontWeight.Bold
+                )
+
+                Text(
+                    v15Text(
+                        "শেষ সফল ব্যাকআপ: $lastBackupText",
+                        "Last successful backup: $lastBackupText"
+                    ),
+                    style = MaterialTheme.typography.bodySmall
+                )
+
+                if (backupReminderNeeded) {
+                    Text(
+                        if (lastBackupAt == 0L) {
+                            v15Text(
+                                "ডেটা নিরাপদ রাখতে এখন একটি ব্যাকআপ তৈরি করুন।",
+                                "Create a backup now to keep your data safe."
+                            )
+                        } else {
+                            v15Text(
+                                "শেষ ব্যাকআপের ৭ দিন বা বেশি হয়েছে। নতুন ব্যাকআপ নেওয়া ভালো।",
+                                "It has been 7 days or more since the last backup. A new backup is recommended."
+                            )
+                        },
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.error
+                    )
+                }
+            }
+        }
+
         MoreActionCard(
             symbol = "⇩",
             title = v15Text("ব্যাকআপ তৈরি করুন","Create backup"),
@@ -1746,14 +2612,103 @@ private fun MoreScreen(viewModel: FamilyKhataViewModel) {
     }
 
     pendingRestoreJson?.let { json ->
+        val previewRoot = remember(json) {
+            JSONObject(json)
+        }
+
+        val previewVersion =
+            previewRoot.optInt("version")
+
+        val previewCreatedAt =
+            previewRoot.optLong("createdAt", 0L)
+
+        val previewCreatedText =
+            if (previewCreatedAt > 0L) {
+                SimpleDateFormat(
+                    "dd MMM yyyy, h:mm a",
+                    Locale.getDefault()
+                ).format(Date(previewCreatedAt))
+            } else {
+                v15Text("অজানা", "Unknown")
+            }
+
+        val previewTransactions =
+            previewRoot.optJSONArray("transactions")
+                ?.length() ?: 0
+
+        val previewPeople =
+            previewRoot.optJSONArray("people")
+                ?.length() ?: 0
+
+        val previewEntries =
+            previewRoot.optJSONArray("entries")
+                ?.length() ?: 0
+
+        val previewProducts =
+            previewRoot.optJSONArray("inventoryProducts")
+                ?.length() ?: 0
+
+        val previewBatches =
+            previewRoot.optJSONArray("inventoryBatches")
+                ?.length() ?: 0
+
+        val hasBusinessData =
+            previewRoot.optJSONObject("businessData") != null
+
         AlertDialog(
             onDismissRequest = { pendingRestoreJson = null },
             title = { Text(v15Text("ব্যাকআপ রিস্টোর করবেন?","Restore backup?")) },
             text = {
-                Text(
-                    v15Text("বর্তমান অ্যাপের সব হিসাব মুছে ব্যাকআপ ফাইলের ডেটা বসবে। ","All current app data will be replaced by the backup data. ") +
-                        v15Text("নিশ্চিত হওয়ার আগে চাইলে বর্তমান ডেটার একটি ব্যাকআপ তৈরি করুন।","Create a backup of your current data first if needed.")
-                )
+                Column(
+                    verticalArrangement =
+                        Arrangement.spacedBy(7.dp)
+                ) {
+                    Text(
+                        v15Text(
+                            "ব্যাকআপের তারিখ: $previewCreatedText",
+                            "Backup date: $previewCreatedText"
+                        ),
+                        fontWeight = FontWeight.Bold
+                    )
+
+                    Text(
+                        v15Text(
+                            "ব্যাকআপ ভার্সন: $previewVersion",
+                            "Backup version: $previewVersion"
+                        )
+                    )
+
+                    Text(
+                        v15Text(
+                            "আয়-খরচ: $previewTransactions • বাকি খাতা: $previewPeople • বাকি লেনদেন: $previewEntries",
+                            "Transactions: $previewTransactions • Ledgers: $previewPeople • Ledger entries: $previewEntries"
+                        )
+                    )
+
+                    Text(
+                        v15Text(
+                            "পণ্য: $previewProducts • স্টক ব্যাচ: $previewBatches",
+                            "Products: $previewProducts • Stock batches: $previewBatches"
+                        )
+                    )
+
+                    if (hasBusinessData) {
+                        Text(
+                            v15Text(
+                                "ব্যবসার অতিরিক্ত ডেটাও এই ব্যাকআপে আছে।",
+                                "Additional business data is also included."
+                            )
+                        )
+                    }
+
+                    Text(
+                        v15Text(
+                            "রিস্টোর করলে বর্তমান অ্যাপের হিসাব মুছে এই ব্যাকআপের ডেটা বসবে। আগে বর্তমান ডেটার ব্যাকআপ রাখা নিরাপদ।",
+                            "Restoring will replace the current app data with this backup. Keeping a backup of the current data first is safer."
+                        ),
+                        color = MaterialTheme.colorScheme.error
+                    )
+                }
             },
             confirmButton = {
                 TextButton(

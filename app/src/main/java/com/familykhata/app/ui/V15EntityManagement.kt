@@ -20,6 +20,8 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.lifecycle.viewmodel.compose.viewModel
+import com.familykhata.app.FamilyKhataViewModel
 import com.familykhata.app.agency.AgencyClientEntity
 import com.familykhata.app.agency.AgencyViewModel
 import com.familykhata.app.coaching.CoachingBatchEntity
@@ -801,38 +803,20 @@ private fun ConfirmEntityDeleteDialog(
     onDismiss: () -> Unit,
     onConfirm: () -> Unit
 ) {
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        title = {
-            Text(title)
-        },
-        text = {
-            Text(message)
-        },
-        confirmButton = {
-            TextButton(
-                onClick = onConfirm
-            ) {
-                Text(
-                    v15Text(
-                        "ডিলিট করুন",
-                        "Delete"
-                    )
-                )
-            }
-        },
-        dismissButton = {
-            TextButton(
-                onClick = onDismiss
-            ) {
-                Text(
-                    v15Text(
-                        "বাতিল",
-                        "Cancel"
-                    )
-                )
-            }
-        }
+    val securityViewModel: FamilyKhataViewModel =
+        viewModel()
+
+    ProtectedDeleteDialog(
+        viewModel = securityViewModel,
+        title = title,
+        message = message,
+        confirmLabel =
+            v15Text(
+                "ডিলিট করুন",
+                "Delete"
+            ),
+        onDismiss = onDismiss,
+        onConfirmed = onConfirm
     )
 }
 

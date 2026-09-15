@@ -29,6 +29,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
+import com.familykhata.app.FamilyKhataViewModel
 import com.familykhata.app.agency.AgencyChargeEntity
 import com.familykhata.app.agency.AgencyClientEntity
 import com.familykhata.app.agency.AgencyPaymentEntity
@@ -1092,48 +1093,28 @@ private fun DeleteAgencyProjectDialog(
     onDismiss: () -> Unit,
     onConfirm: () -> Unit
 ) {
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        title = {
-            Text(
-                v15Text(
-                    "প্রজেক্ট ডিলিট করবেন?",
-                    "Delete project?"
-                )
-            )
-        },
-        text = {
-            Text(
-                v15Text(
-                    "${project.title} ডিলিট করলে এই প্রজেক্টের চার্জ ও পেমেন্ট হিসাবও মুছে যাবে। এই কাজ ফিরিয়ে আনা যাবে না।",
-                    "Deleting ${project.title} will also remove its charges and payments. This cannot be undone."
-                )
-            )
-        },
-        confirmButton = {
-            TextButton(
-                onClick = onConfirm
-            ) {
-                Text(
-                    v15Text(
-                        "ডিলিট করুন",
-                        "Delete"
-                    )
-                )
-            }
-        },
-        dismissButton = {
-            TextButton(
-                onClick = onDismiss
-            ) {
-                Text(
-                    v15Text(
-                        "বাতিল",
-                        "Cancel"
-                    )
-                )
-            }
-        }
+    val securityViewModel: FamilyKhataViewModel =
+        viewModel()
+
+    ProtectedDeleteDialog(
+        viewModel = securityViewModel,
+        title =
+            v15Text(
+                "প্রজেক্ট ডিলিট করবেন?",
+                "Delete project?"
+            ),
+        message =
+            v15Text(
+                "${project.title} ডিলিট করলে এই প্রজেক্টের চার্জ ও পেমেন্ট হিসাবও মুছে যাবে। এই কাজ ফিরিয়ে আনা যাবে না।",
+                "Deleting ${project.title} will also remove its charges and payments. This cannot be undone."
+            ),
+        confirmLabel =
+            v15Text(
+                "ডিলিট করুন",
+                "Delete"
+            ),
+        onDismiss = onDismiss,
+        onConfirmed = onConfirm
     )
 }
 

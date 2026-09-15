@@ -40,6 +40,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
+import com.familykhata.app.FamilyKhataViewModel
 import com.familykhata.app.InventoryViewModel
 import com.familykhata.app.data.ProductStockSummary
 import com.familykhata.app.data.StockBatchEntity
@@ -53,6 +54,34 @@ private val InventoryGreen = Color(0xFF0B7A53)
 private val InventoryOrange = Color(0xFFB85C00)
 private val InventoryRed = Color(0xFFC4473A)
 private val InventoryBlue = Color(0xFF1565C0)
+
+private fun String.v15InventoryNormalizeNumber(): String =
+    buildString(length) {
+        this@v15InventoryNormalizeNumber.forEach { ch ->
+            when (ch) {
+                '০' -> append('0')
+                '১' -> append('1')
+                '২' -> append('2')
+                '৩' -> append('3')
+                '৪' -> append('4')
+                '৫' -> append('5')
+                '৬' -> append('6')
+                '৭' -> append('7')
+                '৮' -> append('8')
+                '৯' -> append('9')
+                else -> append(ch)
+            }
+        }
+    }
+        .trim()
+        .replace(",", "")
+
+private fun String.v15InventoryDoubleOrNull(): Double? =
+    v15InventoryNormalizeNumber().toDoubleOrNull()
+
+private fun String.v15InventoryIntOrNull(): Int? =
+    v15InventoryNormalizeNumber().toIntOrNull()
+
 
 private enum class ProductFormMode {
     PHARMACY,
@@ -89,6 +118,24 @@ private data class NewProductInput(
 )
 
 private data class BatchInput(
+    val quantity: Int,
+    val purchasePrice: Double,
+    val purchaseDate: Long,
+    val expiryDate: Long?,
+    val batchNo: String
+)
+
+private data class EditableBatchInput(
+    val id: Long,
+    val quantity: String,
+    val purchasePrice: String,
+    val purchaseDate: Long,
+    val expiryDate: Long?,
+    val batchNo: String
+)
+
+private data class BatchUpdateInput(
+    val id: Long,
     val quantity: Int,
     val purchasePrice: Double,
     val purchaseDate: Long,
@@ -134,6 +181,7 @@ internal fun V15InventoryScreen(
     onExit: () -> Unit
 ) {
     val vm: InventoryViewModel = viewModel()
+    val securityViewModel: FamilyKhataViewModel = viewModel()
     val products by vm.products.collectAsState()
     var selectedId by remember { mutableStateOf<Long?>(null) }
     val selected = selectedId?.let { id -> products.firstOrNull { it.id == id } }
@@ -171,6 +219,7 @@ internal fun V15InventoryScreen(
                     workspace = workspace,
                     canWrite = canWrite,
                     viewModel = vm,
+                    securityViewModel = securityViewModel,
                     onSelect = {
                         selectedId = it.id
                     }
@@ -182,6 +231,7 @@ internal fun V15InventoryScreen(
                 workspace = workspace,
                 canWrite = canWrite,
                 viewModel = vm,
+                securityViewModel = securityViewModel,
                 onSelect = {
                     selectedId = it.id
                 }
@@ -198,6 +248,7 @@ internal fun V15InventoryScreen(
                 product = selected,
                 canWrite = canWrite,
                 viewModel = vm,
+                securityViewModel = securityViewModel,
                 onDeleted = {
                     selectedId = null
                 }
@@ -212,6 +263,7 @@ private fun ProductListScreen(
     workspace: String,
     canWrite: Boolean,
     viewModel: InventoryViewModel,
+    securityViewModel: FamilyKhataViewModel,
     onSelect: (ProductStockSummary) -> Unit
 ) {
     var query by remember { mutableStateOf("") }
@@ -309,12 +361,23 @@ private fun ProductListScreen(
     }
 
     editingProduct?.let { product ->
+        val editBatchesFlow =
+            remember(product.id) {
+                viewModel.observeBatches(product.id)
+            }
+
+        val editBatches by
+            editBatchesFlow.collectAsState(
+                initial = emptyList()
+            )
+
         EditProductDialog(
             product = product,
+            batches = editBatches,
             onDismiss = {
                 editingProduct = null
             }
-        ) { input ->
+        ) { input, batchUpdates ->
             viewModel.updateProduct(
                 item = product,
                 name = input.name,
@@ -336,61 +399,48 @@ private fun ProductListScreen(
                 note = input.note
             )
 
+            batchUpdates.forEach { batch ->
+                viewModel.updateBatch(
+                    batchId = batch.id,
+                    quantity = batch.quantity,
+                    purchasePrice =
+                        batch.purchasePrice,
+                    purchaseDate =
+                        batch.purchaseDate,
+                    expiryDate =
+                        batch.expiryDate,
+                    batchNo = batch.batchNo
+                )
+            }
+
             editingProduct = null
         }
     }
 
     deletingProduct?.let { product ->
-        AlertDialog(
-            onDismissRequest = {
+        ProtectedDeleteDialog(
+            viewModel = securityViewModel,
+            title =
+                v15Text(
+                    "পণ্য ডিলিট করবেন?",
+                    "Delete product?"
+                ),
+            message =
+                v15Text(
+                    "${product.name} ডিলিট করলে এর সব stock batch মুছে যাবে এবং এই পণ্যের সাথে যুক্ত অন্য ব্যবসায়িক রেকর্ড প্রভাবিত হতে পারে। এই কাজ ফিরিয়ে আনা যাবে না।",
+                    "Deleting ${product.name} will remove all of its stock batches and may affect business records linked to this product. This cannot be undone."
+                ),
+            confirmLabel =
+                v15Text(
+                    "ডিলিট করুন",
+                    "Delete"
+                ),
+            onDismiss = {
                 deletingProduct = null
             },
-            title = {
-                Text(
-                    v15Text(
-                        "পণ্য ডিলিট করবেন?",
-                        "Delete product?"
-                    )
-                )
-            },
-            text = {
-                Text(
-                    v15Text(
-                        "${product.name} ডিলিট করলে এর সব stock batch মুছে যাবে এবং এই পণ্যের সাথে যুক্ত অন্য ব্যবসায়িক রেকর্ড প্রভাবিত হতে পারে। এই কাজ ফিরিয়ে আনা যাবে না।",
-                        "Deleting ${product.name} will remove all of its stock batches and may affect business records linked to this product. This cannot be undone."
-                    )
-                )
-            },
-            confirmButton = {
-                TextButton(
-                    onClick = {
-                        viewModel.deleteProduct(
-                            product.id
-                        )
-                        deletingProduct = null
-                    }
-                ) {
-                    Text(
-                        v15Text(
-                            "ডিলিট করুন",
-                            "Delete"
-                        )
-                    )
-                }
-            },
-            dismissButton = {
-                TextButton(
-                    onClick = {
-                        deletingProduct = null
-                    }
-                ) {
-                    Text(
-                        v15Text(
-                            "বাতিল",
-                            "Cancel"
-                        )
-                    )
-                }
+            onConfirmed = {
+                viewModel.deleteProduct(product.id)
+                deletingProduct = null
             }
         )
     }
@@ -656,6 +706,7 @@ private fun ProductDetailScreen(
     product: ProductStockSummary,
     canWrite: Boolean,
     viewModel: InventoryViewModel,
+    securityViewModel: FamilyKhataViewModel,
     onDeleted: () -> Unit
 ) {
     val context = LocalContext.current
@@ -791,7 +842,11 @@ private fun ProductDetailScreen(
         }
     }
     if (showEdit) {
-        EditProductDialog(product, onDismiss = { showEdit = false }) { input ->
+        EditProductDialog(
+            product = product,
+            batches = batches,
+            onDismiss = { showEdit = false }
+        ) { input, batchUpdates ->
             viewModel.updateProduct(
                 item = product,
                 name = input.name,
@@ -809,16 +864,47 @@ private fun ProductDetailScreen(
                 lowStockLevel = input.lowStockLevel,
                 note = input.note
             )
+
+            batchUpdates.forEach { batch ->
+                viewModel.updateBatch(
+                    batchId = batch.id,
+                    quantity = batch.quantity,
+                    purchasePrice = batch.purchasePrice,
+                    purchaseDate = batch.purchaseDate,
+                    expiryDate = batch.expiryDate,
+                    batchNo = batch.batchNo
+                )
+            }
+
             showEdit = false
         }
     }
     if (showDelete) {
-        AlertDialog(
-            onDismissRequest = { showDelete = false },
-            title = { Text(v15Text("পণ্য ডিলিট করবেন?", "Delete product?")) },
-            text = { Text(v15Text("পণ্যের সব stock batch-ও মুছে যাবে।", "All stock batches for this product will also be deleted.")) },
-            confirmButton = { TextButton(onClick = { viewModel.deleteProduct(product.id); showDelete = false; onDeleted() }) { Text(v15Text("ডিলিট", "Delete")) } },
-            dismissButton = { TextButton(onClick = { showDelete = false }) { Text(v15Text("বাতিল", "Cancel")) } }
+        ProtectedDeleteDialog(
+            viewModel = securityViewModel,
+            title =
+                v15Text(
+                    "পণ্য ডিলিট করবেন?",
+                    "Delete product?"
+                ),
+            message =
+                v15Text(
+                    "পণ্যের সব stock batch-ও মুছে যাবে।",
+                    "All stock batches for this product will also be deleted."
+                ),
+            confirmLabel =
+                v15Text(
+                    "ডিলিট",
+                    "Delete"
+                ),
+            onDismiss = {
+                showDelete = false
+            },
+            onConfirmed = {
+                viewModel.deleteProduct(product.id)
+                showDelete = false
+                onDeleted()
+            }
         )
     }
 }
@@ -1133,11 +1219,11 @@ private fun AddProductDialog(
         confirmButton = {
             TextButton(
                 onClick = {
-                    val selling = sell.toDoubleOrNull() ?: 0.0
-                    val purchase = buy.toDoubleOrNull() ?: 0.0
-                    val quantity = qty.toIntOrNull() ?: 0
-                    val lowValue = low.toIntOrNull() ?: 0
-                    val warrantyMonths = warranty.toIntOrNull() ?: 0
+                    val selling = sell.v15InventoryDoubleOrNull() ?: 0.0
+                    val purchase = buy.v15InventoryDoubleOrNull() ?: 0.0
+                    val quantity = qty.v15InventoryIntOrNull() ?: 0
+                    val lowValue = low.v15InventoryIntOrNull() ?: 0
+                    val warrantyMonths = warranty.v15InventoryIntOrNull() ?: 0
 
                     when {
                         name.isBlank() ->
@@ -1280,8 +1366,8 @@ private fun AddBatchDialog(
         confirmButton = {
             TextButton(
                 onClick = {
-                    val q = qty.toIntOrNull()
-                    val p = buy.toDoubleOrNull() ?: 0.0
+                    val q = qty.v15InventoryIntOrNull()
+                    val p = buy.v15InventoryDoubleOrNull() ?: 0.0
 
                     if (q == null || q <= 0 || p < 0) {
                         error = v15Text(
@@ -1327,7 +1413,7 @@ private fun ReduceStockDialog(max: Int, onDismiss: () -> Unit, onSave: (Int) -> 
             }
         },
         confirmButton = { TextButton(onClick = {
-            val q = qty.toIntOrNull()
+            val q = qty.v15InventoryIntOrNull()
             if (q == null || q <= 0 || q > max) error = v15Text("সঠিক পরিমাণ দিন", "Enter a valid quantity") else onSave(q)
         }) { Text(v15Text("আপডেট", "Update")) } },
         dismissButton = { TextButton(onClick = onDismiss) { Text(v15Text("বাতিল", "Cancel")) } }
@@ -1337,8 +1423,9 @@ private fun ReduceStockDialog(max: Int, onDismiss: () -> Unit, onSave: (Int) -> 
 @Composable
 private fun EditProductDialog(
     product: ProductStockSummary,
+    batches: List<StockBatchEntity>,
     onDismiss: () -> Unit,
-    onSave: (ProductDetailsInput) -> Unit
+    onSave: (ProductDetailsInput, List<BatchUpdateInput>) -> Unit
 ) {
     val context = LocalContext.current
     val prefs = remember {
@@ -1371,6 +1458,22 @@ private fun EditProductDialog(
     var low by remember { mutableStateOf(product.lowStockLevel.toString()) }
     var note by remember { mutableStateOf(product.note) }
     var showUnitPicker by remember { mutableStateOf(false) }
+    var error by remember { mutableStateOf<String?>(null) }
+
+    var editableBatches by remember(product.id, batches) {
+        mutableStateOf(
+            batches.map { batch ->
+                EditableBatchInput(
+                    id = batch.id,
+                    quantity = batch.quantity.toString(),
+                    purchasePrice = v15Money(batch.purchasePrice),
+                    purchaseDate = batch.purchaseDate,
+                    expiryDate = batch.expiryDate,
+                    batchNo = batch.batchNo
+                )
+            }
+        )
+    }
 
     AlertDialog(
         onDismissRequest = onDismiss,
@@ -1471,33 +1574,239 @@ private fun EditProductDialog(
                     }
                 )
 
+                Text(
+                    v15Text(
+                        "স্টক ব্যাচ / ক্রয় তথ্য",
+                        "Stock batches / purchase details"
+                    ),
+                    style = MaterialTheme.typography.titleSmall,
+                    fontWeight = FontWeight.Bold
+                )
+
+                if (editableBatches.isEmpty()) {
+                    Text(
+                        v15Text(
+                            "এই পণ্যের কোনো stock batch নেই।",
+                            "This product has no stock batch."
+                        ),
+                        style = MaterialTheme.typography.bodySmall
+                    )
+                }
+
+                editableBatches.forEachIndexed { index, batch ->
+                    Text(
+                        v15Text(
+                            "ব্যাচ ${index + 1}",
+                            "Batch ${index + 1}"
+                        ),
+                        fontWeight = FontWeight.Bold
+                    )
+
+                    OutlinedTextField(
+                        value = batch.quantity,
+                        onValueChange = { value ->
+                            editableBatches =
+                                editableBatches.toMutableList().also {
+                                    it[index] =
+                                        batch.copy(quantity = value)
+                                }
+                        },
+                        label = {
+                            Text(
+                                v15Text(
+                                    "পরিমাণ",
+                                    "Quantity"
+                                )
+                            )
+                        },
+                        singleLine = true,
+                        modifier = Modifier.fillMaxWidth()
+                    )
+
+                    OutlinedTextField(
+                        value = batch.purchasePrice,
+                        onValueChange = { value ->
+                            editableBatches =
+                                editableBatches.toMutableList().also {
+                                    it[index] =
+                                        batch.copy(
+                                            purchasePrice = value
+                                        )
+                                }
+                        },
+                        label = {
+                            Text(
+                                v15Text(
+                                    "ক্রয় মূল্য / ইউনিট",
+                                    "Purchase price / unit"
+                                )
+                            )
+                        },
+                        singleLine = true,
+                        modifier = Modifier.fillMaxWidth()
+                    )
+
+                    OutlinedTextField(
+                        value = batch.batchNo,
+                        onValueChange = { value ->
+                            editableBatches =
+                                editableBatches.toMutableList().also {
+                                    it[index] =
+                                        batch.copy(batchNo = value)
+                                }
+                        },
+                        label = {
+                            Text(
+                                v15Text(
+                                    "Batch / Lot No.",
+                                    "Batch / Lot No."
+                                )
+                            )
+                        },
+                        singleLine = true,
+                        modifier = Modifier.fillMaxWidth()
+                    )
+
+                    DateButton(
+                        v15Text(
+                            "কেনার তারিখ",
+                            "Purchase date"
+                        ),
+                        batch.purchaseDate
+                    ) { value ->
+                        editableBatches =
+                            editableBatches.toMutableList().also {
+                                it[index] =
+                                    batch.copy(
+                                        purchaseDate = value
+                                    )
+                            }
+                    }
+
+                    NullableDateButton(
+                        v15Text(
+                            "মেয়াদ শেষের তারিখ",
+                            "Expiry date"
+                        ),
+                        batch.expiryDate
+                    ) { value ->
+                        editableBatches =
+                            editableBatches.toMutableList().also {
+                                it[index] =
+                                    batch.copy(
+                                        expiryDate = value
+                                    )
+                            }
+                    }
+                }
+
                 OutlinedTextField(
                     note,
                     { note = it },
                     label = { Text(v15Text("নোট", "Note")) }
                 )
+
+                error?.let {
+                    Text(
+                        it,
+                        color = MaterialTheme.colorScheme.error
+                    )
+                }
             }
         },
         confirmButton = {
             TextButton(
                 onClick = {
+                    val warrantyMonths =
+                        warranty.v15InventoryIntOrNull()
+                    val sellingPrice =
+                        sell.v15InventoryDoubleOrNull()
+                    val lowStockLevel =
+                        low.v15InventoryIntOrNull()
+
+                    if (
+                        name.isBlank() ||
+                        warrantyMonths == null ||
+                        warrantyMonths < 0 ||
+                        sellingPrice == null ||
+                        sellingPrice < 0 ||
+                        lowStockLevel == null ||
+                        lowStockLevel < 0
+                    ) {
+                        error =
+                            v15Text(
+                                "পণ্যের তথ্য ও সংখ্যাগুলো সঠিকভাবে দিন।",
+                                "Enter valid product information and numbers."
+                            )
+                        return@TextButton
+                    }
+
+                    val batchUpdates =
+                        mutableListOf<BatchUpdateInput>()
+
+                    for (batch in editableBatches) {
+                        val quantity =
+                            batch.quantity.v15InventoryIntOrNull()
+                        val purchasePrice =
+                            batch.purchasePrice
+                                .v15InventoryDoubleOrNull()
+
+                        if (
+                            quantity == null ||
+                            quantity < 0 ||
+                            purchasePrice == null ||
+                            purchasePrice < 0
+                        ) {
+                            error =
+                                v15Text(
+                                    "Stock batch-এর পরিমাণ ও ক্রয় মূল্য সঠিকভাবে দিন।",
+                                    "Enter valid stock batch quantity and purchase price."
+                                )
+                            return@TextButton
+                        }
+
+                        batchUpdates +=
+                            BatchUpdateInput(
+                                id = batch.id,
+                                quantity = quantity,
+                                purchasePrice = purchasePrice,
+                                purchaseDate =
+                                    batch.purchaseDate,
+                                expiryDate =
+                                    batch.expiryDate,
+                                batchNo =
+                                    batch.batchNo.trim()
+                            )
+                    }
+
+                    error = null
+
                     onSave(
                         ProductDetailsInput(
                             name = name.trim(),
                             category = category.trim(),
                             sku = sku.trim(),
-                            unit = unit.trim().ifBlank { "pcs" },
+                            unit =
+                                unit.trim()
+                                    .ifBlank { "pcs" },
                             brand = brand.trim(),
-                            genericName = genericName.trim(),
-                            modelName = modelName.trim(),
-                            serialOrImei = serialOrImei.trim(),
+                            genericName =
+                                genericName.trim(),
+                            modelName =
+                                modelName.trim(),
+                            serialOrImei =
+                                serialOrImei.trim(),
                             size = size.trim(),
                             color = color.trim(),
-                            warrantyMonths = warranty.toIntOrNull() ?: 0,
-                            sellingPrice = sell.toDoubleOrNull() ?: 0.0,
-                            lowStockLevel = low.toIntOrNull() ?: 0,
+                            warrantyMonths =
+                                warrantyMonths,
+                            sellingPrice =
+                                sellingPrice,
+                            lowStockLevel =
+                                lowStockLevel,
                             note = note.trim()
-                        )
+                        ),
+                        batchUpdates
                     )
                 }
             ) {

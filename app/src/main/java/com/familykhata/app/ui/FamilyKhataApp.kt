@@ -8,6 +8,7 @@ import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -91,6 +92,8 @@ private enum class Tab(val label: String) {
 fun FamilyKhataApp(viewModel: FamilyKhataViewModel) {
     var tab by remember { mutableStateOf(Tab.DASHBOARD) }
     var addTypePreset by remember { mutableStateOf("EXPENSE") }
+    var bakiFilterPreset by remember { mutableStateOf("ALL") }
+    var historyFilterPreset by remember { mutableStateOf("ALL") }
     val workspace by viewModel.selectedWorkspace.collectAsState()
     val trialStatus by viewModel.trialStatus.collectAsState()
     val isAppUnlocked by viewModel.isAppUnlocked.collectAsState()
@@ -178,6 +181,15 @@ fun FamilyKhataApp(viewModel: FamilyKhataViewModel) {
                             selected = tab == item,
                             onClick = {
                                 V15DeepNavigationState.clear()
+
+                                if (item == Tab.BAKI) {
+                                    bakiFilterPreset = "ALL"
+                                }
+
+                                if (item == Tab.HISTORY) {
+                                    historyFilterPreset = "ALL"
+                                }
+
                                 tab = item
                             },
                             colors = NavigationBarItemDefaults.colors(
@@ -279,7 +291,7 @@ fun FamilyKhataApp(viewModel: FamilyKhataViewModel) {
                             horizontalArrangement =
                                 Arrangement.SpaceBetween,
                             verticalAlignment =
-                                Alignment.CenterVertically
+                                Alignment.Top
                         ) {
                             Text(
                                 v15Text(
@@ -309,30 +321,55 @@ fun FamilyKhataApp(viewModel: FamilyKhataViewModel) {
                                     onClick = {
                                         V15DeepNavigationState.clear()
                                         tab = Tab.MORE
-                                    }
+                                    },
+                                    modifier =
+                                        Modifier.padding(end = 4.dp),
+                                    contentPadding =
+                                        androidx.compose.foundation.layout.PaddingValues(
+                                            0.dp
+                                        )
                                 ) {
-                                    Text(
-                                        if (trialStatus.expired) {
+                                    Column(
+                                        horizontalAlignment =
+                                            Alignment.End
+                                    ) {
+                                        Text(
                                             v15Text(
                                                 "Get Premium",
                                                 "Get Premium"
-                                            )
-                                        } else {
-                                            v15Text(
-                                                "Get Premium • ${trialStatus.daysRemaining} দিন বাকি",
-                                                "Get Premium • ${trialStatus.daysRemaining} days left"
-                                            )
-                                        },
-                                        fontWeight =
-                                            FontWeight.ExtraBold,
-                                        color =
-                                            if (trialStatus.expired)
-                                                ExpenseAccent
-                                            else
-                                                workspaceAccent(
-                                                    workspace
+                                            ),
+                                            fontWeight =
+                                                FontWeight.ExtraBold,
+                                            color =
+                                                if (trialStatus.expired)
+                                                    ExpenseAccent
+                                                else
+                                                    workspaceAccent(
+                                                        workspace
+                                                    )
+                                        )
+
+                                        Text(
+                                            if (trialStatus.expired) {
+                                                v15Text(
+                                                    "Trial শেষ",
+                                                    "Trial ended"
                                                 )
-                                    )
+                                            } else {
+                                                v15Text(
+                                                    "${trialStatus.daysRemaining} দিন বাকি",
+                                                    "${trialStatus.daysRemaining} days left"
+                                                )
+                                            },
+                                            style =
+                                                MaterialTheme.typography.labelSmall,
+                                            color =
+                                                MaterialTheme.colorScheme
+                                                    .onSurfaceVariant,
+                                            textAlign =
+                                                TextAlign.End
+                                        )
+                                    }
                                 }
                             }
                         }
@@ -378,8 +415,30 @@ fun FamilyKhataApp(viewModel: FamilyKhataViewModel) {
                                 addTypePreset = "EXPENSE"
                                 tab = Tab.ADD
                             },
-                            onLedger = { tab = Tab.BAKI },
-                            onHistory = { tab = Tab.HISTORY }
+                            onLedger = {
+                                bakiFilterPreset = "ALL"
+                                tab = Tab.BAKI
+                            },
+                            onReceivable = {
+                                bakiFilterPreset = "RECEIVABLE"
+                                tab = Tab.BAKI
+                            },
+                            onPayable = {
+                                bakiFilterPreset = "PAYABLE"
+                                tab = Tab.BAKI
+                            },
+                            onHistory = {
+                                historyFilterPreset = "ALL"
+                                tab = Tab.HISTORY
+                            },
+                            onIncomeHistory = {
+                                historyFilterPreset = "INCOME"
+                                tab = Tab.HISTORY
+                            },
+                            onExpenseHistory = {
+                                historyFilterPreset = "EXPENSE"
+                                tab = Tab.HISTORY
+                            }
                         )
                         Tab.ADD -> AddTransactionScreen(
                             viewModel = viewModel,
@@ -391,6 +450,7 @@ fun FamilyKhataApp(viewModel: FamilyKhataViewModel) {
                             viewModel = viewModel,
                             workspace = workspace,
                             canWrite = !trialStatus.expired,
+                            initialFilter = bakiFilterPreset,
                             onExit = { tab = Tab.DASHBOARD }
                         )
                         Tab.PRODUCTS -> {
@@ -497,7 +557,8 @@ fun FamilyKhataApp(viewModel: FamilyKhataViewModel) {
                             HistoryScreen(
                                 viewModel = viewModel,
                                 workspace = workspace,
-                                canWrite = !trialStatus.expired
+                                canWrite = !trialStatus.expired,
+                                initialFilter = historyFilterPreset
                             )
                         Tab.MORE -> MoreScreen(viewModel)
                     }
@@ -672,7 +733,11 @@ private fun DashboardScreen(
     onCashIn: () -> Unit,
     onCashOut: () -> Unit,
     onLedger: () -> Unit,
-    onHistory: () -> Unit
+    onReceivable: () -> Unit,
+    onPayable: () -> Unit,
+    onHistory: () -> Unit,
+    onIncomeHistory: () -> Unit,
+    onExpenseHistory: () -> Unit
 ) {
     val totals by viewModel.totals.collectAsState()
     val bakiPeople by viewModel.bakiPeople.collectAsState()
@@ -693,7 +758,11 @@ private fun DashboardScreen(
             onCashIn = onCashIn,
             onCashOut = onCashOut,
             onLedger = onLedger,
-            onHistory = onHistory
+            onReceivable = onReceivable,
+            onPayable = onPayable,
+            onHistory = onHistory,
+            onIncomeHistory = onIncomeHistory,
+            onExpenseHistory = onExpenseHistory
         )
         return
     }
@@ -705,7 +774,10 @@ private fun DashboardScreen(
         verticalArrangement = Arrangement.spacedBy(12.dp)
     ) {
         Surface(
-            modifier = Modifier.fillMaxWidth(),
+            modifier =
+                Modifier
+                    .fillMaxWidth()
+                    .clickable { onHistory() },
             shape = RoundedCornerShape(24.dp),
             color = accent
         ) {
@@ -740,13 +812,15 @@ private fun DashboardScreen(
                 title = v15Text("মোট আয়", "Total income"),
                 amount = totals.income,
                 modifier = Modifier.weight(1f),
-                accentColor = IncomeAccent
+                accentColor = IncomeAccent,
+                onClick = onIncomeHistory
             )
             MetricCard(
                 title = v15Text("মোট খরচ", "Total expense"),
                 amount = totals.expense,
                 modifier = Modifier.weight(1f),
-                accentColor = ExpenseAccent
+                accentColor = ExpenseAccent,
+                onClick = onExpenseHistory
             )
         }
 
@@ -758,13 +832,15 @@ private fun DashboardScreen(
                 title = v15Text("পাবো", "Receivable"),
                 amount = receivable,
                 modifier = Modifier.weight(1f),
-                accentColor = ReceivableAccent
+                accentColor = ReceivableAccent,
+                onClick = onReceivable
             )
             MetricCard(
                 title = v15Text("দেবো", "Payable"),
                 amount = payable,
                 modifier = Modifier.weight(1f),
-                accentColor = PayableAccent
+                accentColor = PayableAccent,
+                onClick = onPayable
             )
         }
 
@@ -804,7 +880,11 @@ private fun BusinessDashboard(
     onCashIn: () -> Unit,
     onCashOut: () -> Unit,
     onLedger: () -> Unit,
-    onHistory: () -> Unit
+    onReceivable: () -> Unit,
+    onPayable: () -> Unit,
+    onHistory: () -> Unit,
+    onIncomeHistory: () -> Unit,
+    onExpenseHistory: () -> Unit
 ) {
     Column(
         modifier = Modifier
@@ -814,7 +894,10 @@ private fun BusinessDashboard(
         verticalArrangement = Arrangement.spacedBy(12.dp)
     ) {
         Surface(
-            modifier = Modifier.fillMaxWidth(),
+            modifier =
+                Modifier
+                    .fillMaxWidth()
+                    .clickable { onHistory() },
             shape = RoundedCornerShape(24.dp),
             color = ShopAccent
         ) {
@@ -849,13 +932,15 @@ private fun BusinessDashboard(
                 title = v15Text("মোট ক্যাশ ইন", "Total cash in"),
                 amount = income,
                 modifier = Modifier.weight(1f),
-                accentColor = IncomeAccent
+                accentColor = IncomeAccent,
+                onClick = onIncomeHistory
             )
             MetricCard(
                 title = v15Text("মোট ক্যাশ আউট", "Total cash out"),
                 amount = expense,
                 modifier = Modifier.weight(1f),
-                accentColor = ExpenseAccent
+                accentColor = ExpenseAccent,
+                onClick = onExpenseHistory
             )
         }
 
@@ -867,13 +952,15 @@ private fun BusinessDashboard(
                 title = v15Text("পাবো", "Receivable"),
                 amount = receivable,
                 modifier = Modifier.weight(1f),
-                accentColor = ReceivableAccent
+                accentColor = ReceivableAccent,
+                onClick = onReceivable
             )
             MetricCard(
                 title = v15Text("দেবো", "Payable"),
                 amount = payable,
                 modifier = Modifier.weight(1f),
-                accentColor = PayableAccent
+                accentColor = PayableAccent,
+                onClick = onPayable
             )
         }
 
@@ -933,7 +1020,10 @@ private fun BusinessDashboard(
         }
 
         Surface(
-            modifier = Modifier.fillMaxWidth(),
+            modifier =
+                Modifier
+                    .fillMaxWidth()
+                    .clickable { onLedger() },
             shape = RoundedCornerShape(18.dp),
             color = ShopAccent.copy(alpha = 0.09f)
         ) {
@@ -1008,10 +1098,16 @@ private fun MetricCard(
     title: String,
     amount: Double,
     modifier: Modifier = Modifier,
-    accentColor: Color = NeutralAccent
+    accentColor: Color = NeutralAccent,
+    onClick: (() -> Unit)? = null
 ) {
     Surface(
-        modifier = modifier,
+        modifier =
+            if (onClick != null) {
+                modifier.clickable { onClick.invoke() }
+            } else {
+                modifier
+            },
         shape = RoundedCornerShape(20.dp),
         color = accentColor.copy(alpha = 0.12f),
         border = BorderStroke(1.dp, accentColor.copy(alpha = 0.22f))
@@ -1184,13 +1280,27 @@ private fun TransactionTypeCard(
 private fun HistoryScreen(
     viewModel: FamilyKhataViewModel,
     workspace: String,
-    canWrite: Boolean
+    canWrite: Boolean,
+    initialFilter: String
 ) {
     val transactions by
         viewModel.transactions.collectAsState()
 
     val isBusiness =
         workspace == "SHOP"
+
+    var typeFilter by remember(initialFilter) {
+        mutableStateOf(initialFilter)
+    }
+
+    val filteredTransactions =
+        transactions.filter { item ->
+            when (typeFilter) {
+                "INCOME" -> item.type == "INCOME"
+                "EXPENSE" -> item.type == "EXPENSE"
+                else -> true
+            }
+        }
 
     if (transactions.isEmpty()) {
         Column(
@@ -1254,19 +1364,70 @@ private fun HistoryScreen(
             )
         }
 
-        items(
-            transactions,
-            key = { it.id }
-        ) { item ->
-            TransactionRow(
-                item = item,
-                isBusiness = isBusiness,
-                canWrite = canWrite,
-                viewModel = viewModel,
-                onDelete = {
-                    viewModel.deleteTransaction(item)
+        item {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement =
+                    Arrangement.spacedBy(6.dp)
+            ) {
+                listOf(
+                    "ALL" to v15Text("সব", "All"),
+                    "INCOME" to
+                        if (isBusiness)
+                            v15Text("ক্যাশ ইন", "Cash in")
+                        else
+                            v15Text("আয়", "Income"),
+                    "EXPENSE" to
+                        if (isBusiness)
+                            v15Text("ক্যাশ আউট", "Cash out")
+                        else
+                            v15Text("খরচ", "Expense")
+                ).forEach { (value, label) ->
+                    OutlinedButton(
+                        onClick = { typeFilter = value },
+                        modifier = Modifier.weight(1f)
+                    ) {
+                        Text(
+                            label,
+                            fontWeight =
+                                if (typeFilter == value)
+                                    FontWeight.ExtraBold
+                                else
+                                    FontWeight.Normal,
+                            textAlign = TextAlign.Center
+                        )
+                    }
                 }
-            )
+            }
+        }
+
+        if (filteredTransactions.isEmpty()) {
+            item {
+                Text(
+                    v15Text(
+                        "এই ধরনের কোনো লেনদেন পাওয়া যায়নি।",
+                        "No transactions found for this filter."
+                    ),
+                    color =
+                        MaterialTheme.colorScheme
+                            .onSurfaceVariant
+                )
+            }
+        } else {
+            items(
+                filteredTransactions,
+                key = { it.id }
+            ) { item ->
+                TransactionRow(
+                    item = item,
+                    isBusiness = isBusiness,
+                    canWrite = canWrite,
+                    viewModel = viewModel,
+                    onDelete = {
+                        viewModel.deleteTransaction(item)
+                    }
+                )
+            }
         }
     }
 }
@@ -1292,6 +1453,10 @@ private fun TransactionRow(
         item.category,
         item.note
     ) {
+        mutableStateOf(false)
+    }
+
+    var showDelete by remember(item.id) {
         mutableStateOf(false)
     }
 
@@ -1406,7 +1571,9 @@ private fun TransactionRow(
                     }
 
                     OutlinedButton(
-                        onClick = onDelete,
+                        onClick = {
+                            showDelete = true
+                        },
                         modifier =
                             Modifier.weight(1f)
                     ) {
@@ -1420,6 +1587,34 @@ private fun TransactionRow(
                 }
             }
         }
+    }
+
+    if (showDelete) {
+        ProtectedDeleteDialog(
+            viewModel = viewModel,
+            title =
+                v15Text(
+                    "লেনদেন মুছবেন?",
+                    "Delete transaction?"
+                ),
+            message =
+                v15Text(
+                    "এই লেনদেন স্থায়ীভাবে মুছে যাবে।",
+                    "This transaction will be permanently deleted."
+                ),
+            confirmLabel =
+                v15Text(
+                    "মুছুন",
+                    "Delete"
+                ),
+            onDismiss = {
+                showDelete = false
+            },
+            onConfirmed = {
+                onDelete()
+                showDelete = false
+            }
+        )
     }
 
     if (showEdit) {
@@ -1671,6 +1866,7 @@ private fun BakiScreen(
     viewModel: FamilyKhataViewModel,
     workspace: String,
     canWrite: Boolean,
+    initialFilter: String,
     onExit: () -> Unit
 ) {
     val people by viewModel.bakiPeople.collectAsState()
@@ -1692,6 +1888,7 @@ private fun BakiScreen(
             viewModel = viewModel,
             workspace = workspace,
             canWrite = canWrite,
+            initialFilter = initialFilter,
             onSelect = { selectedId = it.id }
         )
     } else if (showStatement) {
@@ -1729,9 +1926,13 @@ private fun BakiPeopleScreen(
     viewModel: FamilyKhataViewModel,
     workspace: String,
     canWrite: Boolean,
+    initialFilter: String,
     onSelect: (BakiPersonSummary) -> Unit
 ) {
     var query by remember { mutableStateOf("") }
+    var balanceFilter by remember(initialFilter) {
+        mutableStateOf(initialFilter)
+    }
     var showAdd by remember { mutableStateOf(false) }
     val personLabel = if (workspace == "SHOP") v15Text("কাস্টমার/সাপ্লায়ার", "Customer/Supplier") else v15Text("ব্যক্তি", "Person")
     val sectionTitle = if (workspace == "SHOP") v15Text("কাস্টমার/সাপ্লায়ার", "Customers & Suppliers") else v15Text("বাকি/পাওনা", "Due Accounts")
@@ -1760,8 +1961,48 @@ private fun BakiPeopleScreen(
             modifier = Modifier.fillMaxWidth()
         )
 
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(6.dp)
+        ) {
+            listOf(
+                "ALL" to v15Text("সব", "All"),
+                "RECEIVABLE" to v15Text("পাবো", "Receivable"),
+                "PAYABLE" to v15Text("দেবো", "Payable")
+            ).forEach { (value, label) ->
+                OutlinedButton(
+                    onClick = { balanceFilter = value },
+                    modifier = Modifier.weight(1f)
+                ) {
+                    Text(
+                        label,
+                        fontWeight =
+                            if (balanceFilter == value)
+                                FontWeight.ExtraBold
+                            else
+                                FontWeight.Normal
+                    )
+                }
+            }
+        }
+
         val filteredPeople = people.filter { person ->
-            query.isBlank() || person.name.contains(query, ignoreCase = true) || person.phone.contains(query)
+            val matchesQuery =
+                query.isBlank() ||
+                    person.name.contains(
+                        query,
+                        ignoreCase = true
+                    ) ||
+                    person.phone.contains(query)
+
+            val matchesBalance =
+                when (balanceFilter) {
+                    "RECEIVABLE" -> person.balance > 0
+                    "PAYABLE" -> person.balance < 0
+                    else -> true
+                }
+
+            matchesQuery && matchesBalance
         }
         if (filteredPeople.isEmpty()) {
             Text(v15Text("কোনো $personLabel পাওয়া যায়নি।", "No $personLabel found."))
@@ -1979,25 +2220,30 @@ private fun BakiEntryScreen(
     }
 
     pendingDelete?.let { entry ->
-        AlertDialog(
-            onDismissRequest = { pendingDelete = null },
-            title = { Text(v15Text("এন্ট্রি মুছবেন?", "Delete entry?")) },
-            text = {
-                Text(
-                    "${actionLabel(entry.action)} — ${V14DisplayState.currencySymbol} ${money(entry.amount)}\n" +
-                        v15Text("মুছে দিলে ব্যক্তির বর্তমান হিসাবও স্বয়ংক্রিয়ভাবে বদলে যাবে।", "Deleting this entry will automatically update the current balance.")
-                )
+        ProtectedDeleteDialog(
+            viewModel = viewModel,
+            title =
+                v15Text(
+                    "এন্ট্রি মুছবেন?",
+                    "Delete entry?"
+                ),
+            message =
+                "${actionLabel(entry.action)} — ${V14DisplayState.currencySymbol} ${money(entry.amount)}\n" +
+                    v15Text(
+                        "মুছে দিলে ব্যক্তির বর্তমান হিসাবও স্বয়ংক্রিয়ভাবে বদলে যাবে।",
+                        "Deleting this entry will automatically update the current balance."
+                    ),
+            confirmLabel =
+                v15Text(
+                    "মুছুন",
+                    "Delete"
+                ),
+            onDismiss = {
+                pendingDelete = null
             },
-            confirmButton = {
-                TextButton(
-                    onClick = {
-                        viewModel.deleteBakiEntry(entry)
-                        pendingDelete = null
-                    }
-                ) { Text(v15Text("মুছুন", "Delete")) }
-            },
-            dismissButton = {
-                TextButton(onClick = { pendingDelete = null }) { Text(v15Text("বাতিল", "Cancel")) }
+            onConfirmed = {
+                viewModel.deleteBakiEntry(entry)
+                pendingDelete = null
             }
         )
     }

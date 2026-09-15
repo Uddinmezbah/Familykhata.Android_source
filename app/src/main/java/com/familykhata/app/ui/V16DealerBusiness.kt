@@ -38,6 +38,7 @@ import com.familykhata.app.dealerbusiness.DealerCollectionEntity
 import com.familykhata.app.dealerbusiness.DealerCompanyEntity
 import com.familykhata.app.dealerbusiness.DealerCustomerEntity
 import com.familykhata.app.dealerbusiness.DealerExpenseEntity
+import com.familykhata.app.dealerbusiness.DealerDamageEntity
 import com.familykhata.app.dealerbusiness.DealerDeliveryChallanEntity
 import com.familykhata.app.dealerbusiness.DealerDeliveryPersonEntity
 import com.familykhata.app.dealerbusiness.DealerProductPackEntity
@@ -118,6 +119,60 @@ private fun String.dealerBusinessDateMillis(): Long? {
     }.getOrNull()
 }
 
+private sealed interface DealerDeleteTarget {
+    data class Company(
+        val item: DealerCompanyEntity
+    ) : DealerDeleteTarget
+
+    data class Area(
+        val item: DealerAreaEntity
+    ) : DealerDeleteTarget
+
+    data class Customer(
+        val item: DealerCustomerEntity
+    ) : DealerDeleteTarget
+
+    data class DeliveryPerson(
+        val item: DealerDeliveryPersonEntity
+    ) : DealerDeleteTarget
+
+    data class Collection(
+        val item: DealerCollectionEntity
+    ) : DealerDeleteTarget
+
+    data class SupplierPayment(
+        val item: DealerSupplierPaymentEntity
+    ) : DealerDeleteTarget
+
+    data class Expense(
+        val item: DealerExpenseEntity
+    ) : DealerDeleteTarget
+
+    data class ProductPack(
+        val item: DealerProductPackEntity
+    ) : DealerDeleteTarget
+
+    data class Purchase(
+        val item: DealerPurchaseEntity
+    ) : DealerDeleteTarget
+
+    data class Sale(
+        val item: DealerSaleEntity
+    ) : DealerDeleteTarget
+
+    data class DeliveryChallan(
+        val item: DealerDeliveryChallanEntity
+    ) : DealerDeleteTarget
+
+    data class ReopenSettlement(
+        val item: DealerDeliveryChallanEntity
+    ) : DealerDeleteTarget
+
+    data class WarehouseDamage(
+        val item: DealerDamageEntity
+    ) : DealerDeleteTarget
+}
+
 @Composable
 internal fun V16DealerBusinessScreen(
     workspace: String,
@@ -126,6 +181,12 @@ internal fun V16DealerBusinessScreen(
     onExit: () -> Unit
 ) {
     val vm: DealerBusinessViewModel = viewModel()
+    val securityViewModel:
+        FamilyKhataViewModel = viewModel()
+
+    val context =
+        androidx.compose.ui.platform
+            .LocalContext.current
 
     val companies by vm.companies.collectAsState()
     val areas by vm.areas.collectAsState()
@@ -234,6 +295,18 @@ internal fun V16DealerBusinessScreen(
         )
     }
 
+    var editingDeliveryChallan by remember {
+        mutableStateOf<DealerDeliveryChallanEntity?>(
+            null
+        )
+    }
+
+    var editingSettlementChallan by remember {
+        mutableStateOf<DealerDeliveryChallanEntity?>(
+            null
+        )
+    }
+
     var editingExpense by remember {
         mutableStateOf<DealerExpenseEntity?>(null)
     }
@@ -264,6 +337,14 @@ internal fun V16DealerBusinessScreen(
 
     var editingSupplierPayment by remember {
         mutableStateOf<DealerSupplierPaymentEntity?>(null)
+    }
+
+    var editingDamage by remember {
+        mutableStateOf<DealerDamageEntity?>(null)
+    }
+
+    var deleteTarget by remember {
+        mutableStateOf<DealerDeleteTarget?>(null)
     }
 
     LaunchedEffect(
@@ -625,17 +706,37 @@ internal fun V16DealerBusinessScreen(
                     }
 
                     if (canWrite) {
-                        TextButton(
-                            onClick = {
-                                companyDialog = item
-                            }
+                        Row(
+                            horizontalArrangement =
+                                Arrangement.spacedBy(6.dp)
                         ) {
-                            Text(
-                                v15Text(
-                                    "সম্পাদনা",
-                                    "Edit"
+                            TextButton(
+                                onClick = {
+                                    companyDialog = item
+                                }
+                            ) {
+                                Text(
+                                    v15Text(
+                                        "সম্পাদনা",
+                                        "Edit"
+                                    )
                                 )
-                            )
+                            }
+
+                            TextButton(
+                                onClick = {
+                                    deleteTarget =
+                                        DealerDeleteTarget
+                                            .Company(item)
+                                }
+                            ) {
+                                Text(
+                                    v15Text(
+                                        "ডিলিট",
+                                        "Delete"
+                                    )
+                                )
+                            }
                         }
                     }
                 }
@@ -691,17 +792,34 @@ internal fun V16DealerBusinessScreen(
                     }
 
                     if (canWrite) {
-                        TextButton(
-                            onClick = {
-                                areaDialog = item
-                            }
-                        ) {
-                            Text(
-                                v15Text(
-                                    "সম্পাদনা",
-                                    "Edit"
+                        Column {
+                            TextButton(
+                                onClick = {
+                                    areaDialog = item
+                                }
+                            ) {
+                                Text(
+                                    v15Text(
+                                        "সম্পাদনা",
+                                        "Edit"
+                                    )
                                 )
-                            )
+                            }
+
+                            TextButton(
+                                onClick = {
+                                    deleteTarget =
+                                        DealerDeleteTarget
+                                            .Area(item)
+                                }
+                            ) {
+                                Text(
+                                    v15Text(
+                                        "ডিলিট",
+                                        "Delete"
+                                    )
+                                )
+                            }
                         }
                     }
                 }
@@ -801,17 +919,37 @@ internal fun V16DealerBusinessScreen(
                     }
 
                     if (canWrite) {
-                        TextButton(
-                            onClick = {
-                                customerDialog = item
-                            }
+                        Row(
+                            horizontalArrangement =
+                                Arrangement.spacedBy(6.dp)
                         ) {
-                            Text(
-                                v15Text(
-                                    "সম্পাদনা",
-                                    "Edit"
+                            TextButton(
+                                onClick = {
+                                    customerDialog = item
+                                }
+                            ) {
+                                Text(
+                                    v15Text(
+                                        "সম্পাদনা",
+                                        "Edit"
+                                    )
                                 )
-                            )
+                            }
+
+                            TextButton(
+                                onClick = {
+                                    deleteTarget =
+                                        DealerDeleteTarget
+                                            .Customer(item)
+                                }
+                            ) {
+                                Text(
+                                    v15Text(
+                                        "ডিলিট",
+                                        "Delete"
+                                    )
+                                )
+                            }
                         }
                     }
                 }
@@ -1046,6 +1184,97 @@ internal fun V16DealerBusinessScreen(
                                     )
                                 )
                             }
+
+                            if (canWrite) {
+                                TextButton(
+                                    onClick = {
+                                        editingDeliveryChallan =
+                                            challan
+                                    }
+                                ) {
+                                    Text(
+                                        v15Text(
+                                            "চালান তথ্য সম্পাদনা",
+                                            "Edit challan info"
+                                        )
+                                    )
+                                }
+
+                                if (
+                                    challan.status ==
+                                        "OPEN"
+                                ) {
+                                    TextButton(
+                                        onClick = {
+                                            deleteTarget =
+                                                DealerDeleteTarget
+                                                    .DeliveryChallan(
+                                                        challan
+                                                    )
+                                        }
+                                    ) {
+                                        Text(
+                                            v15Text(
+                                                "চালান ডিলিট",
+                                                "Delete challan"
+                                            )
+                                        )
+                                    }
+                                }
+
+                                if (
+                                    challan.status ==
+                                        "SETTLED"
+                                ) {
+                                    Row(
+                                        modifier =
+                                            Modifier.fillMaxWidth(),
+                                        horizontalArrangement =
+                                            Arrangement.spacedBy(
+                                                6.dp
+                                            )
+                                    ) {
+                                        TextButton(
+                                            onClick = {
+                                                editingSettlementChallan =
+                                                    challan
+                                            },
+                                            modifier =
+                                                Modifier.weight(
+                                                    1f
+                                                )
+                                        ) {
+                                            Text(
+                                                v15Text(
+                                                    "সেটেলমেন্ট সম্পাদনা",
+                                                    "Edit settlement"
+                                                )
+                                            )
+                                        }
+
+                                        TextButton(
+                                            onClick = {
+                                                deleteTarget =
+                                                    DealerDeleteTarget
+                                                        .ReopenSettlement(
+                                                            challan
+                                                        )
+                                            },
+                                            modifier =
+                                                Modifier.weight(
+                                                    1f
+                                                )
+                                        ) {
+                                            Text(
+                                                v15Text(
+                                                    "পুনরায় খুলুন",
+                                                    "Reopen"
+                                                )
+                                            )
+                                        }
+                                    }
+                                }
+                            }
                         }
                     }
                 }
@@ -1120,6 +1349,50 @@ internal fun V16DealerBusinessScreen(
                                     damage.damagedAt
                                 )
                             )
+
+                            if (
+                                canWrite &&
+                                damage.sourceType ==
+                                    "WAREHOUSE"
+                            ) {
+                                Row(
+                                    horizontalArrangement =
+                                        Arrangement.spacedBy(
+                                            6.dp
+                                        )
+                                ) {
+                                    TextButton(
+                                        onClick = {
+                                            editingDamage =
+                                                damage
+                                        }
+                                    ) {
+                                        Text(
+                                            v15Text(
+                                                "সম্পাদনা",
+                                                "Edit"
+                                            )
+                                        )
+                                    }
+
+                                    TextButton(
+                                        onClick = {
+                                            deleteTarget =
+                                                DealerDeleteTarget
+                                                    .WarehouseDamage(
+                                                        damage
+                                                    )
+                                        }
+                                    ) {
+                                        Text(
+                                            v15Text(
+                                                "ডিলিট",
+                                                "Delete"
+                                            )
+                                        )
+                                    }
+                                }
+                            }
                         }
                     }
                 }
@@ -1182,21 +1455,40 @@ internal fun V16DealerBusinessScreen(
                         }
 
                         if (canWrite) {
-                            TextButton(
-                                onClick = {
-                                    editingDeliveryPerson =
-                                        person
+                            Column {
+                                TextButton(
+                                    onClick = {
+                                        editingDeliveryPerson =
+                                            person
 
-                                    showDeliveryPerson =
-                                        true
-                                }
-                            ) {
-                                Text(
-                                    v15Text(
-                                        "সম্পাদনা",
-                                        "Edit"
+                                        showDeliveryPerson =
+                                            true
+                                    }
+                                ) {
+                                    Text(
+                                        v15Text(
+                                            "সম্পাদনা",
+                                            "Edit"
+                                        )
                                     )
-                                )
+                                }
+
+                                TextButton(
+                                    onClick = {
+                                        deleteTarget =
+                                            DealerDeleteTarget
+                                                .DeliveryPerson(
+                                                    person
+                                                )
+                                    }
+                                ) {
+                                    Text(
+                                        v15Text(
+                                            "ডিলিট",
+                                            "Delete"
+                                        )
+                                    )
+                                }
                             }
                         }
                     }
@@ -1390,18 +1682,48 @@ internal fun V16DealerBusinessScreen(
                     }
 
                     if (canWrite) {
-                        TextButton(
-                            onClick = {
-                                editingPurchaseMeta =
-                                    purchase
-                            }
-                        ) {
-                            Text(
-                                v15Text(
-                                    "ইনভয়েস তথ্য সম্পাদনা",
-                                    "Edit invoice info"
+                        Row(
+                            modifier =
+                                Modifier.fillMaxWidth(),
+                            horizontalArrangement =
+                                Arrangement.spacedBy(
+                                    6.dp
                                 )
-                            )
+                        ) {
+                            TextButton(
+                                onClick = {
+                                    editingPurchaseMeta =
+                                        purchase
+                                },
+                                modifier =
+                                    Modifier.weight(1f)
+                            ) {
+                                Text(
+                                    v15Text(
+                                        "সম্পাদনা",
+                                        "Edit"
+                                    )
+                                )
+                            }
+
+                            TextButton(
+                                onClick = {
+                                    deleteTarget =
+                                        DealerDeleteTarget
+                                            .Purchase(
+                                                purchase
+                                            )
+                                },
+                                modifier =
+                                    Modifier.weight(1f)
+                            ) {
+                                Text(
+                                    v15Text(
+                                        "ডিলিট",
+                                        "Delete"
+                                    )
+                                )
+                            }
                         }
                     }
                 }
@@ -1482,18 +1804,46 @@ internal fun V16DealerBusinessScreen(
                     }
 
                     if (canWrite) {
-                        TextButton(
-                            onClick = {
-                                editingSaleMeta =
-                                    sale
-                            }
-                        ) {
-                            Text(
-                                v15Text(
-                                    "ইনভয়েস তথ্য সম্পাদনা",
-                                    "Edit invoice info"
+                        Row(
+                            modifier =
+                                Modifier.fillMaxWidth(),
+                            horizontalArrangement =
+                                Arrangement.spacedBy(
+                                    6.dp
                                 )
-                            )
+                        ) {
+                            TextButton(
+                                onClick = {
+                                    editingSaleMeta =
+                                        sale
+                                },
+                                modifier =
+                                    Modifier.weight(1f)
+                            ) {
+                                Text(
+                                    v15Text(
+                                        "সম্পাদনা",
+                                        "Edit"
+                                    )
+                                )
+                            }
+
+                            TextButton(
+                                onClick = {
+                                    deleteTarget =
+                                        DealerDeleteTarget
+                                            .Sale(sale)
+                                },
+                                modifier =
+                                    Modifier.weight(1f)
+                            ) {
+                                Text(
+                                    v15Text(
+                                        "ডিলিট",
+                                        "Delete"
+                                    )
+                                )
+                            }
                         }
                     }
                 }
@@ -1558,19 +1908,39 @@ internal fun V16DealerBusinessScreen(
                     }
 
                     if (canWrite) {
-                        TextButton(
-                            onClick = {
-                                editingCollection =
-                                    item
-                                showCollection = true
-                            }
+                        Row(
+                            horizontalArrangement =
+                                Arrangement.spacedBy(6.dp)
                         ) {
-                            Text(
-                                v15Text(
-                                    "সংশোধন",
-                                    "Correct"
+                            TextButton(
+                                onClick = {
+                                    editingCollection =
+                                        item
+                                    showCollection = true
+                                }
+                            ) {
+                                Text(
+                                    v15Text(
+                                        "সংশোধন",
+                                        "Correct"
+                                    )
                                 )
-                            )
+                            }
+
+                            TextButton(
+                                onClick = {
+                                    deleteTarget =
+                                        DealerDeleteTarget
+                                            .Collection(item)
+                                }
+                            ) {
+                                Text(
+                                    v15Text(
+                                        "ডিলিট",
+                                        "Delete"
+                                    )
+                                )
+                            }
                         }
                     }
                 }
@@ -1635,20 +2005,42 @@ internal fun V16DealerBusinessScreen(
                     }
 
                     if (canWrite) {
-                        TextButton(
-                            onClick = {
-                                editingSupplierPayment =
-                                    item
-                                showSupplierPayment =
-                                    true
-                            }
+                        Row(
+                            horizontalArrangement =
+                                Arrangement.spacedBy(6.dp)
                         ) {
-                            Text(
-                                v15Text(
-                                    "সংশোধন",
-                                    "Correct"
+                            TextButton(
+                                onClick = {
+                                    editingSupplierPayment =
+                                        item
+                                    showSupplierPayment =
+                                        true
+                                }
+                            ) {
+                                Text(
+                                    v15Text(
+                                        "সংশোধন",
+                                        "Correct"
+                                    )
                                 )
-                            )
+                            }
+
+                            TextButton(
+                                onClick = {
+                                    deleteTarget =
+                                        DealerDeleteTarget
+                                            .SupplierPayment(
+                                                item
+                                            )
+                                }
+                            ) {
+                                Text(
+                                    v15Text(
+                                        "ডিলিট",
+                                        "Delete"
+                                    )
+                                )
+                            }
                         }
                     }
                 }
@@ -1713,20 +2105,37 @@ internal fun V16DealerBusinessScreen(
                     }
 
                     if (canWrite) {
-                        TextButton(
-                            onClick = {
-                                editingExpense =
-                                    expense
-                                showExpense =
-                                    true
-                            }
-                        ) {
-                            Text(
-                                v15Text(
-                                    "সম্পাদনা",
-                                    "Edit"
+                        Column {
+                            TextButton(
+                                onClick = {
+                                    editingExpense =
+                                        expense
+                                    showExpense =
+                                        true
+                                }
+                            ) {
+                                Text(
+                                    v15Text(
+                                        "সম্পাদনা",
+                                        "Edit"
+                                    )
                                 )
-                            )
+                            }
+
+                            TextButton(
+                                onClick = {
+                                    deleteTarget =
+                                        DealerDeleteTarget
+                                            .Expense(expense)
+                                }
+                            ) {
+                                Text(
+                                    v15Text(
+                                        "ডিলিট",
+                                        "Delete"
+                                    )
+                                )
+                            }
                         }
                     }
                 }
@@ -2261,12 +2670,111 @@ internal fun V16DealerBusinessScreen(
         )
     }
 
+    editingDeliveryChallan?.let { item ->
+        DealerDeliveryChallanMetaDialog(
+            initial = item,
+            deliveryPeople =
+                deliveryPeople,
+            onDismiss = {
+                editingDeliveryChallan =
+                    null
+            },
+            onSave = {
+                    personId,
+                    challanNo,
+                    issuedAt,
+                    note ->
+
+                vm.updateDeliveryChallanMeta(
+                    item = item,
+                    deliveryPersonId =
+                        personId,
+                    challanNo =
+                        challanNo,
+                    issuedAt =
+                        issuedAt,
+                    note = note
+                ) {
+                    if (it) {
+                        editingDeliveryChallan =
+                            null
+                    }
+                }
+            }
+        )
+    }
+
+    editingSettlementChallan?.let {
+            challan ->
+
+        DealerDeliverySettlementMetaDialog(
+            challan = challan,
+            viewModel = vm,
+            onDismiss = {
+                editingSettlementChallan =
+                    null
+            },
+            onSave = {
+                    settlement,
+                    cash,
+                    receivedAt,
+                    note ->
+
+                vm.updateDeliverySettlementMeta(
+                    challan = challan,
+                    item = settlement,
+                    cashHandedOver =
+                        cash,
+                    receivedAt =
+                        receivedAt,
+                    note = note
+                ) {
+                    if (it) {
+                        editingSettlementChallan =
+                            null
+                    }
+                }
+            }
+        )
+    }
+
+    editingDamage?.let { item ->
+        DealerWarehouseDamageEditDialog(
+            initial = item,
+            onDismiss = {
+                editingDamage = null
+            },
+            onSave = {
+                    quantity,
+                    reason,
+                    note ->
+
+                vm.updateWarehouseDamage(
+                    item = item,
+                    quantityPieces =
+                        quantity,
+                    reason = reason,
+                    note = note
+                ) {
+                    if (it) {
+                        editingDamage = null
+                    }
+                }
+            }
+        )
+    }
+
     if (showPackSetup) {
         DealerPackSetupDialog(
             products = products,
             packs = productPacks,
             onDismiss = {
                 showPackSetup = false
+            },
+            onDelete = { pack ->
+                deleteTarget =
+                    DealerDeleteTarget
+                        .ProductPack(pack)
             },
             onSave = {
                     productId,
@@ -2376,6 +2884,284 @@ internal fun V16DealerBusinessScreen(
                             editingExpense = null
                         }
                     }
+                }
+            }
+        )
+    }
+
+    deleteTarget?.let { target ->
+        val title =
+            when (target) {
+                is DealerDeleteTarget.Company ->
+                    v15Text(
+                        "কোম্পানি ডিলিট করবেন?",
+                        "Delete company?"
+                    )
+
+                is DealerDeleteTarget.Area ->
+                    v15Text(
+                        "এরিয়া ডিলিট করবেন?",
+                        "Delete area?"
+                    )
+
+                is DealerDeleteTarget.Customer ->
+                    v15Text(
+                        "রিটেইলার ডিলিট করবেন?",
+                        "Delete retailer?"
+                    )
+
+                is DealerDeleteTarget.DeliveryPerson ->
+                    v15Text(
+                        "ডেলিভারি ম্যান ডিলিট করবেন?",
+                        "Delete delivery person?"
+                    )
+
+                is DealerDeleteTarget.Collection ->
+                    v15Text(
+                        "কালেকশন ডিলিট করবেন?",
+                        "Delete collection?"
+                    )
+
+                is DealerDeleteTarget.SupplierPayment ->
+                    v15Text(
+                        "সাপ্লায়ার পেমেন্ট ডিলিট করবেন?",
+                        "Delete supplier payment?"
+                    )
+
+                is DealerDeleteTarget.Expense ->
+                    v15Text(
+                        "খরচ ডিলিট করবেন?",
+                        "Delete expense?"
+                    )
+
+                is DealerDeleteTarget.ProductPack ->
+                    v15Text(
+                        "প্যাক সেটআপ ডিলিট করবেন?",
+                        "Delete pack setup?"
+                    )
+
+                is DealerDeleteTarget.Purchase ->
+                    v15Text(
+                        "ক্রয় ডিলিট করবেন?",
+                        "Delete purchase?"
+                    )
+
+                is DealerDeleteTarget.Sale ->
+                    v15Text(
+                        "বিক্রি ডিলিট করবেন?",
+                        "Delete sale?"
+                    )
+
+                is DealerDeleteTarget.DeliveryChallan ->
+                    v15Text(
+                        "ডেলিভারি চালান ডিলিট করবেন?",
+                        "Delete delivery challan?"
+                    )
+
+                is DealerDeleteTarget.ReopenSettlement ->
+                    v15Text(
+                        "সেটেলমেন্ট পুনরায় খুলবেন?",
+                        "Reopen settlement?"
+                    )
+
+                is DealerDeleteTarget.WarehouseDamage ->
+                    v15Text(
+                        "ড্যামেজ এন্ট্রি ডিলিট করবেন?",
+                        "Delete damage entry?"
+                    )
+            }
+
+        val message =
+            when (target) {
+                is DealerDeleteTarget.Company ->
+                    v15Text(
+                        "${target.item.name} ডিলিট হবে। আগের ক্রয়/পেমেন্ট ইতিহাস থাকবে, তবে কোম্পানির লিংক সরবে।",
+                        "${target.item.name} will be deleted. Existing purchase/payment history remains, but the company link will be removed."
+                    )
+
+                is DealerDeleteTarget.Area ->
+                    v15Text(
+                        "এরিয়া ডিলিট হলে সংশ্লিষ্ট রিটেইলার থাকবে, শুধু এরিয়া লিংক সরবে।",
+                        "Retailers remain; only their area link is removed."
+                    )
+
+                is DealerDeleteTarget.Customer ->
+                    v15Text(
+                        "${target.item.name} ডিলিট হবে। আগের বিক্রি/কালেকশন snapshot ইতিহাস থাকবে।",
+                        "${target.item.name} will be deleted. Historical sale/collection snapshots remain."
+                    )
+
+                is DealerDeleteTarget.DeliveryPerson ->
+                    v15Text(
+                        "ডেলিভারি ম্যান ডিলিট হবে। পুরনো চালানে নামের snapshot থাকবে।",
+                        "The delivery person will be deleted. Existing challans keep the name snapshot."
+                    )
+
+                is DealerDeleteTarget.Collection ->
+                    v15Text(
+                        "এই কালেকশন ডিলিট হলে রিটেইলারের বাকি হিসাব স্বয়ংক্রিয়ভাবে পুনরায় হিসাব হবে।",
+                        "Deleting this collection will automatically rebuild the retailer due allocation."
+                    )
+
+                is DealerDeleteTarget.SupplierPayment ->
+                    v15Text(
+                        "এই পেমেন্ট ডিলিট হলে সাপ্লায়ারের পাওনা হিসাব স্বয়ংক্রিয়ভাবে পুনরায় হিসাব হবে।",
+                        "Deleting this payment will automatically rebuild supplier payment allocation."
+                    )
+
+                is DealerDeleteTarget.Expense ->
+                    v15Text(
+                        "এই ব্যবসার খরচ স্থায়ীভাবে ডিলিট হবে।",
+                        "This business expense will be permanently deleted."
+                    )
+
+                is DealerDeleteTarget.ProductPack ->
+                    v15Text(
+                        "বক্স/পাতা conversion সেটআপ মুছে যাবে। পণ্যের stock পিসে অপরিবর্তিত থাকবে।",
+                        "Box/sheet conversion will be removed. Piece stock remains unchanged."
+                    )
+
+                is DealerDeleteTarget.Purchase ->
+                    v15Text(
+                        "ক্রয়টি শুধু তখনই ডিলিট হবে যখন এর stock অন্য বিক্রি/ডেলিভারি/ড্যামেজে ব্যবহার হয়নি। পেমেন্ট allocation পুনরায় হিসাব হবে।",
+                        "The purchase is deleted only when its stock has not been used by sale, delivery or damage. Payment allocations are rebuilt."
+                    )
+
+                is DealerDeleteTarget.Sale ->
+                    v15Text(
+                        "বিক্রি ডিলিট হলে stock effect reverse হবে এবং রিটেইলারের কালেকশন/বাকি allocation পুনরায় হিসাব হবে।",
+                        "Deleting the sale reverses its stock effect and rebuilds retailer collection/due allocations."
+                    )
+
+                is DealerDeleteTarget.DeliveryChallan ->
+                    v15Text(
+                        "OPEN চালানে কোনো বিক্রি বা সেটেলমেন্ট না থাকলেই ডিলিট হবে। চালানের মাল warehouse stock-এ ফেরত যাবে।",
+                        "Only an OPEN challan with no sale or settlement can be deleted. Issued goods return to warehouse stock."
+                    )
+
+                is DealerDeleteTarget.ReopenSettlement ->
+                    v15Text(
+                        "রাতের সেটেলমেন্ট reverse করে চালান আবার OPEN হবে। ফেরত মাল delivery custody-তে যাবে এবং settlement damage entry সরবে।",
+                        "The night settlement will be reversed and the challan reopened. Returned stock goes back to delivery custody and settlement damage records are removed."
+                    )
+
+                is DealerDeleteTarget.WarehouseDamage ->
+                    v15Text(
+                        "ড্যামেজ এন্ট্রি মুছলে ঐ পরিমাণ পণ্য আবার সংশ্লিষ্ট stock batch-এ ফেরত যাবে।",
+                        "Deleting this damage entry restores the quantity to its stock batch."
+                    )
+            }
+
+        val finishDelete:
+            (Boolean) -> Unit = { ok ->
+                Toast.makeText(
+                    context,
+                    if (ok) {
+                        v15Text(
+                            "ডিলিট হয়েছে",
+                            "Deleted"
+                        )
+                    } else {
+                        v15Text(
+                            "ডিলিট করা যায়নি। সংযুক্ত হিসাব/স্টক যাচাই করুন।",
+                            "Delete failed. Check linked accounting/stock."
+                        )
+                    },
+                    Toast.LENGTH_SHORT
+                ).show()
+
+                if (ok) {
+                    deleteTarget = null
+                }
+            }
+
+        ProtectedDeleteDialog(
+            viewModel =
+                securityViewModel,
+            title = title,
+            message = message,
+            onDismiss = {
+                deleteTarget = null
+            },
+            onConfirmed = {
+                when (target) {
+                    is DealerDeleteTarget.Company ->
+                        vm.deleteCompany(
+                            target.item,
+                            finishDelete
+                        )
+
+                    is DealerDeleteTarget.Area ->
+                        vm.deleteArea(
+                            target.item,
+                            finishDelete
+                        )
+
+                    is DealerDeleteTarget.Customer ->
+                        vm.deleteCustomer(
+                            target.item,
+                            finishDelete
+                        )
+
+                    is DealerDeleteTarget.DeliveryPerson ->
+                        vm.deleteDeliveryPerson(
+                            target.item,
+                            finishDelete
+                        )
+
+                    is DealerDeleteTarget.Collection ->
+                        vm.deleteCollection(
+                            target.item,
+                            finishDelete
+                        )
+
+                    is DealerDeleteTarget.SupplierPayment ->
+                        vm.deleteSupplierPayment(
+                            target.item,
+                            finishDelete
+                        )
+
+                    is DealerDeleteTarget.Expense ->
+                        vm.deleteExpense(
+                            target.item,
+                            finishDelete
+                        )
+
+                    is DealerDeleteTarget.ProductPack ->
+                        vm.deleteProductPack(
+                            target.item,
+                            finishDelete
+                        )
+
+                    is DealerDeleteTarget.Purchase ->
+                        vm.deletePurchase(
+                            target.item,
+                            finishDelete
+                        )
+
+                    is DealerDeleteTarget.Sale ->
+                        vm.deleteSale(
+                            target.item,
+                            finishDelete
+                        )
+
+                    is DealerDeleteTarget.DeliveryChallan ->
+                        vm.deleteDeliveryChallan(
+                            target.item,
+                            finishDelete
+                        )
+
+                    is DealerDeleteTarget.ReopenSettlement ->
+                        vm.reopenDeliverySettlement(
+                            target.item,
+                            finishDelete
+                        )
+
+                    is DealerDeleteTarget.WarehouseDamage ->
+                        vm.deleteWarehouseDamage(
+                            target.item,
+                            finishDelete
+                        )
                 }
             }
         )
@@ -2808,6 +3594,15 @@ private fun DealerSaleDetail(
         )
     }
 
+    var deletingReturn by remember {
+        mutableStateOf<DealerSalesReturnEntity?>(
+            null
+        )
+    }
+
+    val deleteSecurityViewModel:
+        FamilyKhataViewModel = viewModel()
+
     Column(
         modifier =
             Modifier
@@ -2986,17 +3781,39 @@ private fun DealerSaleDetail(
                     }
 
                     if (canWrite) {
-                        TextButton(
-                            onClick = {
-                                editingReturn = item
-                            }
-                        ) {
-                            Text(
-                                v15Text(
-                                    "নোট/তারিখ সম্পাদনা",
-                                    "Edit note/date"
+                        Row(
+                            horizontalArrangement =
+                                Arrangement.spacedBy(
+                                    6.dp
                                 )
-                            )
+                        ) {
+                            TextButton(
+                                onClick = {
+                                    editingReturn =
+                                        item
+                                }
+                            ) {
+                                Text(
+                                    v15Text(
+                                        "সম্পাদনা",
+                                        "Edit"
+                                    )
+                                )
+                            }
+
+                            TextButton(
+                                onClick = {
+                                    deletingReturn =
+                                        item
+                                }
+                            ) {
+                                Text(
+                                    v15Text(
+                                        "ডিলিট",
+                                        "Delete"
+                                    )
+                                )
+                            }
                         }
                     }
                 }
@@ -3070,6 +3887,51 @@ private fun DealerSaleDetail(
             }
         )
     }
+
+    deletingReturn?.let { item ->
+        ProtectedDeleteDialog(
+            viewModel =
+                deleteSecurityViewModel,
+            title =
+                v15Text(
+                    "রিটার্ন ডিলিট করবেন?",
+                    "Delete return?"
+                ),
+            message =
+                v15Text(
+                    "রিটার্নের stock ও বাকি হিসাব reverse হবে। ফেরত stock পরে ব্যবহার হয়ে থাকলে নিরাপত্তার জন্য ডিলিট বন্ধ হবে।",
+                    "Return stock and due effects will be reversed. Delete is blocked if restored stock has already been consumed."
+                ),
+            onDismiss = {
+                deletingReturn = null
+            },
+            onConfirmed = {
+                viewModel.deleteSalesReturn(
+                    item
+                ) { ok ->
+                    Toast.makeText(
+                        context,
+                        if (ok) {
+                            v15Text(
+                                "রিটার্ন ডিলিট হয়েছে",
+                                "Return deleted"
+                            )
+                        } else {
+                            v15Text(
+                                "রিটার্ন ডিলিট করা যায়নি",
+                                "Return could not be deleted"
+                            )
+                        },
+                        Toast.LENGTH_SHORT
+                    ).show()
+
+                    if (ok) {
+                        deletingReturn = null
+                    }
+                }
+            }
+        )
+    }
 }
 
 @Composable
@@ -3117,6 +3979,15 @@ private fun DealerPurchaseDetail(
             null
         )
     }
+
+    var deletingReturn by remember {
+        mutableStateOf<DealerPurchaseReturnEntity?>(
+            null
+        )
+    }
+
+    val deleteSecurityViewModel:
+        FamilyKhataViewModel = viewModel()
 
     Column(
         modifier =
@@ -3296,17 +4167,39 @@ private fun DealerPurchaseDetail(
                     }
 
                     if (canWrite) {
-                        TextButton(
-                            onClick = {
-                                editingReturn = item
-                            }
-                        ) {
-                            Text(
-                                v15Text(
-                                    "নোট/তারিখ সম্পাদনা",
-                                    "Edit note/date"
+                        Row(
+                            horizontalArrangement =
+                                Arrangement.spacedBy(
+                                    6.dp
                                 )
-                            )
+                        ) {
+                            TextButton(
+                                onClick = {
+                                    editingReturn =
+                                        item
+                                }
+                            ) {
+                                Text(
+                                    v15Text(
+                                        "সম্পাদনা",
+                                        "Edit"
+                                    )
+                                )
+                            }
+
+                            TextButton(
+                                onClick = {
+                                    deletingReturn =
+                                        item
+                                }
+                            ) {
+                                Text(
+                                    v15Text(
+                                        "ডিলিট",
+                                        "Delete"
+                                    )
+                                )
+                            }
                         }
                     }
                 }
@@ -3374,6 +4267,51 @@ private fun DealerPurchaseDetail(
                 ) {
                     if (it) {
                         editingReturn = null
+                    }
+                }
+            }
+        )
+    }
+
+    deletingReturn?.let { item ->
+        ProtectedDeleteDialog(
+            viewModel =
+                deleteSecurityViewModel,
+            title =
+                v15Text(
+                    "পারচেজ রিটার্ন ডিলিট করবেন?",
+                    "Delete purchase return?"
+                ),
+            message =
+                v15Text(
+                    "ডিলিট করলে রিটার্ন করা পণ্য আবার stock-এ যোগ হবে এবং supplier payable পুনরায় হিসাব হবে।",
+                    "Deleting this return adds the quantity back to stock and rebuilds supplier payable allocations."
+                ),
+            onDismiss = {
+                deletingReturn = null
+            },
+            onConfirmed = {
+                viewModel.deletePurchaseReturn(
+                    item
+                ) { ok ->
+                    Toast.makeText(
+                        context,
+                        if (ok) {
+                            v15Text(
+                                "পারচেজ রিটার্ন ডিলিট হয়েছে",
+                                "Purchase return deleted"
+                            )
+                        } else {
+                            v15Text(
+                                "পারচেজ রিটার্ন ডিলিট করা যায়নি",
+                                "Purchase return could not be deleted"
+                            )
+                        },
+                        Toast.LENGTH_SHORT
+                    ).show()
+
+                    if (ok) {
+                        deletingReturn = null
                     }
                 }
             }
@@ -5510,14 +6448,14 @@ private fun DealerDeliverySaleDialog(
                                             ""
                                         )
                                         ?.toDoubleOrNull()
-                                        ?: 0.0
+                                        ?: -1.0
 
                                 if (
                                     quantity > 0 &&
                                     quantity <=
                                         status
                                             .remainingPieces &&
-                                    rate >= 0
+                                    rate > 0
                                 ) {
                                     com.familykhata.app
                                         .dealerbusiness
@@ -5554,19 +6492,58 @@ private fun DealerDeliverySaleDialog(
                                         .remainingPieces
                         }
 
-                    val collection =
+                    val invalidRate =
+                        statuses.any {
+                                status ->
+
+                            val quantity =
+                                quantityValues[
+                                    status.line.id
+                                ]
+                                    ?.dealerBusinessInt()
+                                    ?: 0
+
+                            val rate =
+                                rateValues[
+                                    status.line.id
+                                ]
+                                    ?.trim()
+                                    ?.replace(
+                                        ",",
+                                        ""
+                                    )
+                                    ?.toDoubleOrNull()
+
+                            quantity > 0 &&
+                                (
+                                    rate == null ||
+                                        rate <= 0
+                                )
+                        }
+
+                    val collectionText =
                         collectedNow
                             .trim()
                             .replace(
                                 ",",
                                 ""
                             )
-                            .toDoubleOrNull()
-                            ?: 0.0
+
+                    val collection =
+                        if (
+                            collectionText.isBlank()
+                        ) {
+                            0.0
+                        } else {
+                            collectionText
+                                .toDoubleOrNull()
+                                ?: return@TextButton
+                        }
 
                     if (
                         saleLines.isNotEmpty() &&
                         !invalidQuantity &&
+                        !invalidRate &&
                         collection >= 0
                     ) {
                         onSave(
@@ -6021,15 +6998,24 @@ private fun DealerDeliverySettlementDialog(
                                         .quantityPieces
                         }
 
-                    val cashValue =
+                    val cashText =
                         cash
                             .trim()
                             .replace(
                                 ",",
                                 ""
                             )
-                            .toDoubleOrNull()
-                            ?: 0.0
+
+                    val cashValue =
+                        if (
+                            cashText.isBlank()
+                        ) {
+                            0.0
+                        } else {
+                            cashText
+                                .toDoubleOrNull()
+                                ?: return@TextButton
+                        }
 
                     if (
                         balanced &&
@@ -6077,6 +7063,9 @@ private fun DealerDeliveryChallanDialog(
     packs:
         List<DealerProductPackEntity>,
     onDismiss: () -> Unit,
+    onDelete: (
+        DealerProductPackEntity
+    ) -> Unit,
     onSave: (
         Long,
         String,
@@ -6797,6 +7786,564 @@ private fun DealerWarehouseDamageDialog(
 
 
 @Composable
+private fun DealerDeliveryChallanMetaDialog(
+    initial: DealerDeliveryChallanEntity,
+    deliveryPeople:
+        List<DealerDeliveryPersonEntity>,
+    onDismiss: () -> Unit,
+    onSave: (
+        Long,
+        String,
+        Long,
+        String
+    ) -> Unit
+) {
+    var personId by remember(initial.id) {
+        mutableStateOf(
+            initial.deliveryPersonId
+        )
+    }
+
+    var challanNo by remember(initial.id) {
+        mutableStateOf(
+            initial.challanNo
+        )
+    }
+
+    var dateText by remember(initial.id) {
+        mutableStateOf(
+            dealerBusinessDate(
+                initial.issuedAt
+            )
+        )
+    }
+
+    var note by remember(initial.id) {
+        mutableStateOf(
+            initial.note
+        )
+    }
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = {
+            Text(
+                v15Text(
+                    "চালান তথ্য সম্পাদনা",
+                    "Edit challan information"
+                )
+            )
+        },
+        text = {
+            Column(
+                modifier =
+                    Modifier
+                        .heightIn(
+                            max = 560.dp
+                        )
+                        .verticalScroll(
+                            rememberScrollState()
+                        ),
+                verticalArrangement =
+                    Arrangement.spacedBy(7.dp)
+            ) {
+                Text(
+                    v15Text(
+                        "ডেলিভারি ম্যান",
+                        "Delivery person"
+                    ),
+                    fontWeight =
+                        FontWeight.Bold
+                )
+
+                deliveryPeople.forEach {
+                        person ->
+
+                    OutlinedButton(
+                        onClick = {
+                            personId =
+                                person.id
+                        },
+                        modifier =
+                            Modifier.fillMaxWidth()
+                    ) {
+                        Text(
+                            if (
+                                personId ==
+                                    person.id
+                            ) {
+                                "✓ ${person.name}"
+                            } else {
+                                person.name
+                            }
+                        )
+                    }
+                }
+
+                OutlinedTextField(
+                    value = challanNo,
+                    onValueChange = {
+                        challanNo = it
+                    },
+                    label = {
+                        Text(
+                            v15Text(
+                                "চালান নং",
+                                "Challan no."
+                            )
+                        )
+                    },
+                    modifier =
+                        Modifier.fillMaxWidth()
+                )
+
+                OutlinedTextField(
+                    value = dateText,
+                    onValueChange = {
+                        dateText = it
+                    },
+                    label = {
+                        Text(
+                            v15Text(
+                                "তারিখ (YYYY-MM-DD)",
+                                "Date (YYYY-MM-DD)"
+                            )
+                        )
+                    },
+                    modifier =
+                        Modifier.fillMaxWidth()
+                )
+
+                OutlinedTextField(
+                    value = note,
+                    onValueChange = {
+                        note = it
+                    },
+                    label = {
+                        Text(
+                            v15Text(
+                                "নোট",
+                                "Note"
+                            )
+                        )
+                    },
+                    modifier =
+                        Modifier.fillMaxWidth()
+                )
+            }
+        },
+        confirmButton = {
+            TextButton(
+                onClick = {
+                    val selectedPerson =
+                        personId
+                            ?: return@TextButton
+
+                    val issuedAt =
+                        dateText
+                            .dealerBusinessDateMillis()
+                            ?: return@TextButton
+
+                    onSave(
+                        selectedPerson,
+                        challanNo,
+                        issuedAt,
+                        note
+                    )
+                }
+            ) {
+                Text(
+                    v15Text(
+                        "সংরক্ষণ",
+                        "Save"
+                    )
+                )
+            }
+        },
+        dismissButton = {
+            TextButton(
+                onClick = onDismiss
+            ) {
+                Text(
+                    v15Text(
+                        "বাতিল",
+                        "Cancel"
+                    )
+                )
+            }
+        }
+    )
+}
+
+
+@Composable
+private fun DealerDeliverySettlementMetaDialog(
+    challan: DealerDeliveryChallanEntity,
+    viewModel: DealerBusinessViewModel,
+    onDismiss: () -> Unit,
+    onSave: (
+        com.familykhata.app.dealerbusiness
+            .DealerDeliverySettlementEntity,
+        Double,
+        Long,
+        String
+    ) -> Unit
+) {
+    var settlement by
+        remember(challan.id) {
+            mutableStateOf<
+                com.familykhata.app
+                    .dealerbusiness
+                    .DealerDeliverySettlementEntity?
+            >(null)
+        }
+
+    var loading by remember(challan.id) {
+        mutableStateOf(true)
+    }
+
+    var cash by remember(challan.id) {
+        mutableStateOf("")
+    }
+
+    var dateText by remember(challan.id) {
+        mutableStateOf("")
+    }
+
+    var note by remember(challan.id) {
+        mutableStateOf("")
+    }
+
+    LaunchedEffect(challan.id) {
+        loading = true
+
+        val loaded =
+            viewModel.loadDeliverySettlement(
+                challan.id
+            )
+
+        settlement = loaded
+
+        if (loaded != null) {
+            cash =
+                loaded.cashHandedOver
+                    .toString()
+
+            dateText =
+                dealerBusinessDate(
+                    loaded.receivedAt
+                )
+
+            note =
+                loaded.note
+        }
+
+        loading = false
+    }
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = {
+            Text(
+                v15Text(
+                    "সেটেলমেন্ট সম্পাদনা",
+                    "Edit settlement"
+                )
+            )
+        },
+        text = {
+            Column(
+                verticalArrangement =
+                    Arrangement.spacedBy(7.dp)
+            ) {
+                if (loading) {
+                    Text(
+                        v15Text(
+                            "লোড হচ্ছে...",
+                            "Loading..."
+                        )
+                    )
+                } else if (
+                    settlement == null
+                ) {
+                    Text(
+                        v15Text(
+                            "সেটেলমেন্ট পাওয়া যায়নি।",
+                            "Settlement not found."
+                        )
+                    )
+                } else {
+                    OutlinedTextField(
+                        value = cash,
+                        onValueChange = {
+                            cash = it
+                        },
+                        label = {
+                            Text(
+                                v15Text(
+                                    "জমা নগদ",
+                                    "Cash handed over"
+                                )
+                            )
+                        },
+                        modifier =
+                            Modifier.fillMaxWidth()
+                    )
+
+                    OutlinedTextField(
+                        value = dateText,
+                        onValueChange = {
+                            dateText = it
+                        },
+                        label = {
+                            Text(
+                                v15Text(
+                                    "তারিখ (YYYY-MM-DD)",
+                                    "Date (YYYY-MM-DD)"
+                                )
+                            )
+                        },
+                        modifier =
+                            Modifier.fillMaxWidth()
+                    )
+
+                    OutlinedTextField(
+                        value = note,
+                        onValueChange = {
+                            note = it
+                        },
+                        label = {
+                            Text(
+                                v15Text(
+                                    "নোট",
+                                    "Note"
+                                )
+                            )
+                        },
+                        modifier =
+                            Modifier.fillMaxWidth()
+                    )
+
+                    Text(
+                        v15Text(
+                            "ফেরত/ড্যামেজ পরিমাণ বদলাতে 'পুনরায় খুলুন' ব্যবহার করুন, তারপর আবার রাতে বুঝে নিন।",
+                            "To change returned/damaged quantities, reopen the settlement and settle it again."
+                        ),
+                        style =
+                            MaterialTheme
+                                .typography
+                                .bodySmall
+                    )
+                }
+            }
+        },
+        confirmButton = {
+            TextButton(
+                onClick = {
+                    val current =
+                        settlement
+                            ?: return@TextButton
+
+                    val cashValue =
+                        cash
+                            .trim()
+                            .replace(
+                                ",",
+                                ""
+                            )
+                            .toDoubleOrNull()
+                            ?: return@TextButton
+
+                    val receivedAt =
+                        dateText
+                            .dealerBusinessDateMillis()
+                            ?: return@TextButton
+
+                    if (cashValue >= 0) {
+                        onSave(
+                            current,
+                            cashValue,
+                            receivedAt,
+                            note
+                        )
+                    }
+                },
+                enabled =
+                    !loading &&
+                        settlement != null
+            ) {
+                Text(
+                    v15Text(
+                        "সংরক্ষণ",
+                        "Save"
+                    )
+                )
+            }
+        },
+        dismissButton = {
+            TextButton(
+                onClick = onDismiss
+            ) {
+                Text(
+                    v15Text(
+                        "বাতিল",
+                        "Cancel"
+                    )
+                )
+            }
+        }
+    )
+}
+
+
+@Composable
+private fun DealerWarehouseDamageEditDialog(
+    initial: DealerDamageEntity,
+    onDismiss: () -> Unit,
+    onSave: (
+        Int,
+        String,
+        String
+    ) -> Unit
+) {
+    var quantity by remember(initial.id) {
+        mutableStateOf(
+            initial.quantityPieces.toString()
+        )
+    }
+
+    var reason by remember(initial.id) {
+        mutableStateOf(initial.reason)
+    }
+
+    var note by remember(initial.id) {
+        mutableStateOf(initial.note)
+    }
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = {
+            Text(
+                v15Text(
+                    "ড্যামেজ এন্ট্রি সম্পাদনা",
+                    "Edit damage entry"
+                )
+            )
+        },
+        text = {
+            Column(
+                verticalArrangement =
+                    Arrangement.spacedBy(7.dp)
+            ) {
+                Text(
+                    initial.productNameSnapshot,
+                    fontWeight =
+                        FontWeight.Bold
+                )
+
+                Text(
+                    v15Text(
+                        "ক্রয় দর: ${dealerBusinessMoney(initial.unitCost)}",
+                        "Purchase rate: ${dealerBusinessMoney(initial.unitCost)}"
+                    )
+                )
+
+                OutlinedTextField(
+                    value = quantity,
+                    onValueChange = {
+                        quantity = it
+                    },
+                    label = {
+                        Text(
+                            v15Text(
+                                "ড্যামেজ পিস",
+                                "Damaged pieces"
+                            )
+                        )
+                    },
+                    modifier =
+                        Modifier.fillMaxWidth()
+                )
+
+                OutlinedTextField(
+                    value = reason,
+                    onValueChange = {
+                        reason = it
+                    },
+                    label = {
+                        Text(
+                            v15Text(
+                                "কারণ",
+                                "Reason"
+                            )
+                        )
+                    },
+                    modifier =
+                        Modifier.fillMaxWidth()
+                )
+
+                OutlinedTextField(
+                    value = note,
+                    onValueChange = {
+                        note = it
+                    },
+                    label = {
+                        Text(
+                            v15Text(
+                                "নোট",
+                                "Note"
+                            )
+                        )
+                    },
+                    modifier =
+                        Modifier.fillMaxWidth()
+                )
+            }
+        },
+        confirmButton = {
+            TextButton(
+                onClick = {
+                    val qty =
+                        quantity
+                            .dealerBusinessInt()
+
+                    if (
+                        qty != null &&
+                        qty > 0
+                    ) {
+                        onSave(
+                            qty,
+                            reason,
+                            note
+                        )
+                    }
+                }
+            ) {
+                Text(
+                    v15Text(
+                        "সংরক্ষণ",
+                        "Save"
+                    )
+                )
+            }
+        },
+        dismissButton = {
+            TextButton(
+                onClick = onDismiss
+            ) {
+                Text(
+                    v15Text(
+                        "বাতিল",
+                        "Cancel"
+                    )
+                )
+            }
+        }
+    )
+}
+
+
+@Composable
 private fun DealerPackSetupDialog(
     products:
         List<com.familykhata.app.data.ProductEntity>,
@@ -6943,6 +8490,21 @@ private fun DealerPackSetupDialog(
                             .typography
                             .bodySmall
                 )
+
+                selectedPack?.let { pack ->
+                    TextButton(
+                        onClick = {
+                            onDelete(pack)
+                        }
+                    ) {
+                        Text(
+                            v15Text(
+                                "এই প্যাক সেটআপ ডিলিট",
+                                "Delete this pack setup"
+                            )
+                        )
+                    }
+                }
             }
         },
         confirmButton = {

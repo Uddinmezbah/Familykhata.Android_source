@@ -205,6 +205,111 @@ interface DealerBusinessDao {
         item: DealerPurchaseReturnEntity
     ): Int
 
+    @Update
+    suspend fun updateDamage(
+        item: DealerDamageEntity
+    ): Int
+
+    @Query("""
+        DELETE FROM dealer_business_companies
+        WHERE id = :id
+          AND workspace = :workspace
+    """)
+    suspend fun deleteCompanyById(
+        id: Long,
+        workspace: String
+    ): Int
+
+    @Query("""
+        DELETE FROM dealer_business_areas
+        WHERE id = :id
+          AND workspace = :workspace
+    """)
+    suspend fun deleteAreaById(
+        id: Long,
+        workspace: String
+    ): Int
+
+    @Query("""
+        DELETE FROM dealer_business_customers
+        WHERE id = :id
+          AND workspace = :workspace
+    """)
+    suspend fun deleteCustomerById(
+        id: Long,
+        workspace: String
+    ): Int
+
+    @Query("""
+        DELETE FROM dealer_business_delivery_people
+        WHERE id = :id
+          AND workspace = :workspace
+    """)
+    suspend fun deleteDeliveryPersonById(
+        id: Long,
+        workspace: String
+    ): Int
+
+    @Query("""
+        DELETE FROM dealer_business_expenses
+        WHERE id = :id
+          AND workspace = :workspace
+    """)
+    suspend fun deleteExpenseById(
+        id: Long,
+        workspace: String
+    ): Int
+
+    @Query("""
+        DELETE FROM dealer_business_collections
+        WHERE id = :id
+          AND workspace = :workspace
+    """)
+    suspend fun deleteCollectionById(
+        id: Long,
+        workspace: String
+    ): Int
+
+    @Query("""
+        DELETE FROM dealer_business_supplier_payments
+        WHERE id = :id
+          AND workspace = :workspace
+    """)
+    suspend fun deleteSupplierPaymentById(
+        id: Long,
+        workspace: String
+    ): Int
+
+    @Query("""
+        DELETE FROM dealer_business_product_packs
+        WHERE productId = :productId
+          AND workspace = :workspace
+    """)
+    suspend fun deleteProductPackByProductId(
+        productId: Long,
+        workspace: String
+    ): Int
+
+    @Query("""
+        DELETE FROM dealer_business_damages
+        WHERE id = :id
+          AND workspace = :workspace
+    """)
+    suspend fun deleteDamageById(
+        id: Long,
+        workspace: String
+    ): Int
+
+    @Query("""
+        SELECT *
+        FROM dealer_business_damages
+        WHERE id = :id
+        LIMIT 1
+    """)
+    suspend fun getDamageOnce(
+        id: Long
+    ): DealerDamageEntity?
+
     @Query("""
         SELECT *
         FROM dealer_business_product_packs
@@ -912,6 +1017,219 @@ interface DealerBusinessDao {
     suspend fun deleteSupplierPaymentAllocationById(
         allocationId: Long
     )
+
+    @Query("""
+        SELECT *
+        FROM dealer_business_purchase_lines
+        WHERE purchaseId = :purchaseId
+        ORDER BY id
+    """)
+    suspend fun getPurchaseLinesOnce(
+        purchaseId: Long
+    ): List<DealerPurchaseLineEntity>
+
+    @Query("""
+        SELECT *
+        FROM dealer_business_sale_lines
+        WHERE saleId = :saleId
+        ORDER BY id
+    """)
+    suspend fun getSaleLinesOnce(
+        saleId: Long
+    ): List<DealerSaleLineEntity>
+
+    @Query("""
+        SELECT *
+        FROM dealer_business_sales_returns
+        WHERE id = :id
+        LIMIT 1
+    """)
+    suspend fun getSalesReturnOnce(
+        id: Long
+    ): DealerSalesReturnEntity?
+
+    @Query("""
+        SELECT *
+        FROM dealer_business_sales_return_allocations
+        WHERE returnId = :returnId
+        ORDER BY id
+    """)
+    suspend fun getSalesReturnAllocationsForReturnOnce(
+        returnId: Long
+    ): List<DealerSalesReturnAllocationEntity>
+
+    @Query("""
+        SELECT ra.*
+        FROM dealer_business_sales_return_allocations ra
+        INNER JOIN dealer_business_sales_returns r
+            ON r.id = ra.returnId
+        WHERE r.saleId = :saleId
+          AND r.returnType = 'RESTOCK'
+        ORDER BY ra.id
+    """)
+    suspend fun getRestockReturnAllocationsForSaleOnce(
+        saleId: Long
+    ): List<DealerSalesReturnAllocationEntity>
+
+    @Query("""
+        SELECT COALESCE(
+            SUM(ra.quantity),
+            0
+        )
+        FROM dealer_business_sales_return_allocations ra
+        INNER JOIN dealer_business_sales_returns r
+            ON r.id = ra.returnId
+        WHERE ra.saleAllocationId = :saleAllocationId
+          AND r.returnType = 'RESTOCK'
+    """)
+    suspend fun getRestockedReturnedAllocationQuantity(
+        saleAllocationId: Long
+    ): Int
+
+    @Query("""
+        SELECT COUNT(*)
+        FROM dealer_business_sales_return_allocations ra
+        INNER JOIN dealer_business_sales_returns r
+            ON r.id = ra.returnId
+        WHERE r.saleId = :saleId
+          AND ra.saleAllocationId IS NULL
+    """)
+    suspend fun getUnmappedSalesReturnAllocationCount(
+        saleId: Long
+    ): Int
+
+    @Query("""
+        SELECT *
+        FROM dealer_business_purchase_returns
+        WHERE id = :id
+        LIMIT 1
+    """)
+    suspend fun getPurchaseReturnOnce(
+        id: Long
+    ): DealerPurchaseReturnEntity?
+
+    @Query("""
+        SELECT *
+        FROM dealer_business_delivery_challan_sales
+        WHERE saleId = :saleId
+        LIMIT 1
+    """)
+    suspend fun getDeliveryChallanSaleForSaleOnce(
+        saleId: Long
+    ): DealerDeliveryChallanSaleEntity?
+
+    @Query("""
+        SELECT *
+        FROM dealer_business_damages
+        WHERE deliveryChallanId = :challanId
+          AND sourceType = 'DELIVERY'
+        ORDER BY id
+    """)
+    suspend fun getDeliveryDamagesForChallanOnce(
+        challanId: Long
+    ): List<DealerDamageEntity>
+
+    @Query("""
+        SELECT
+            (
+                SELECT COUNT(*)
+                FROM dealer_business_stock_allocations
+                WHERE sourceStockBatchId = :batchId
+            )
+            +
+            (
+                SELECT COUNT(*)
+                FROM dealer_business_delivery_challan_allocations
+                WHERE sourceStockBatchId = :batchId
+            )
+            +
+            (
+                SELECT COUNT(*)
+                FROM dealer_business_sales_return_allocations
+                WHERE sourceStockBatchId = :batchId
+            )
+            +
+            (
+                SELECT COUNT(*)
+                FROM dealer_business_damages
+                WHERE sourceStockBatchId = :batchId
+            )
+    """)
+    suspend fun getDealerDownstreamBatchReferenceCount(
+        batchId: Long
+    ): Int
+
+    @Query("""
+        DELETE FROM dealer_business_purchases
+        WHERE id = :id
+          AND workspace = :workspace
+    """)
+    suspend fun deletePurchaseById(
+        id: Long,
+        workspace: String
+    ): Int
+
+    @Query("""
+        DELETE FROM dealer_business_sales
+        WHERE id = :id
+          AND workspace = :workspace
+    """)
+    suspend fun deleteSaleById(
+        id: Long,
+        workspace: String
+    ): Int
+
+    @Query("""
+        DELETE FROM dealer_business_sales_returns
+        WHERE id = :id
+          AND workspace = :workspace
+    """)
+    suspend fun deleteSalesReturnById(
+        id: Long,
+        workspace: String
+    ): Int
+
+    @Query("""
+        DELETE FROM dealer_business_purchase_returns
+        WHERE id = :id
+          AND workspace = :workspace
+    """)
+    suspend fun deletePurchaseReturnById(
+        id: Long,
+        workspace: String
+    ): Int
+
+    @Query("""
+        DELETE FROM dealer_business_delivery_challans
+        WHERE id = :id
+          AND workspace = :workspace
+    """)
+    suspend fun deleteDeliveryChallanById(
+        id: Long,
+        workspace: String
+    ): Int
+
+    @Query("""
+        DELETE FROM dealer_business_delivery_settlements
+        WHERE id = :id
+    """)
+    suspend fun deleteDeliverySettlementById(
+        id: Long
+    ): Int
+
+    @Query("""
+        DELETE FROM dealer_business_damages
+        WHERE deliveryChallanId = :challanId
+          AND sourceType = 'DELIVERY'
+    """)
+    suspend fun deleteDeliveryDamagesForChallan(
+        challanId: Long
+    ): Int
+
+    @Update
+    suspend fun updateDeliverySettlementCrud(
+        item: DealerDeliverySettlementEntity
+    ): Int
 
     @Query("""
         UPDATE dealer_business_sales

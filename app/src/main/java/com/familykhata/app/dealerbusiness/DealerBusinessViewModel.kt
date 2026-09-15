@@ -714,6 +714,208 @@ class DealerBusinessViewModel(
         }
     }
 
+    fun updateDeliveryChallanMeta(
+        item: DealerDeliveryChallanEntity,
+        deliveryPersonId: Long,
+        challanNo: String,
+        issuedAt: Long,
+        note: String,
+        onDone: (Boolean) -> Unit = {}
+    ) {
+        if (
+            item.id <= 0 ||
+            deliveryPersonId <= 0 ||
+            item.workspace != workspace.value
+        ) {
+            onDone(false)
+            return
+        }
+
+        val currentWorkspace =
+            workspace.value
+
+        viewModelScope.launch {
+            val success =
+                runCatching {
+                    database.withTransaction {
+                        val fresh =
+                            requireNotNull(
+                                dao.getDeliveryChallanOnce(
+                                    item.id
+                                )
+                            )
+
+                        require(
+                            fresh.workspace ==
+                                currentWorkspace
+                        )
+
+                        val person =
+                            requireNotNull(
+                                dao.getDeliveryPersonOnce(
+                                    deliveryPersonId
+                                )
+                            )
+
+                        require(
+                            person.workspace ==
+                                currentWorkspace
+                        )
+
+                        require(
+                            dao.updateDeliveryChallan(
+                                fresh.copy(
+                                    deliveryPersonId =
+                                        person.id,
+                                    deliveryPersonNameSnapshot =
+                                        person.name,
+                                    challanNo =
+                                        challanNo
+                                            .trim()
+                                            .ifBlank {
+                                                fresh.challanNo
+                                            },
+                                    issuedAt =
+                                        issuedAt,
+                                    note =
+                                        note.trim()
+                                )
+                            ) == 1
+                        )
+                    }
+                }.isSuccess
+
+            onDone(success)
+        }
+    }
+
+    fun deleteDeliveryChallan(
+        item: DealerDeliveryChallanEntity,
+        onDone: (Boolean) -> Unit = {}
+    ) {
+        if (
+            item.id <= 0 ||
+            item.workspace != workspace.value
+        ) {
+            onDone(false)
+            return
+        }
+
+        val currentWorkspace =
+            workspace.value
+
+        viewModelScope.launch {
+            val success =
+                runCatching {
+                    database.withTransaction {
+                        val challan =
+                            requireNotNull(
+                                dao.getDeliveryChallanOnce(
+                                    item.id
+                                )
+                            )
+
+                        require(
+                            challan.workspace ==
+                                currentWorkspace
+                        )
+
+                        /*
+                         * Once a challan has sale or settlement,
+                         * use sale correction / settlement reopen.
+                         */
+                        require(
+                            challan.status ==
+                                "OPEN"
+                        )
+
+                        require(
+                            dao.getDeliveryChallanSalesOnce(
+                                challan.id
+                            ).isEmpty()
+                        )
+
+                        require(
+                            dao.getDeliverySettlementOnce(
+                                challan.id
+                            ) == null
+                        )
+
+                        val lines =
+                            dao.getDeliveryChallanLinesOnce(
+                                challan.id
+                            ).associateBy {
+                                it.id
+                            }
+
+                        val allocations =
+                            dao
+                                .getDeliveryChallanAllocationsOnce(
+                                    challan.id
+                                )
+
+                        for (
+                            allocation in
+                            allocations
+                        ) {
+                            val line =
+                                requireNotNull(
+                                    lines[
+                                        allocation
+                                            .challanLineId
+                                    ]
+                                )
+
+                            restoreDeliveryStock(
+                                line = line,
+                                allocation =
+                                    allocation,
+                                quantity =
+                                    allocation
+                                        .quantityPieces,
+                                receivedAt =
+                                    System
+                                        .currentTimeMillis()
+                            )
+                        }
+
+                        require(
+                            dao.deleteDeliveryChallanById(
+                                challan.id,
+                                currentWorkspace
+                            ) == 1
+                        )
+                    }
+                }.isSuccess
+
+            onDone(success)
+        }
+    }
+
+    suspend fun loadDeliverySettlement(
+        challanId: Long
+    ): DealerDeliverySettlementEntity? {
+        if (challanId <= 0) {
+            return null
+        }
+
+        val challan =
+            dao.getDeliveryChallanOnce(
+                challanId
+            ) ?: return null
+
+        if (
+            challan.workspace !=
+                workspace.value
+        ) {
+            return null
+        }
+
+        return dao.getDeliverySettlementOnce(
+            challanId
+        )
+    }
+
     fun createDeliverySale(
         challanId: Long,
         customerId: Long,
@@ -729,7 +931,7 @@ class DealerBusinessViewModel(
             lines.filter {
                 it.challanLineId > 0 &&
                     it.quantityPieces > 0 &&
-                    it.unitPrice >= 0
+                    it.unitPrice > 0
             }
 
         if (
@@ -1501,6 +1703,308 @@ class DealerBusinessViewModel(
         }
     }
 
+    fun updateDeliverySettlementMeta(
+        challan: DealerDeliveryChallanEntity,
+        item: DealerDeliverySettlementEntity,
+        cashHandedOver: Double,
+        receivedAt: Long,
+        note: String,
+        onDone: (Boolean) -> Unit = {}
+    ) {
+        if (
+            challan.id <= 0 ||
+            item.id <= 0 ||
+            cashHandedOver < 0 ||
+            challan.workspace != workspace.value
+        ) {
+            onDone(false)
+            return
+        }
+
+        val currentWorkspace =
+            workspace.value
+
+        viewModelScope.launch {
+            val success =
+                runCatching {
+                    database.withTransaction {
+                        val freshChallan =
+                            requireNotNull(
+                                dao.getDeliveryChallanOnce(
+                                    challan.id
+                                )
+                            )
+
+                        require(
+                            freshChallan.workspace ==
+                                currentWorkspace
+                        )
+
+                        require(
+                            freshChallan.status ==
+                                "SETTLED"
+                        )
+
+                        val freshSettlement =
+                            requireNotNull(
+                                dao.getDeliverySettlementOnce(
+                                    freshChallan.id
+                                )
+                            )
+
+                        require(
+                            freshSettlement.id ==
+                                item.id
+                        )
+
+                        require(
+                            dao.updateDeliverySettlementCrud(
+                                freshSettlement.copy(
+                                    cashHandedOver =
+                                        cashHandedOver,
+                                    receivedAt =
+                                        receivedAt,
+                                    note =
+                                        note.trim()
+                                )
+                            ) == 1
+                        )
+
+                        require(
+                            dao.updateDeliveryChallan(
+                                freshChallan.copy(
+                                    settledAt =
+                                        receivedAt
+                                )
+                            ) == 1
+                        )
+                    }
+                }.isSuccess
+
+            onDone(success)
+        }
+    }
+
+    fun reopenDeliverySettlement(
+        challanItem:
+            DealerDeliveryChallanEntity,
+        onDone: (Boolean) -> Unit = {}
+    ) {
+        if (
+            challanItem.id <= 0 ||
+            challanItem.workspace != workspace.value
+        ) {
+            onDone(false)
+            return
+        }
+
+        val currentWorkspace =
+            workspace.value
+
+        viewModelScope.launch {
+            val success =
+                runCatching {
+                    database.withTransaction {
+                        val challan =
+                            requireNotNull(
+                                dao.getDeliveryChallanOnce(
+                                    challanItem.id
+                                )
+                            )
+
+                        require(
+                            challan.workspace ==
+                                currentWorkspace
+                        )
+
+                        require(
+                            challan.status ==
+                                "SETTLED"
+                        )
+
+                        val settlement =
+                            requireNotNull(
+                                dao.getDeliverySettlementOnce(
+                                    challan.id
+                                )
+                            )
+
+                        val settlementLines =
+                            dao.getDeliverySettlementLinesOnce(
+                                settlement.id
+                            )
+
+                        val challanLines =
+                            dao.getDeliveryChallanLinesOnce(
+                                challan.id
+                            ).associateBy {
+                                it.id
+                            }
+
+                        require(
+                            settlementLines.size ==
+                                challanLines.size
+                        )
+
+                        /*
+                         * First validate and reverse stock that
+                         * was returned to warehouse at settlement.
+                         */
+                        for (
+                            settlementLine in
+                            settlementLines
+                        ) {
+                            val line =
+                                requireNotNull(
+                                    challanLines[
+                                        settlementLine
+                                            .challanLineId
+                                    ]
+                                )
+
+                            val currentSold =
+                                dao
+                                    .getDeliverySoldQuantityForLine(
+                                        line.id
+                                    )
+
+                            require(
+                                currentSold ==
+                                    settlementLine
+                                        .soldPieces
+                            )
+
+                            require(
+                                currentSold +
+                                    settlementLine
+                                        .returnedPieces +
+                                    settlementLine
+                                        .damagedPieces ==
+                                    line.quantityPieces
+                            )
+
+                            var returnRemaining =
+                                settlementLine
+                                    .returnedPieces
+
+                            val allocations =
+                                dao
+                                    .getDeliveryAllocationsForLineOnce(
+                                        line.id
+                                    )
+
+                            for (
+                                allocation in
+                                allocations
+                            ) {
+                                if (
+                                    returnRemaining <= 0
+                                ) {
+                                    break
+                                }
+
+                                val soldFromAllocation =
+                                    dao
+                                        .getDeliverySoldQuantityForAllocation(
+                                            allocation.id
+                                        )
+
+                                val free =
+                                    (
+                                        allocation
+                                            .quantityPieces -
+                                            soldFromAllocation
+                                    ).coerceAtLeast(0)
+
+                                val returned =
+                                    minOf(
+                                        free,
+                                        returnRemaining
+                                    )
+
+                                if (returned > 0) {
+                                    val batchId =
+                                        requireNotNull(
+                                            allocation
+                                                .sourceStockBatchId
+                                        )
+
+                                    val batch =
+                                        requireNotNull(
+                                            inventoryDao
+                                                .getBatchOnce(
+                                                    batchId
+                                                )
+                                        )
+
+                                    /*
+                                     * Returned goods are going
+                                     * back to delivery custody.
+                                     */
+                                    require(
+                                        batch.quantity >=
+                                            returned
+                                    )
+
+                                    inventoryDao
+                                        .updateBatchQuantity(
+                                            batch.id,
+                                            batch.quantity -
+                                                returned
+                                        )
+
+                                    returnRemaining -=
+                                        returned
+                                }
+                            }
+
+                            require(
+                                returnRemaining == 0
+                            )
+                        }
+
+                        val deliveryDamages =
+                            dao
+                                .getDeliveryDamagesForChallanOnce(
+                                    challan.id
+                                )
+
+                        val expectedDamage =
+                            settlementLines.sumOf {
+                                it.damagedPieces
+                            }
+
+                        require(
+                            deliveryDamages.sumOf {
+                                it.quantityPieces
+                            } == expectedDamage
+                        )
+
+                        dao.deleteDeliveryDamagesForChallan(
+                            challan.id
+                        )
+
+                        require(
+                            dao.deleteDeliverySettlementById(
+                                settlement.id
+                            ) == 1
+                        )
+
+                        require(
+                            dao.updateDeliveryChallan(
+                                challan.copy(
+                                    settledAt = null,
+                                    status = "OPEN"
+                                )
+                            ) == 1
+                        )
+                    }
+                }.isSuccess
+
+            onDone(success)
+        }
+    }
+
     fun recordWarehouseDamage(
         batchId: Long,
         quantityPieces: Int,
@@ -1595,6 +2099,159 @@ class DealerBusinessViewModel(
                                 batch.quantity -
                                     quantityPieces
                             )
+                    }
+                }.isSuccess
+
+            onDone(success)
+        }
+    }
+
+    fun updateWarehouseDamage(
+        item: DealerDamageEntity,
+        quantityPieces: Int,
+        reason: String,
+        note: String,
+        onDone: (Boolean) -> Unit = {}
+    ) {
+        if (
+            item.id <= 0 ||
+            quantityPieces <= 0 ||
+            item.workspace != workspace.value ||
+            item.sourceType != "WAREHOUSE"
+        ) {
+            onDone(false)
+            return
+        }
+
+        val batchId =
+            item.sourceStockBatchId
+
+        if (batchId == null) {
+            onDone(false)
+            return
+        }
+
+        viewModelScope.launch {
+            val success =
+                runCatching {
+                    database.withTransaction {
+                        val batch =
+                            requireNotNull(
+                                inventoryDao.getBatchOnce(
+                                    batchId
+                                )
+                            )
+
+                        if (item.productId != null) {
+                            require(
+                                batch.productId ==
+                                    item.productId
+                            )
+                        }
+
+                        val delta =
+                            quantityPieces -
+                                item.quantityPieces
+
+                        when {
+                            delta > 0 -> {
+                                require(
+                                    batch.quantity >=
+                                        delta
+                                )
+
+                                inventoryDao
+                                    .updateBatchQuantity(
+                                        batch.id,
+                                        batch.quantity -
+                                            delta
+                                    )
+                            }
+
+                            delta < 0 -> {
+                                inventoryDao
+                                    .updateBatchQuantity(
+                                        batch.id,
+                                        batch.quantity +
+                                            (-delta)
+                                    )
+                            }
+                        }
+
+                        require(
+                            dao.updateDamage(
+                                item.copy(
+                                    quantityPieces =
+                                        quantityPieces,
+                                    totalCost =
+                                        quantityPieces *
+                                            item.unitCost,
+                                    reason =
+                                        reason.trim(),
+                                    note =
+                                        note.trim()
+                                )
+                            ) == 1
+                        )
+                    }
+                }.isSuccess
+
+            onDone(success)
+        }
+    }
+
+    fun deleteWarehouseDamage(
+        item: DealerDamageEntity,
+        onDone: (Boolean) -> Unit = {}
+    ) {
+        if (
+            item.id <= 0 ||
+            item.workspace != workspace.value ||
+            item.sourceType != "WAREHOUSE"
+        ) {
+            onDone(false)
+            return
+        }
+
+        val batchId =
+            item.sourceStockBatchId
+
+        if (batchId == null) {
+            onDone(false)
+            return
+        }
+
+        viewModelScope.launch {
+            val success =
+                runCatching {
+                    database.withTransaction {
+                        val batch =
+                            requireNotNull(
+                                inventoryDao.getBatchOnce(
+                                    batchId
+                                )
+                            )
+
+                        if (item.productId != null) {
+                            require(
+                                batch.productId ==
+                                    item.productId
+                            )
+                        }
+
+                        inventoryDao
+                            .updateBatchQuantity(
+                                batch.id,
+                                batch.quantity +
+                                    item.quantityPieces
+                            )
+
+                        require(
+                            dao.deleteDamageById(
+                                item.id,
+                                item.workspace
+                            ) == 1
+                        )
                     }
                 }.isSuccess
 
@@ -1846,6 +2503,131 @@ class DealerBusinessViewModel(
         }
     }
 
+    fun deleteCompany(
+        item: DealerCompanyEntity,
+        onDone: (Boolean) -> Unit = {}
+    ) {
+        if (
+            item.id <= 0 ||
+            item.workspace != workspace.value
+        ) {
+            onDone(false)
+            return
+        }
+
+        viewModelScope.launch {
+            val success =
+                runCatching {
+                    dao.deleteCompanyById(
+                        item.id,
+                        item.workspace
+                    ) == 1
+                }.getOrDefault(false)
+
+            onDone(success)
+        }
+    }
+
+    fun deleteArea(
+        item: DealerAreaEntity,
+        onDone: (Boolean) -> Unit = {}
+    ) {
+        if (
+            item.id <= 0 ||
+            item.workspace != workspace.value
+        ) {
+            onDone(false)
+            return
+        }
+
+        viewModelScope.launch {
+            val success =
+                runCatching {
+                    dao.deleteAreaById(
+                        item.id,
+                        item.workspace
+                    ) == 1
+                }.getOrDefault(false)
+
+            onDone(success)
+        }
+    }
+
+    fun deleteCustomer(
+        item: DealerCustomerEntity,
+        onDone: (Boolean) -> Unit = {}
+    ) {
+        if (
+            item.id <= 0 ||
+            item.workspace != workspace.value
+        ) {
+            onDone(false)
+            return
+        }
+
+        viewModelScope.launch {
+            val success =
+                runCatching {
+                    dao.deleteCustomerById(
+                        item.id,
+                        item.workspace
+                    ) == 1
+                }.getOrDefault(false)
+
+            onDone(success)
+        }
+    }
+
+    fun deleteDeliveryPerson(
+        item: DealerDeliveryPersonEntity,
+        onDone: (Boolean) -> Unit = {}
+    ) {
+        if (
+            item.id <= 0 ||
+            item.workspace != workspace.value
+        ) {
+            onDone(false)
+            return
+        }
+
+        viewModelScope.launch {
+            val success =
+                runCatching {
+                    dao.deleteDeliveryPersonById(
+                        item.id,
+                        item.workspace
+                    ) == 1
+                }.getOrDefault(false)
+
+            onDone(success)
+        }
+    }
+
+    fun deleteProductPack(
+        item: DealerProductPackEntity,
+        onDone: (Boolean) -> Unit = {}
+    ) {
+        if (
+            item.productId <= 0 ||
+            item.workspace != workspace.value
+        ) {
+            onDone(false)
+            return
+        }
+
+        viewModelScope.launch {
+            val success =
+                runCatching {
+                    dao.deleteProductPackByProductId(
+                        item.productId,
+                        item.workspace
+                    ) == 1
+                }.getOrDefault(false)
+
+            onDone(success)
+        }
+    }
+
     fun addExpense(
         category: String,
         amount: Double,
@@ -1905,6 +2687,31 @@ class DealerBusinessViewModel(
                             amount = amount,
                             note = note.trim()
                         )
+                    ) == 1
+                }.getOrDefault(false)
+
+            onDone(success)
+        }
+    }
+
+    fun deleteExpense(
+        item: DealerExpenseEntity,
+        onDone: (Boolean) -> Unit = {}
+    ) {
+        if (
+            item.id <= 0 ||
+            item.workspace != workspace.value
+        ) {
+            onDone(false)
+            return
+        }
+
+        viewModelScope.launch {
+            val success =
+                runCatching {
+                    dao.deleteExpenseById(
+                        item.id,
+                        item.workspace
                     ) == 1
                 }.getOrDefault(false)
 
@@ -2236,6 +3043,125 @@ class DealerBusinessViewModel(
         }
     }
 
+    fun deletePurchase(
+        item: DealerPurchaseEntity,
+        onDone: (Boolean) -> Unit = {}
+    ) {
+        if (
+            item.id <= 0 ||
+            item.workspace != workspace.value
+        ) {
+            onDone(false)
+            return
+        }
+
+        val currentWorkspace =
+            workspace.value
+
+        viewModelScope.launch {
+            val success =
+                runCatching {
+                    database.withTransaction {
+                        val purchase =
+                            requireNotNull(
+                                dao.getPurchaseOnce(
+                                    item.id
+                                )
+                            )
+
+                        require(
+                            purchase.workspace ==
+                                currentWorkspace
+                        )
+
+                        val lines =
+                            dao.getPurchaseLinesOnce(
+                                purchase.id
+                            )
+
+                        val batches =
+                            mutableListOf<
+                                StockBatchEntity
+                            >()
+
+                        for (line in lines) {
+                            val batchId =
+                                requireNotNull(
+                                    line.inventoryBatchId
+                                )
+
+                            /*
+                             * A purchase can only be physically
+                             * deleted while its batches have not
+                             * been used by sale/delivery/damage.
+                             */
+                            require(
+                                dao
+                                    .getDealerDownstreamBatchReferenceCount(
+                                        batchId
+                                    ) == 0
+                            )
+
+                            val returned =
+                                dao.getReturnedPurchaseQuantity(
+                                    line.id
+                                )
+
+                            val batch =
+                                requireNotNull(
+                                    inventoryDao
+                                        .getBatchOnce(
+                                            batchId
+                                        )
+                                )
+
+                            require(
+                                batch.quantity ==
+                                    (
+                                        line.quantity -
+                                            returned
+                                    )
+                                        .coerceAtLeast(0)
+                            )
+
+                            batches += batch
+                        }
+
+                        val companyId =
+                            purchase.companyId
+
+                        require(
+                            dao.deletePurchaseById(
+                                purchase.id,
+                                currentWorkspace
+                            ) == 1
+                        )
+
+                        /*
+                         * Purchase lines are now gone, so their
+                         * dedicated stock batches can be removed.
+                         */
+                        for (batch in batches) {
+                            inventoryDao.deleteBatch(
+                                batch
+                            )
+                        }
+
+                        if (companyId != null) {
+                            rebuildCompanyPaymentAllocations(
+                                companyId =
+                                    companyId,
+                                workspaceValue =
+                                    currentWorkspace
+                            )
+                        }
+                    }
+                }.isSuccess
+
+            onDone(success)
+        }
+    }
+
     fun updatePurchaseMeta(
         item: DealerPurchaseEntity,
         invoiceNo: String,
@@ -2299,6 +3225,209 @@ class DealerBusinessViewModel(
                         )
                     ) == 1
                 }.getOrDefault(false)
+
+            onDone(success)
+        }
+    }
+
+    fun deleteSale(
+        item: DealerSaleEntity,
+        onDone: (Boolean) -> Unit = {}
+    ) {
+        if (
+            item.id <= 0 ||
+            item.workspace != workspace.value
+        ) {
+            onDone(false)
+            return
+        }
+
+        val currentWorkspace =
+            workspace.value
+
+        viewModelScope.launch {
+            val success =
+                runCatching {
+                    database.withTransaction {
+                        val sale =
+                            requireNotNull(
+                                dao.getSaleOnce(
+                                    item.id
+                                )
+                            )
+
+                        require(
+                            sale.workspace ==
+                                currentWorkspace
+                        )
+
+                        /*
+                         * Old pre-allocation return data cannot
+                         * be reversed safely.
+                         */
+                        require(
+                            dao
+                                .getUnmappedSalesReturnAllocationCount(
+                                    sale.id
+                                ) == 0
+                        )
+
+                        val deliveryLink =
+                            dao
+                                .getDeliveryChallanSaleForSaleOnce(
+                                    sale.id
+                                )
+
+                        val saleLines =
+                            dao.getSaleLinesOnce(
+                                sale.id
+                            )
+
+                        if (deliveryLink == null) {
+                            /*
+                             * Normal sale:
+                             * restore the part of each original
+                             * allocation that is not already back
+                             * in stock through RESTOCK returns.
+                             */
+                            for (line in saleLines) {
+                                val allocations =
+                                    dao.getStockAllocationsOnce(
+                                        line.id
+                                    )
+
+                                for (
+                                    allocation in
+                                    allocations
+                                ) {
+                                    val alreadyRestocked =
+                                        dao
+                                            .getRestockedReturnedAllocationQuantity(
+                                                allocation.id
+                                            )
+
+                                    require(
+                                        alreadyRestocked <=
+                                            allocation.quantity
+                                    )
+
+                                    val restore =
+                                        allocation.quantity -
+                                            alreadyRestocked
+
+                                    if (restore > 0) {
+                                        val batchId =
+                                            requireNotNull(
+                                                allocation
+                                                    .sourceStockBatchId
+                                            )
+
+                                        val batch =
+                                            requireNotNull(
+                                                inventoryDao
+                                                    .getBatchOnce(
+                                                        batchId
+                                                    )
+                                            )
+
+                                        inventoryDao
+                                            .updateBatchQuantity(
+                                                batch.id,
+                                                batch.quantity +
+                                                    restore
+                                            )
+                                    }
+                                }
+                            }
+                        } else {
+                            /*
+                             * Delivery sale:
+                             * challan issue already removed stock.
+                             * Deleting the sale makes those units
+                             * unsold challan stock again, so no
+                             * warehouse restore is done here.
+                             *
+                             * But any retailer RESTOCK return
+                             * previously added to warehouse must
+                             * be removed again.
+                             */
+                            val challan =
+                                requireNotNull(
+                                    dao.getDeliveryChallanOnce(
+                                        deliveryLink
+                                            .challanId
+                                    )
+                                )
+
+                            require(
+                                challan.status ==
+                                    "OPEN"
+                            )
+
+                            require(
+                                dao.getDeliverySettlementOnce(
+                                    challan.id
+                                ) == null
+                            )
+
+                            val returnAllocations =
+                                dao
+                                    .getRestockReturnAllocationsForSaleOnce(
+                                        sale.id
+                                    )
+
+                            for (
+                                allocation in
+                                returnAllocations
+                            ) {
+                                val batchId =
+                                    requireNotNull(
+                                        allocation
+                                            .sourceStockBatchId
+                                    )
+
+                                val batch =
+                                    requireNotNull(
+                                        inventoryDao
+                                            .getBatchOnce(
+                                                batchId
+                                            )
+                                    )
+
+                                require(
+                                    batch.quantity >=
+                                        allocation.quantity
+                                )
+
+                                inventoryDao
+                                    .updateBatchQuantity(
+                                        batch.id,
+                                        batch.quantity -
+                                            allocation.quantity
+                                    )
+                            }
+                        }
+
+                        val customerId =
+                            sale.customerId
+
+                        require(
+                            dao.deleteSaleById(
+                                sale.id,
+                                currentWorkspace
+                            ) == 1
+                        )
+
+                        if (customerId != null) {
+                            rebuildCustomerCollectionAllocations(
+                                customerId =
+                                    customerId,
+                                workspaceValue =
+                                    currentWorkspace
+                            )
+                        }
+                    }
+                }.isSuccess
 
             onDone(success)
         }
@@ -2380,6 +3509,54 @@ class DealerBusinessViewModel(
                             rebuildCustomerCollectionAllocations(
                                 customerId =
                                     affectedCustomerId,
+                                workspaceValue =
+                                    currentWorkspace
+                            )
+                        }
+                    }
+                }.isSuccess
+
+            onDone(success)
+        }
+    }
+
+    fun deleteCollection(
+        item: DealerCollectionEntity,
+        onDone: (Boolean) -> Unit = {}
+    ) {
+        if (
+            item.id <= 0 ||
+            item.workspace != workspace.value
+        ) {
+            onDone(false)
+            return
+        }
+
+        val currentWorkspace =
+            workspace.value
+
+        viewModelScope.launch {
+            val success =
+                runCatching {
+                    database.withTransaction {
+                        val customerId =
+                            item.customerId
+
+                        dao.deleteCollectionAllocationsByCollection(
+                            item.id
+                        )
+
+                        require(
+                            dao.deleteCollectionById(
+                                item.id,
+                                currentWorkspace
+                            ) == 1
+                        )
+
+                        if (customerId != null) {
+                            rebuildCustomerCollectionAllocations(
+                                customerId =
+                                    customerId,
                                 workspaceValue =
                                     currentWorkspace
                             )
@@ -2478,6 +3655,54 @@ class DealerBusinessViewModel(
         }
     }
 
+    fun deleteSupplierPayment(
+        item: DealerSupplierPaymentEntity,
+        onDone: (Boolean) -> Unit = {}
+    ) {
+        if (
+            item.id <= 0 ||
+            item.workspace != workspace.value
+        ) {
+            onDone(false)
+            return
+        }
+
+        val currentWorkspace =
+            workspace.value
+
+        viewModelScope.launch {
+            val success =
+                runCatching {
+                    database.withTransaction {
+                        val companyId =
+                            item.companyId
+
+                        dao.deleteSupplierPaymentAllocationsByPayment(
+                            item.id
+                        )
+
+                        require(
+                            dao.deleteSupplierPaymentById(
+                                item.id,
+                                currentWorkspace
+                            ) == 1
+                        )
+
+                        if (companyId != null) {
+                            rebuildCompanyPaymentAllocations(
+                                companyId =
+                                    companyId,
+                                workspaceValue =
+                                    currentWorkspace
+                            )
+                        }
+                    }
+                }.isSuccess
+
+            onDone(success)
+        }
+    }
+
     fun updateSalesReturnMeta(
         item: DealerSalesReturnEntity,
         returnedAt: Long,
@@ -2504,6 +3729,119 @@ class DealerBusinessViewModel(
                         )
                     ) == 1
                 }.getOrDefault(false)
+
+            onDone(success)
+        }
+    }
+
+    fun deleteSalesReturn(
+        item: DealerSalesReturnEntity,
+        onDone: (Boolean) -> Unit = {}
+    ) {
+        if (
+            item.id <= 0 ||
+            item.workspace != workspace.value
+        ) {
+            onDone(false)
+            return
+        }
+
+        val currentWorkspace =
+            workspace.value
+
+        viewModelScope.launch {
+            val success =
+                runCatching {
+                    database.withTransaction {
+                        val returnItem =
+                            requireNotNull(
+                                dao.getSalesReturnOnce(
+                                    item.id
+                                )
+                            )
+
+                        require(
+                            returnItem.workspace ==
+                                currentWorkspace
+                        )
+
+                        val sale =
+                            requireNotNull(
+                                dao.getSaleOnce(
+                                    returnItem.saleId
+                                )
+                            )
+
+                        val allocations =
+                            dao
+                                .getSalesReturnAllocationsForReturnOnce(
+                                    returnItem.id
+                                )
+
+                        if (
+                            returnItem.returnType ==
+                                "RESTOCK"
+                        ) {
+                            /*
+                             * Undo the stock that this return
+                             * previously placed back in warehouse.
+                             */
+                            for (
+                                allocation in
+                                allocations
+                            ) {
+                                val batchId =
+                                    requireNotNull(
+                                        allocation
+                                            .sourceStockBatchId
+                                    )
+
+                                val batch =
+                                    requireNotNull(
+                                        inventoryDao
+                                            .getBatchOnce(
+                                                batchId
+                                            )
+                                    )
+
+                                require(
+                                    batch.quantity >=
+                                        allocation.quantity
+                                )
+
+                                inventoryDao
+                                    .updateBatchQuantity(
+                                        batch.id,
+                                        batch.quantity -
+                                            allocation.quantity
+                                    )
+                            }
+                        }
+
+                        require(
+                            dao.deleteSalesReturnById(
+                                returnItem.id,
+                                currentWorkspace
+                            ) == 1
+                        )
+
+                        val customerId =
+                            sale.customerId
+
+                        if (customerId != null) {
+                            rebuildCustomerCollectionAllocations(
+                                customerId =
+                                    customerId,
+                                workspaceValue =
+                                    currentWorkspace
+                            )
+                        } else {
+                            refreshSaleStatus(
+                                sale.id
+                            )
+                        }
+                    }
+                }.isSuccess
 
             onDone(success)
         }
@@ -2540,6 +3878,105 @@ class DealerBusinessViewModel(
         }
     }
 
+    fun deletePurchaseReturn(
+        item: DealerPurchaseReturnEntity,
+        onDone: (Boolean) -> Unit = {}
+    ) {
+        if (
+            item.id <= 0 ||
+            item.workspace != workspace.value
+        ) {
+            onDone(false)
+            return
+        }
+
+        val currentWorkspace =
+            workspace.value
+
+        viewModelScope.launch {
+            val success =
+                runCatching {
+                    database.withTransaction {
+                        val returnItem =
+                            requireNotNull(
+                                dao.getPurchaseReturnOnce(
+                                    item.id
+                                )
+                            )
+
+                        require(
+                            returnItem.workspace ==
+                                currentWorkspace
+                        )
+
+                        val purchase =
+                            requireNotNull(
+                                dao.getPurchaseOnce(
+                                    returnItem.purchaseId
+                                )
+                            )
+
+                        val line =
+                            requireNotNull(
+                                dao.getPurchaseLineOnce(
+                                    returnItem
+                                        .purchaseLineId
+                                )
+                            )
+
+                        val batchId =
+                            requireNotNull(
+                                line.inventoryBatchId
+                            )
+
+                        val batch =
+                            requireNotNull(
+                                inventoryDao
+                                    .getBatchOnce(
+                                        batchId
+                                    )
+                            )
+
+                        /*
+                         * Deleting purchase return means the
+                         * returned quantity belongs to stock again.
+                         */
+                        inventoryDao
+                            .updateBatchQuantity(
+                                batch.id,
+                                batch.quantity +
+                                    returnItem.quantity
+                            )
+
+                        require(
+                            dao.deletePurchaseReturnById(
+                                returnItem.id,
+                                currentWorkspace
+                            ) == 1
+                        )
+
+                        val companyId =
+                            purchase.companyId
+
+                        if (companyId != null) {
+                            rebuildCompanyPaymentAllocations(
+                                companyId =
+                                    companyId,
+                                workspaceValue =
+                                    currentWorkspace
+                            )
+                        } else {
+                            refreshPurchaseStatus(
+                                purchase.id
+                            )
+                        }
+                    }
+                }.isSuccess
+
+            onDone(success)
+        }
+    }
+
     fun createPurchase(
         companyId: Long,
         invoiceNo: String,
@@ -2554,7 +3991,7 @@ class DealerBusinessViewModel(
             lines.filter {
                 it.productId > 0 &&
                     it.quantity > 0 &&
-                    it.unitCost >= 0
+                    it.unitCost > 0
             }
 
         if (
@@ -2789,7 +4226,7 @@ class DealerBusinessViewModel(
             lines.filter {
                 it.productId > 0 &&
                     it.quantity > 0 &&
-                    it.unitPrice >= 0
+                    it.unitPrice > 0
             }
 
         if (
@@ -3346,6 +4783,35 @@ class DealerBusinessViewModel(
                             sale.workspace ==
                                 currentWorkspace
                         )
+
+                        /*
+                         * Delivery stock was already removed from
+                         * warehouse when the challan was issued.
+                         * Until night settlement closes the challan,
+                         * a normal retailer return would otherwise
+                         * restore warehouse stock while delivery
+                         * allocation still counted it as sold.
+                         */
+                        val deliveryLink =
+                            dao
+                                .getDeliveryChallanSaleForSaleOnce(
+                                    sale.id
+                                )
+
+                        if (deliveryLink != null) {
+                            val deliveryChallan =
+                                requireNotNull(
+                                    dao.getDeliveryChallanOnce(
+                                        deliveryLink
+                                            .challanId
+                                    )
+                                )
+
+                            require(
+                                deliveryChallan.status !=
+                                    "OPEN"
+                            )
+                        }
 
                         val alreadyReturned =
                             dao.getReturnedSaleQuantity(

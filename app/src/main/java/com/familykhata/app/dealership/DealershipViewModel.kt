@@ -243,6 +243,140 @@ class DealershipViewModel(
         }
     }
 
+
+    fun updateSupplier(
+        supplier: DealershipSupplierEntity,
+        name: String,
+        phone: String,
+        contactPerson: String,
+        address: String,
+        note: String,
+        onDone: (Boolean) -> Unit = {}
+    ) {
+        if (
+            supplier.id <= 0 ||
+            name.isBlank()
+        ) {
+            onDone(false)
+            return
+        }
+
+        val currentWorkspace = workspace.value
+
+        viewModelScope.launch {
+            val success =
+                runCatching {
+                    require(
+                        supplier.workspace ==
+                            currentWorkspace
+                    )
+
+                    dao.updateSupplier(
+                        supplier.copy(
+                            name = name.trim(),
+                            phone = phone.trim(),
+                            contactPerson =
+                                contactPerson.trim(),
+                            address = address.trim(),
+                            note = note.trim()
+                        )
+                    ) == 1
+                }.getOrDefault(false)
+
+            onDone(success)
+        }
+    }
+
+    fun updateTerritory(
+        territory: DealershipTerritoryEntity,
+        name: String,
+        code: String,
+        note: String,
+        onDone: (Boolean) -> Unit = {}
+    ) {
+        if (
+            territory.id <= 0 ||
+            name.isBlank()
+        ) {
+            onDone(false)
+            return
+        }
+
+        val currentWorkspace = workspace.value
+
+        viewModelScope.launch {
+            val success =
+                runCatching {
+                    require(
+                        territory.workspace ==
+                            currentWorkspace
+                    )
+
+                    dao.updateTerritory(
+                        territory.copy(
+                            name = name.trim(),
+                            code = code.trim(),
+                            note = note.trim()
+                        )
+                    ) == 1
+                }.getOrDefault(false)
+
+            onDone(success)
+        }
+    }
+
+    fun updateDealer(
+        dealer: DealershipDealerEntity,
+        territoryId: Long?,
+        name: String,
+        dealerCode: String,
+        phone: String,
+        address: String,
+        creditLimit: Double,
+        note: String,
+        onDone: (Boolean) -> Unit = {}
+    ) {
+        if (
+            dealer.id <= 0 ||
+            name.isBlank()
+        ) {
+            onDone(false)
+            return
+        }
+
+        val currentWorkspace = workspace.value
+
+        viewModelScope.launch {
+            val success =
+                runCatching {
+                    require(
+                        dealer.workspace ==
+                            currentWorkspace
+                    )
+
+                    dao.updateDealer(
+                        dealer.copy(
+                            territoryId =
+                                territoryId
+                                    ?.takeIf { it > 0 },
+                            name = name.trim(),
+                            dealerCode =
+                                dealerCode.trim(),
+                            phone = phone.trim(),
+                            address = address.trim(),
+                            creditLimit =
+                                creditLimit.coerceAtLeast(
+                                    0.0
+                                ),
+                            note = note.trim()
+                        )
+                    ) == 1
+                }.getOrDefault(false)
+
+            onDone(success)
+        }
+    }
+
     fun setProductPolicy(
         productId: Long,
         dealerPrice: Double,

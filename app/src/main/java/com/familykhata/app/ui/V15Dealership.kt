@@ -66,6 +66,18 @@ internal fun V15DealershipScreen(
     var showInvoice by remember { mutableStateOf(false) }
     var showInventory by remember { mutableStateOf(false) }
 
+    var editingSupplier by remember {
+        mutableStateOf<DealershipSupplierEntity?>(null)
+    }
+
+    var editingTerritory by remember {
+        mutableStateOf<DealershipTerritoryEntity?>(null)
+    }
+
+    var editingDealer by remember {
+        mutableStateOf<DealershipDealerEntity?>(null)
+    }
+
     var selectedInvoice by remember {
         mutableStateOf<DealershipInvoiceSummary?>(null)
     }
@@ -305,6 +317,7 @@ internal fun V15DealershipScreen(
             ) {
                 OutlinedButton(
                     onClick = {
+                        editingSupplier = null
                         showSupplier = true
                     },
                     modifier =
@@ -320,6 +333,7 @@ internal fun V15DealershipScreen(
 
                 OutlinedButton(
                     onClick = {
+                        editingTerritory = null
                         showTerritory = true
                     },
                     modifier =
@@ -335,6 +349,7 @@ internal fun V15DealershipScreen(
 
                 OutlinedButton(
                     onClick = {
+                        editingDealer = null
                         showDealer = true
                     },
                     modifier =
@@ -405,6 +420,165 @@ internal fun V15DealershipScreen(
                             "+ Invoice"
                         )
                     )
+                }
+            }
+        }
+
+
+        Text(
+            v15Text(
+                "সাপ্লায়ার তালিকা",
+                "Suppliers"
+            ),
+            fontWeight = FontWeight.Bold
+        )
+
+        if (suppliers.isEmpty()) {
+            Text(
+                v15Text(
+                    "এখনো কোনো সাপ্লায়ার যোগ করা হয়নি।",
+                    "No suppliers added yet."
+                )
+            )
+        }
+
+        suppliers.forEach { supplier ->
+            Card(
+                modifier =
+                    Modifier.fillMaxWidth()
+            ) {
+                Column(
+                    modifier =
+                        Modifier.padding(11.dp),
+                    verticalArrangement =
+                        Arrangement.spacedBy(3.dp)
+                ) {
+                    Text(
+                        supplier.name,
+                        fontWeight =
+                            FontWeight.Bold
+                    )
+
+                    if (
+                        supplier.contactPerson
+                            .isNotBlank()
+                    ) {
+                        Text(
+                            v15Text(
+                                "যোগাযোগ: ${supplier.contactPerson}",
+                                "Contact: ${supplier.contactPerson}"
+                            )
+                        )
+                    }
+
+                    if (supplier.phone.isNotBlank()) {
+                        Text(
+                            v15Text(
+                                "ফোন: ${supplier.phone}",
+                                "Phone: ${supplier.phone}"
+                            )
+                        )
+                    }
+
+                    if (supplier.address.isNotBlank()) {
+                        Text(supplier.address)
+                    }
+
+                    if (supplier.note.isNotBlank()) {
+                        Text(
+                            supplier.note,
+                            style =
+                                MaterialTheme.typography.bodySmall
+                        )
+                    }
+
+                    if (canWrite) {
+                        TextButton(
+                            onClick = {
+                                showSupplier = false
+                                editingSupplier =
+                                    supplier
+                            }
+                        ) {
+                            Text(
+                                v15Text(
+                                    "সম্পাদনা",
+                                    "Edit"
+                                )
+                            )
+                        }
+                    }
+                }
+            }
+        }
+
+        Text(
+            v15Text(
+                "টেরিটরি তালিকা",
+                "Territories"
+            ),
+            fontWeight = FontWeight.Bold
+        )
+
+        if (territories.isEmpty()) {
+            Text(
+                v15Text(
+                    "এখনো কোনো টেরিটরি যোগ করা হয়নি।",
+                    "No territories added yet."
+                )
+            )
+        }
+
+        territories.forEach { territory ->
+            Card(
+                modifier =
+                    Modifier.fillMaxWidth()
+            ) {
+                Column(
+                    modifier =
+                        Modifier.padding(11.dp),
+                    verticalArrangement =
+                        Arrangement.spacedBy(3.dp)
+                ) {
+                    Text(
+                        territory.name,
+                        fontWeight =
+                            FontWeight.Bold
+                    )
+
+                    if (territory.code.isNotBlank()) {
+                        Text(
+                            v15Text(
+                                "কোড: ${territory.code}",
+                                "Code: ${territory.code}"
+                            )
+                        )
+                    }
+
+                    if (territory.note.isNotBlank()) {
+                        Text(
+                            territory.note,
+                            style =
+                                MaterialTheme.typography.bodySmall
+                        )
+                    }
+
+                    if (canWrite) {
+                        TextButton(
+                            onClick = {
+                                showTerritory = false
+                                editingTerritory =
+                                    territory
+                            }
+                        ) {
+                            Text(
+                                v15Text(
+                                    "সম্পাদনা",
+                                    "Edit"
+                                )
+                            )
+                        }
+                    }
                 }
             }
         }
@@ -548,6 +722,23 @@ internal fun V15DealershipScreen(
                             color =
                                 MaterialTheme.colorScheme.onSurfaceVariant
                         )
+                    }
+
+                    if (canWrite) {
+                        TextButton(
+                            onClick = {
+                                showDealer = false
+                                editingDealer =
+                                    dealer
+                            }
+                        ) {
+                            Text(
+                                v15Text(
+                                    "সম্পাদনা",
+                                    "Edit"
+                                )
+                            )
+                        }
                     }
                 }
             }
@@ -739,10 +930,15 @@ internal fun V15DealershipScreen(
         }
     }
 
-    if (showSupplier) {
+    if (
+        showSupplier ||
+        editingSupplier != null
+    ) {
         AddDealershipSupplierDialog(
+            initial = editingSupplier,
             onDismiss = {
                 showSupplier = false
+                editingSupplier = null
             },
             onSave = {
                     name,
@@ -751,45 +947,89 @@ internal fun V15DealershipScreen(
                     address,
                     note ->
 
-                vm.addSupplier(
-                    name = name,
-                    phone = phone,
-                    contactPerson = contact,
-                    address = address,
-                    note = note
-                )
+                val current =
+                    editingSupplier
 
-                showSupplier = false
+                if (current == null) {
+                    vm.addSupplier(
+                        name = name,
+                        phone = phone,
+                        contactPerson = contact,
+                        address = address,
+                        note = note
+                    )
+
+                    showSupplier = false
+                } else {
+                    vm.updateSupplier(
+                        supplier = current,
+                        name = name,
+                        phone = phone,
+                        contactPerson = contact,
+                        address = address,
+                        note = note
+                    ) { success ->
+                        if (success) {
+                            editingSupplier = null
+                        }
+                    }
+                }
             }
         )
     }
 
-    if (showTerritory) {
+    if (
+        showTerritory ||
+        editingTerritory != null
+    ) {
         AddDealershipTerritoryDialog(
+            initial = editingTerritory,
             onDismiss = {
                 showTerritory = false
+                editingTerritory = null
             },
             onSave = {
                     name,
                     code,
                     note ->
 
-                vm.addTerritory(
-                    name = name,
-                    code = code,
-                    note = note
-                )
+                val current =
+                    editingTerritory
 
-                showTerritory = false
+                if (current == null) {
+                    vm.addTerritory(
+                        name = name,
+                        code = code,
+                        note = note
+                    )
+
+                    showTerritory = false
+                } else {
+                    vm.updateTerritory(
+                        territory = current,
+                        name = name,
+                        code = code,
+                        note = note
+                    ) { success ->
+                        if (success) {
+                            editingTerritory = null
+                        }
+                    }
+                }
             }
         )
     }
 
-    if (showDealer) {
+    if (
+        showDealer ||
+        editingDealer != null
+    ) {
         AddDealershipDealerDialog(
+            initial = editingDealer,
             territories = territories,
             onDismiss = {
                 showDealer = false
+                editingDealer = null
             },
             onSave = {
                     territoryId,
@@ -800,19 +1040,41 @@ internal fun V15DealershipScreen(
                     creditLimit,
                     note ->
 
-                vm.addDealer(
-                    territoryId =
-                        territoryId,
-                    name = name,
-                    dealerCode = code,
-                    phone = phone,
-                    address = address,
-                    creditLimit =
-                        creditLimit,
-                    note = note
-                )
+                val current =
+                    editingDealer
 
-                showDealer = false
+                if (current == null) {
+                    vm.addDealer(
+                        territoryId =
+                            territoryId,
+                        name = name,
+                        dealerCode = code,
+                        phone = phone,
+                        address = address,
+                        creditLimit =
+                            creditLimit,
+                        note = note
+                    )
+
+                    showDealer = false
+                } else {
+                    vm.updateDealer(
+                        dealer = current,
+                        territoryId =
+                            territoryId,
+                        name = name,
+                        dealerCode = code,
+                        phone = phone,
+                        address = address,
+                        creditLimit =
+                            creditLimit,
+                        note = note
+                    ) { success ->
+                        if (success) {
+                            editingDealer = null
+                        }
+                    }
+                }
             }
         )
     }
@@ -953,6 +1215,7 @@ private fun DealershipMetric(
 
 @Composable
 private fun AddDealershipSupplierDialog(
+    initial: DealershipSupplierEntity? = null,
     onDismiss: () -> Unit,
     onSave: (
         String,
@@ -962,30 +1225,47 @@ private fun AddDealershipSupplierDialog(
         String
     ) -> Unit
 ) {
-    var name by remember {
-        mutableStateOf("")
+    var name by remember(initial?.id) {
+        mutableStateOf(
+            initial?.name.orEmpty()
+        )
     }
-    var phone by remember {
-        mutableStateOf("")
+    var phone by remember(initial?.id) {
+        mutableStateOf(
+            initial?.phone.orEmpty()
+        )
     }
-    var contact by remember {
-        mutableStateOf("")
+    var contact by remember(initial?.id) {
+        mutableStateOf(
+            initial?.contactPerson.orEmpty()
+        )
     }
-    var address by remember {
-        mutableStateOf("")
+    var address by remember(initial?.id) {
+        mutableStateOf(
+            initial?.address.orEmpty()
+        )
     }
-    var note by remember {
-        mutableStateOf("")
+    var note by remember(initial?.id) {
+        mutableStateOf(
+            initial?.note.orEmpty()
+        )
     }
 
     AlertDialog(
         onDismissRequest = onDismiss,
         title = {
             Text(
-                v15Text(
-                    "নতুন সাপ্লায়ার",
-                    "New supplier"
-                )
+                if (initial == null) {
+                    v15Text(
+                        "নতুন সাপ্লায়ার",
+                        "New supplier"
+                    )
+                } else {
+                    v15Text(
+                        "সাপ্লায়ার সম্পাদনা",
+                        "Edit supplier"
+                    )
+                }
             )
         },
         text = {
@@ -1058,10 +1338,17 @@ private fun AddDealershipSupplierDialog(
                 }
             ) {
                 Text(
-                    v15Text(
-                        "সেভ",
-                        "Save"
-                    )
+                    if (initial == null) {
+                        v15Text(
+                            "সেভ",
+                            "Save"
+                        )
+                    } else {
+                        v15Text(
+                            "আপডেট",
+                            "Update"
+                        )
+                    }
                 )
             }
         },
@@ -1082,6 +1369,7 @@ private fun AddDealershipSupplierDialog(
 
 @Composable
 private fun AddDealershipTerritoryDialog(
+    initial: DealershipTerritoryEntity? = null,
     onDismiss: () -> Unit,
     onSave: (
         String,
@@ -1089,24 +1377,37 @@ private fun AddDealershipTerritoryDialog(
         String
     ) -> Unit
 ) {
-    var name by remember {
-        mutableStateOf("")
+    var name by remember(initial?.id) {
+        mutableStateOf(
+            initial?.name.orEmpty()
+        )
     }
-    var code by remember {
-        mutableStateOf("")
+    var code by remember(initial?.id) {
+        mutableStateOf(
+            initial?.code.orEmpty()
+        )
     }
-    var note by remember {
-        mutableStateOf("")
+    var note by remember(initial?.id) {
+        mutableStateOf(
+            initial?.note.orEmpty()
+        )
     }
 
     AlertDialog(
         onDismissRequest = onDismiss,
         title = {
             Text(
-                v15Text(
-                    "নতুন টেরিটরি",
-                    "New territory"
-                )
+                if (initial == null) {
+                    v15Text(
+                        "নতুন টেরিটরি",
+                        "New territory"
+                    )
+                } else {
+                    v15Text(
+                        "টেরিটরি সম্পাদনা",
+                        "Edit territory"
+                    )
+                }
             )
         },
         text = {
@@ -1155,10 +1456,17 @@ private fun AddDealershipTerritoryDialog(
                 }
             ) {
                 Text(
-                    v15Text(
-                        "সেভ",
-                        "Save"
-                    )
+                    if (initial == null) {
+                        v15Text(
+                            "সেভ",
+                            "Save"
+                        )
+                    } else {
+                        v15Text(
+                            "আপডেট",
+                            "Update"
+                        )
+                    }
                 )
             }
         },
@@ -1179,6 +1487,7 @@ private fun AddDealershipTerritoryDialog(
 
 @Composable
 private fun AddDealershipDealerDialog(
+    initial: DealershipDealerEntity? = null,
     territories:
         List<DealershipTerritoryEntity>,
     onDismiss: () -> Unit,
@@ -1192,36 +1501,60 @@ private fun AddDealershipDealerDialog(
         String
     ) -> Unit
 ) {
-    var territoryId by remember {
-        mutableStateOf<Long?>(null)
+    var territoryId by remember(initial?.id) {
+        mutableStateOf(
+            initial?.territoryId
+        )
     }
-    var name by remember {
-        mutableStateOf("")
+    var name by remember(initial?.id) {
+        mutableStateOf(
+            initial?.name.orEmpty()
+        )
     }
-    var code by remember {
-        mutableStateOf("")
+    var code by remember(initial?.id) {
+        mutableStateOf(
+            initial?.dealerCode.orEmpty()
+        )
     }
-    var phone by remember {
-        mutableStateOf("")
+    var phone by remember(initial?.id) {
+        mutableStateOf(
+            initial?.phone.orEmpty()
+        )
     }
-    var address by remember {
-        mutableStateOf("")
+    var address by remember(initial?.id) {
+        mutableStateOf(
+            initial?.address.orEmpty()
+        )
     }
-    var credit by remember {
-        mutableStateOf("")
+    var credit by remember(initial?.id) {
+        mutableStateOf(
+            initial?.creditLimit
+                ?.takeIf { it > 0.0 }
+                ?.toString()
+                .orEmpty()
+        )
     }
-    var note by remember {
-        mutableStateOf("")
+    var note by remember(initial?.id) {
+        mutableStateOf(
+            initial?.note.orEmpty()
+        )
     }
 
     AlertDialog(
         onDismissRequest = onDismiss,
         title = {
             Text(
-                v15Text(
-                    "নতুন ডিলার",
-                    "New dealer"
-                )
+                if (initial == null) {
+                    v15Text(
+                        "নতুন ডিলার",
+                        "New dealer"
+                    )
+                } else {
+                    v15Text(
+                        "ডিলার সম্পাদনা",
+                        "Edit dealer"
+                    )
+                }
             )
         },
         text = {
@@ -1242,6 +1575,28 @@ private fun AddDealershipDealerDialog(
                         fontWeight =
                             FontWeight.Bold
                     )
+
+                    OutlinedButton(
+                        onClick = {
+                            territoryId = null
+                        },
+                        modifier =
+                            Modifier.fillMaxWidth()
+                    ) {
+                        Text(
+                            if (territoryId == null) {
+                                v15Text(
+                                    "✓ কোনো টেরিটরি নয়",
+                                    "✓ No territory"
+                                )
+                            } else {
+                                v15Text(
+                                    "কোনো টেরিটরি নয়",
+                                    "No territory"
+                                )
+                            }
+                        )
+                    }
 
                     territories.forEach {
                             territory ->
@@ -1340,10 +1695,17 @@ private fun AddDealershipDealerDialog(
                 }
             ) {
                 Text(
-                    v15Text(
-                        "সেভ",
-                        "Save"
-                    )
+                    if (initial == null) {
+                        v15Text(
+                            "সেভ",
+                            "Save"
+                        )
+                    } else {
+                        v15Text(
+                            "আপডেট",
+                            "Update"
+                        )
+                    }
                 )
             }
         },

@@ -4,6 +4,7 @@ import androidx.room.Dao
 import androidx.room.Insert
 import androidx.room.OnConflictStrategy
 import androidx.room.Query
+import androidx.room.Update
 import kotlinx.coroutines.flow.Flow
 
 @Dao
@@ -23,6 +24,21 @@ interface DealershipDao {
     suspend fun insertDealer(
         item: DealershipDealerEntity
     ): Long
+
+    @Update
+    suspend fun updateSupplier(
+        item: DealershipSupplierEntity
+    ): Int
+
+    @Update
+    suspend fun updateTerritory(
+        item: DealershipTerritoryEntity
+    ): Int
+
+    @Update
+    suspend fun updateDealer(
+        item: DealershipDealerEntity
+    ): Int
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun upsertProductPolicy(

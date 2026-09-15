@@ -30,6 +30,23 @@ import com.familykhata.app.dealership.DealershipStockAllocationEntity
 import com.familykhata.app.dealership.DealershipStockReceiptEntity
 import com.familykhata.app.dealership.DealershipSupplierEntity
 import com.familykhata.app.dealership.DealershipTerritoryEntity
+import com.familykhata.app.dealerbusiness.DealerAreaEntity
+import com.familykhata.app.dealerbusiness.DealerBusinessDao
+import com.familykhata.app.dealerbusiness.DealerCollectionEntity
+import com.familykhata.app.dealerbusiness.DealerCollectionAllocationEntity
+import com.familykhata.app.dealerbusiness.DealerCompanyEntity
+import com.familykhata.app.dealerbusiness.DealerCustomerEntity
+import com.familykhata.app.dealerbusiness.DealerExpenseEntity
+import com.familykhata.app.dealerbusiness.DealerPurchaseEntity
+import com.familykhata.app.dealerbusiness.DealerPurchaseLineEntity
+import com.familykhata.app.dealerbusiness.DealerPurchaseReturnEntity
+import com.familykhata.app.dealerbusiness.DealerSaleEntity
+import com.familykhata.app.dealerbusiness.DealerSaleLineEntity
+import com.familykhata.app.dealerbusiness.DealerSalesReturnEntity
+import com.familykhata.app.dealerbusiness.DealerSalesReturnAllocationEntity
+import com.familykhata.app.dealerbusiness.DealerStockAllocationEntity
+import com.familykhata.app.dealerbusiness.DealerSupplierPaymentEntity
+import com.familykhata.app.dealerbusiness.DealerSupplierPaymentAllocationEntity
 import com.familykhata.app.production.ProductionBatchEntity
 import com.familykhata.app.production.ProductionConsumptionEntity
 import com.familykhata.app.production.ProductionCostEntity
@@ -54,6 +71,22 @@ import com.familykhata.app.production.ProductionItemRoleEntity
         DealershipStockAllocationEntity::class,
         DealershipPaymentEntity::class,
         DealershipReturnEntity::class,
+        DealerCompanyEntity::class,
+        DealerAreaEntity::class,
+        DealerCustomerEntity::class,
+        DealerPurchaseEntity::class,
+        DealerPurchaseLineEntity::class,
+        DealerSupplierPaymentEntity::class,
+        DealerSupplierPaymentAllocationEntity::class,
+        DealerSaleEntity::class,
+        DealerSaleLineEntity::class,
+        DealerStockAllocationEntity::class,
+        DealerCollectionEntity::class,
+        DealerCollectionAllocationEntity::class,
+        DealerSalesReturnEntity::class,
+        DealerSalesReturnAllocationEntity::class,
+        DealerPurchaseReturnEntity::class,
+        DealerExpenseEntity::class,
         AgroCycleEntity::class,
         AgroCostEntity::class,
         AgroLossEntity::class,
@@ -65,13 +98,14 @@ import com.familykhata.app.production.ProductionItemRoleEntity
         FoodStockAllocationEntity::class,
         FoodPaymentEntity::class
     ],
-    version = 9,
+    version = 10,
     exportSchema = false
 )
 abstract class InventoryDatabase : RoomDatabase() {
     abstract fun dao(): InventoryDao
     abstract fun productionDao(): ProductionDao
     abstract fun dealershipDao(): DealershipDao
+    abstract fun dealerBusinessDao(): DealerBusinessDao
     abstract fun agroDao(): AgroDao
     abstract fun foodServiceDao(): FoodServiceDao
 
@@ -1186,6 +1220,670 @@ abstract class InventoryDatabase : RoomDatabase() {
                 }
             }
 
+
+        private val MIGRATION_9_10 =
+            object : Migration(9, 10) {
+                override fun migrate(
+                    db: SupportSQLiteDatabase
+                ) {
+                    db.execSQL(
+                        """
+                        CREATE TABLE IF NOT EXISTS
+                        `dealer_business_companies` (
+                            `id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+                            `name` TEXT NOT NULL,
+                            `code` TEXT NOT NULL,
+                            `phone` TEXT NOT NULL,
+                            `contactPerson` TEXT NOT NULL,
+                            `address` TEXT NOT NULL,
+                            `note` TEXT NOT NULL,
+                            `workspace` TEXT NOT NULL,
+                            `createdAt` INTEGER NOT NULL
+                        )
+                        """.trimIndent()
+                    )
+
+                    db.execSQL(
+                        """
+                        CREATE INDEX IF NOT EXISTS
+                        `index_dealer_business_companies_workspace_name`
+                        ON `dealer_business_companies`
+                        (`workspace`, `name`)
+                        """.trimIndent()
+                    )
+
+                    db.execSQL(
+                        """
+                        CREATE TABLE IF NOT EXISTS
+                        `dealer_business_areas` (
+                            `id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+                            `name` TEXT NOT NULL,
+                            `code` TEXT NOT NULL,
+                            `note` TEXT NOT NULL,
+                            `workspace` TEXT NOT NULL,
+                            `createdAt` INTEGER NOT NULL
+                        )
+                        """.trimIndent()
+                    )
+
+                    db.execSQL(
+                        """
+                        CREATE INDEX IF NOT EXISTS
+                        `index_dealer_business_areas_workspace_name`
+                        ON `dealer_business_areas`
+                        (`workspace`, `name`)
+                        """.trimIndent()
+                    )
+
+                    db.execSQL(
+                        """
+                        CREATE TABLE IF NOT EXISTS
+                        `dealer_business_customers` (
+                            `id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+                            `areaId` INTEGER,
+                            `name` TEXT NOT NULL,
+                            `customerCode` TEXT NOT NULL,
+                            `phone` TEXT NOT NULL,
+                            `address` TEXT NOT NULL,
+                            `creditLimit` REAL NOT NULL,
+                            `note` TEXT NOT NULL,
+                            `workspace` TEXT NOT NULL,
+                            `createdAt` INTEGER NOT NULL,
+                            FOREIGN KEY(`areaId`)
+                                REFERENCES `dealer_business_areas`(`id`)
+                                ON UPDATE NO ACTION
+                                ON DELETE SET NULL
+                        )
+                        """.trimIndent()
+                    )
+
+                    listOf(
+                        """
+                        CREATE INDEX IF NOT EXISTS
+                        `index_dealer_business_customers_areaId`
+                        ON `dealer_business_customers` (`areaId`)
+                        """,
+                        """
+                        CREATE INDEX IF NOT EXISTS
+                        `index_dealer_business_customers_workspace_name`
+                        ON `dealer_business_customers`
+                        (`workspace`, `name`)
+                        """,
+                        """
+                        CREATE INDEX IF NOT EXISTS
+                        `index_dealer_business_customers_workspace_phone`
+                        ON `dealer_business_customers`
+                        (`workspace`, `phone`)
+                        """,
+                        """
+                        CREATE INDEX IF NOT EXISTS
+                        `index_dealer_business_customers_workspace_customerCode`
+                        ON `dealer_business_customers`
+                        (`workspace`, `customerCode`)
+                        """
+                    ).forEach {
+                        db.execSQL(it.trimIndent())
+                    }
+
+                    db.execSQL(
+                        """
+                        CREATE TABLE IF NOT EXISTS
+                        `dealer_business_purchases` (
+                            `id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+                            `companyId` INTEGER,
+                            `companyNameSnapshot` TEXT NOT NULL,
+                            `invoiceNo` TEXT NOT NULL,
+                            `status` TEXT NOT NULL,
+                            `purchasedAt` INTEGER NOT NULL,
+                            `note` TEXT NOT NULL,
+                            `workspace` TEXT NOT NULL,
+                            `createdAt` INTEGER NOT NULL,
+                            FOREIGN KEY(`companyId`)
+                                REFERENCES `dealer_business_companies`(`id`)
+                                ON UPDATE NO ACTION
+                                ON DELETE SET NULL
+                        )
+                        """.trimIndent()
+                    )
+
+                    listOf(
+                        """
+                        CREATE INDEX IF NOT EXISTS
+                        `index_dealer_business_purchases_companyId`
+                        ON `dealer_business_purchases` (`companyId`)
+                        """,
+                        """
+                        CREATE INDEX IF NOT EXISTS
+                        `index_dealer_business_purchases_workspace_status`
+                        ON `dealer_business_purchases`
+                        (`workspace`, `status`)
+                        """,
+                        """
+                        CREATE INDEX IF NOT EXISTS
+                        `index_dealer_business_purchases_purchasedAt`
+                        ON `dealer_business_purchases` (`purchasedAt`)
+                        """
+                    ).forEach {
+                        db.execSQL(it.trimIndent())
+                    }
+
+                    db.execSQL(
+                        """
+                        CREATE TABLE IF NOT EXISTS
+                        `dealer_business_purchase_lines` (
+                            `id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+                            `purchaseId` INTEGER NOT NULL,
+                            `productId` INTEGER,
+                            `inventoryBatchId` INTEGER,
+                            `productNameSnapshot` TEXT NOT NULL,
+                            `batchNoSnapshot` TEXT NOT NULL,
+                            `quantity` INTEGER NOT NULL,
+                            `unitCost` REAL NOT NULL,
+                            `lineTotal` REAL NOT NULL,
+                            FOREIGN KEY(`purchaseId`)
+                                REFERENCES `dealer_business_purchases`(`id`)
+                                ON UPDATE NO ACTION
+                                ON DELETE CASCADE,
+                            FOREIGN KEY(`productId`)
+                                REFERENCES `inventory_products`(`id`)
+                                ON UPDATE NO ACTION
+                                ON DELETE SET NULL,
+                            FOREIGN KEY(`inventoryBatchId`)
+                                REFERENCES `inventory_batches`(`id`)
+                                ON UPDATE NO ACTION
+                                ON DELETE SET NULL
+                        )
+                        """.trimIndent()
+                    )
+
+                    listOf(
+                        """
+                        CREATE INDEX IF NOT EXISTS
+                        `index_dealer_business_purchase_lines_purchaseId`
+                        ON `dealer_business_purchase_lines`
+                        (`purchaseId`)
+                        """,
+                        """
+                        CREATE INDEX IF NOT EXISTS
+                        `index_dealer_business_purchase_lines_productId`
+                        ON `dealer_business_purchase_lines`
+                        (`productId`)
+                        """,
+                        """
+                        CREATE INDEX IF NOT EXISTS
+                        `index_dealer_business_purchase_lines_inventoryBatchId`
+                        ON `dealer_business_purchase_lines`
+                        (`inventoryBatchId`)
+                        """
+                    ).forEach {
+                        db.execSQL(it.trimIndent())
+                    }
+
+                    db.execSQL(
+                        """
+                        CREATE TABLE IF NOT EXISTS
+                        `dealer_business_supplier_payments` (
+                            `id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+                            `companyId` INTEGER,
+                            `companyNameSnapshot` TEXT NOT NULL,
+                            `amount` REAL NOT NULL,
+                            `paidAt` INTEGER NOT NULL,
+                            `note` TEXT NOT NULL,
+                            `workspace` TEXT NOT NULL,
+                            `createdAt` INTEGER NOT NULL,
+                            FOREIGN KEY(`companyId`)
+                                REFERENCES `dealer_business_companies`(`id`)
+                                ON UPDATE NO ACTION
+                                ON DELETE SET NULL
+                        )
+                        """.trimIndent()
+                    )
+
+                    listOf(
+                        """
+                        CREATE INDEX IF NOT EXISTS
+                        `index_dealer_business_supplier_payments_companyId`
+                        ON `dealer_business_supplier_payments`
+                        (`companyId`)
+                        """,
+                        """
+                        CREATE INDEX IF NOT EXISTS
+                        `index_dealer_business_supplier_payments_workspace_paidAt`
+                        ON `dealer_business_supplier_payments`
+                        (`workspace`, `paidAt`)
+                        """
+                    ).forEach {
+                        db.execSQL(it.trimIndent())
+                    }
+
+                    db.execSQL(
+                        """
+                        CREATE TABLE IF NOT EXISTS
+                        `dealer_business_supplier_payment_allocations` (
+                            `id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+                            `paymentId` INTEGER NOT NULL,
+                            `purchaseId` INTEGER NOT NULL,
+                            `amount` REAL NOT NULL,
+                            FOREIGN KEY(`paymentId`)
+                                REFERENCES `dealer_business_supplier_payments`(`id`)
+                                ON UPDATE NO ACTION
+                                ON DELETE CASCADE,
+                            FOREIGN KEY(`purchaseId`)
+                                REFERENCES `dealer_business_purchases`(`id`)
+                                ON UPDATE NO ACTION
+                                ON DELETE CASCADE
+                        )
+                        """.trimIndent()
+                    )
+
+                    listOf(
+                        """
+                        CREATE INDEX IF NOT EXISTS
+                        `index_dealer_business_supplier_payment_allocations_paymentId`
+                        ON `dealer_business_supplier_payment_allocations`
+                        (`paymentId`)
+                        """,
+                        """
+                        CREATE INDEX IF NOT EXISTS
+                        `index_dealer_business_supplier_payment_allocations_purchaseId`
+                        ON `dealer_business_supplier_payment_allocations`
+                        (`purchaseId`)
+                        """
+                    ).forEach {
+                        db.execSQL(it.trimIndent())
+                    }
+
+                    db.execSQL(
+                        """
+                        CREATE TABLE IF NOT EXISTS
+                        `dealer_business_sales` (
+                            `id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+                            `customerId` INTEGER,
+                            `customerNameSnapshot` TEXT NOT NULL,
+                            `invoiceNo` TEXT NOT NULL,
+                            `status` TEXT NOT NULL,
+                            `soldAt` INTEGER NOT NULL,
+                            `note` TEXT NOT NULL,
+                            `workspace` TEXT NOT NULL,
+                            `createdAt` INTEGER NOT NULL,
+                            FOREIGN KEY(`customerId`)
+                                REFERENCES `dealer_business_customers`(`id`)
+                                ON UPDATE NO ACTION
+                                ON DELETE SET NULL
+                        )
+                        """.trimIndent()
+                    )
+
+                    listOf(
+                        """
+                        CREATE INDEX IF NOT EXISTS
+                        `index_dealer_business_sales_customerId`
+                        ON `dealer_business_sales` (`customerId`)
+                        """,
+                        """
+                        CREATE INDEX IF NOT EXISTS
+                        `index_dealer_business_sales_workspace_status`
+                        ON `dealer_business_sales`
+                        (`workspace`, `status`)
+                        """,
+                        """
+                        CREATE INDEX IF NOT EXISTS
+                        `index_dealer_business_sales_soldAt`
+                        ON `dealer_business_sales` (`soldAt`)
+                        """
+                    ).forEach {
+                        db.execSQL(it.trimIndent())
+                    }
+
+                    db.execSQL(
+                        """
+                        CREATE TABLE IF NOT EXISTS
+                        `dealer_business_sale_lines` (
+                            `id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+                            `saleId` INTEGER NOT NULL,
+                            `productId` INTEGER,
+                            `productNameSnapshot` TEXT NOT NULL,
+                            `quantity` INTEGER NOT NULL,
+                            `unitPrice` REAL NOT NULL,
+                            `lineTotal` REAL NOT NULL,
+                            FOREIGN KEY(`saleId`)
+                                REFERENCES `dealer_business_sales`(`id`)
+                                ON UPDATE NO ACTION
+                                ON DELETE CASCADE,
+                            FOREIGN KEY(`productId`)
+                                REFERENCES `inventory_products`(`id`)
+                                ON UPDATE NO ACTION
+                                ON DELETE SET NULL
+                        )
+                        """.trimIndent()
+                    )
+
+                    listOf(
+                        """
+                        CREATE INDEX IF NOT EXISTS
+                        `index_dealer_business_sale_lines_saleId`
+                        ON `dealer_business_sale_lines` (`saleId`)
+                        """,
+                        """
+                        CREATE INDEX IF NOT EXISTS
+                        `index_dealer_business_sale_lines_productId`
+                        ON `dealer_business_sale_lines` (`productId`)
+                        """
+                    ).forEach {
+                        db.execSQL(it.trimIndent())
+                    }
+
+                    db.execSQL(
+                        """
+                        CREATE TABLE IF NOT EXISTS
+                        `dealer_business_stock_allocations` (
+                            `id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+                            `saleLineId` INTEGER NOT NULL,
+                            `sourceStockBatchId` INTEGER,
+                            `batchNoSnapshot` TEXT NOT NULL,
+                            `quantity` INTEGER NOT NULL,
+                            `unitCost` REAL NOT NULL,
+                            `totalCost` REAL NOT NULL,
+                            FOREIGN KEY(`saleLineId`)
+                                REFERENCES `dealer_business_sale_lines`(`id`)
+                                ON UPDATE NO ACTION
+                                ON DELETE CASCADE,
+                            FOREIGN KEY(`sourceStockBatchId`)
+                                REFERENCES `inventory_batches`(`id`)
+                                ON UPDATE NO ACTION
+                                ON DELETE SET NULL
+                        )
+                        """.trimIndent()
+                    )
+
+                    listOf(
+                        """
+                        CREATE INDEX IF NOT EXISTS
+                        `index_dealer_business_stock_allocations_saleLineId`
+                        ON `dealer_business_stock_allocations`
+                        (`saleLineId`)
+                        """,
+                        """
+                        CREATE INDEX IF NOT EXISTS
+                        `index_dealer_business_stock_allocations_sourceStockBatchId`
+                        ON `dealer_business_stock_allocations`
+                        (`sourceStockBatchId`)
+                        """
+                    ).forEach {
+                        db.execSQL(it.trimIndent())
+                    }
+
+                    db.execSQL(
+                        """
+                        CREATE TABLE IF NOT EXISTS
+                        `dealer_business_collections` (
+                            `id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+                            `customerId` INTEGER,
+                            `customerNameSnapshot` TEXT NOT NULL,
+                            `amount` REAL NOT NULL,
+                            `collectedAt` INTEGER NOT NULL,
+                            `note` TEXT NOT NULL,
+                            `workspace` TEXT NOT NULL,
+                            `createdAt` INTEGER NOT NULL,
+                            FOREIGN KEY(`customerId`)
+                                REFERENCES `dealer_business_customers`(`id`)
+                                ON UPDATE NO ACTION
+                                ON DELETE SET NULL
+                        )
+                        """.trimIndent()
+                    )
+
+                    listOf(
+                        """
+                        CREATE INDEX IF NOT EXISTS
+                        `index_dealer_business_collections_customerId`
+                        ON `dealer_business_collections`
+                        (`customerId`)
+                        """,
+                        """
+                        CREATE INDEX IF NOT EXISTS
+                        `index_dealer_business_collections_workspace_collectedAt`
+                        ON `dealer_business_collections`
+                        (`workspace`, `collectedAt`)
+                        """
+                    ).forEach {
+                        db.execSQL(it.trimIndent())
+                    }
+
+                    db.execSQL(
+                        """
+                        CREATE TABLE IF NOT EXISTS
+                        `dealer_business_collection_allocations` (
+                            `id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+                            `collectionId` INTEGER NOT NULL,
+                            `saleId` INTEGER NOT NULL,
+                            `amount` REAL NOT NULL,
+                            FOREIGN KEY(`collectionId`)
+                                REFERENCES `dealer_business_collections`(`id`)
+                                ON UPDATE NO ACTION
+                                ON DELETE CASCADE,
+                            FOREIGN KEY(`saleId`)
+                                REFERENCES `dealer_business_sales`(`id`)
+                                ON UPDATE NO ACTION
+                                ON DELETE CASCADE
+                        )
+                        """.trimIndent()
+                    )
+
+                    listOf(
+                        """
+                        CREATE INDEX IF NOT EXISTS
+                        `index_dealer_business_collection_allocations_collectionId`
+                        ON `dealer_business_collection_allocations`
+                        (`collectionId`)
+                        """,
+                        """
+                        CREATE INDEX IF NOT EXISTS
+                        `index_dealer_business_collection_allocations_saleId`
+                        ON `dealer_business_collection_allocations`
+                        (`saleId`)
+                        """
+                    ).forEach {
+                        db.execSQL(it.trimIndent())
+                    }
+
+                    db.execSQL(
+                        """
+                        CREATE TABLE IF NOT EXISTS
+                        `dealer_business_sales_returns` (
+                            `id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+                            `saleId` INTEGER NOT NULL,
+                            `saleLineId` INTEGER NOT NULL,
+                            `productId` INTEGER,
+                            `productNameSnapshot` TEXT NOT NULL,
+                            `quantity` INTEGER NOT NULL,
+                            `unitPrice` REAL NOT NULL,
+                            `totalRefund` REAL NOT NULL,
+                            `totalCost` REAL NOT NULL,
+                            `returnType` TEXT NOT NULL,
+                            `returnedAt` INTEGER NOT NULL,
+                            `note` TEXT NOT NULL,
+                            `workspace` TEXT NOT NULL,
+                            `createdAt` INTEGER NOT NULL,
+                            FOREIGN KEY(`saleId`)
+                                REFERENCES `dealer_business_sales`(`id`)
+                                ON UPDATE NO ACTION
+                                ON DELETE CASCADE,
+                            FOREIGN KEY(`saleLineId`)
+                                REFERENCES `dealer_business_sale_lines`(`id`)
+                                ON UPDATE NO ACTION
+                                ON DELETE CASCADE,
+                            FOREIGN KEY(`productId`)
+                                REFERENCES `inventory_products`(`id`)
+                                ON UPDATE NO ACTION
+                                ON DELETE SET NULL
+                        )
+                        """.trimIndent()
+                    )
+
+                    listOf(
+                        """
+                        CREATE INDEX IF NOT EXISTS
+                        `index_dealer_business_sales_returns_saleId`
+                        ON `dealer_business_sales_returns` (`saleId`)
+                        """,
+                        """
+                        CREATE INDEX IF NOT EXISTS
+                        `index_dealer_business_sales_returns_saleLineId`
+                        ON `dealer_business_sales_returns`
+                        (`saleLineId`)
+                        """,
+                        """
+                        CREATE INDEX IF NOT EXISTS
+                        `index_dealer_business_sales_returns_productId`
+                        ON `dealer_business_sales_returns`
+                        (`productId`)
+                        """,
+                        """
+                        CREATE INDEX IF NOT EXISTS
+                        `index_dealer_business_sales_returns_returnedAt`
+                        ON `dealer_business_sales_returns`
+                        (`returnedAt`)
+                        """
+                    ).forEach {
+                        db.execSQL(it.trimIndent())
+                    }
+
+                    db.execSQL(
+                        """
+                        CREATE TABLE IF NOT EXISTS
+                        `dealer_business_sales_return_allocations` (
+                            `id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+                            `returnId` INTEGER NOT NULL,
+                            `sourceStockBatchId` INTEGER,
+                            `batchNoSnapshot` TEXT NOT NULL,
+                            `quantity` INTEGER NOT NULL,
+                            `unitCost` REAL NOT NULL,
+                            `totalCost` REAL NOT NULL,
+                            FOREIGN KEY(`returnId`)
+                                REFERENCES `dealer_business_sales_returns`(`id`)
+                                ON UPDATE NO ACTION
+                                ON DELETE CASCADE,
+                            FOREIGN KEY(`sourceStockBatchId`)
+                                REFERENCES `inventory_batches`(`id`)
+                                ON UPDATE NO ACTION
+                                ON DELETE SET NULL
+                        )
+                        """.trimIndent()
+                    )
+
+                    listOf(
+                        """
+                        CREATE INDEX IF NOT EXISTS
+                        `index_dealer_business_sales_return_allocations_returnId`
+                        ON `dealer_business_sales_return_allocations`
+                        (`returnId`)
+                        """,
+                        """
+                        CREATE INDEX IF NOT EXISTS
+                        `index_dealer_business_sales_return_allocations_sourceStockBatchId`
+                        ON `dealer_business_sales_return_allocations`
+                        (`sourceStockBatchId`)
+                        """
+                    ).forEach {
+                        db.execSQL(it.trimIndent())
+                    }
+
+                    db.execSQL(
+                        """
+                        CREATE TABLE IF NOT EXISTS
+                        `dealer_business_purchase_returns` (
+                            `id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+                            `purchaseId` INTEGER NOT NULL,
+                            `purchaseLineId` INTEGER NOT NULL,
+                            `productId` INTEGER,
+                            `productNameSnapshot` TEXT NOT NULL,
+                            `quantity` INTEGER NOT NULL,
+                            `unitCost` REAL NOT NULL,
+                            `totalValue` REAL NOT NULL,
+                            `returnedAt` INTEGER NOT NULL,
+                            `note` TEXT NOT NULL,
+                            `workspace` TEXT NOT NULL,
+                            `createdAt` INTEGER NOT NULL,
+                            FOREIGN KEY(`purchaseId`)
+                                REFERENCES `dealer_business_purchases`(`id`)
+                                ON UPDATE NO ACTION
+                                ON DELETE CASCADE,
+                            FOREIGN KEY(`purchaseLineId`)
+                                REFERENCES `dealer_business_purchase_lines`(`id`)
+                                ON UPDATE NO ACTION
+                                ON DELETE CASCADE,
+                            FOREIGN KEY(`productId`)
+                                REFERENCES `inventory_products`(`id`)
+                                ON UPDATE NO ACTION
+                                ON DELETE SET NULL
+                        )
+                        """.trimIndent()
+                    )
+
+                    listOf(
+                        """
+                        CREATE INDEX IF NOT EXISTS
+                        `index_dealer_business_purchase_returns_purchaseId`
+                        ON `dealer_business_purchase_returns`
+                        (`purchaseId`)
+                        """,
+                        """
+                        CREATE INDEX IF NOT EXISTS
+                        `index_dealer_business_purchase_returns_purchaseLineId`
+                        ON `dealer_business_purchase_returns`
+                        (`purchaseLineId`)
+                        """,
+                        """
+                        CREATE INDEX IF NOT EXISTS
+                        `index_dealer_business_purchase_returns_productId`
+                        ON `dealer_business_purchase_returns`
+                        (`productId`)
+                        """,
+                        """
+                        CREATE INDEX IF NOT EXISTS
+                        `index_dealer_business_purchase_returns_returnedAt`
+                        ON `dealer_business_purchase_returns`
+                        (`returnedAt`)
+                        """
+                    ).forEach {
+                        db.execSQL(it.trimIndent())
+                    }
+
+                    db.execSQL(
+                        """
+                        CREATE TABLE IF NOT EXISTS
+                        `dealer_business_expenses` (
+                            `id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+                            `category` TEXT NOT NULL,
+                            `amount` REAL NOT NULL,
+                            `expenseAt` INTEGER NOT NULL,
+                            `note` TEXT NOT NULL,
+                            `workspace` TEXT NOT NULL,
+                            `createdAt` INTEGER NOT NULL
+                        )
+                        """.trimIndent()
+                    )
+
+                    listOf(
+                        """
+                        CREATE INDEX IF NOT EXISTS
+                        `index_dealer_business_expenses_workspace_expenseAt`
+                        ON `dealer_business_expenses`
+                        (`workspace`, `expenseAt`)
+                        """,
+                        """
+                        CREATE INDEX IF NOT EXISTS
+                        `index_dealer_business_expenses_workspace_category`
+                        ON `dealer_business_expenses`
+                        (`workspace`, `category`)
+                        """
+                    ).forEach {
+                        db.execSQL(it.trimIndent())
+                    }
+                }
+            }
+
         fun get(context: Context): InventoryDatabase = INSTANCE ?: synchronized(this) {
             INSTANCE ?: Room.databaseBuilder(
                 context.applicationContext,
@@ -1200,7 +1898,8 @@ abstract class InventoryDatabase : RoomDatabase() {
                     MIGRATION_5_6,
                     MIGRATION_6_7,
                     MIGRATION_7_8,
-                    MIGRATION_8_9
+                    MIGRATION_8_9,
+                    MIGRATION_9_10
                 )
                 .build()
                 .also { INSTANCE = it }

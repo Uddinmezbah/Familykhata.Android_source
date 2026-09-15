@@ -118,6 +118,24 @@ object V15BusinessBackupBridge {
                     "dealership_payments",
                     "dealership_returns",
 
+                    // Dealer Business
+                    "dealer_business_companies",
+                    "dealer_business_areas",
+                    "dealer_business_customers",
+                    "dealer_business_purchases",
+                    "dealer_business_purchase_lines",
+                    "dealer_business_supplier_payments",
+                    "dealer_business_supplier_payment_allocations",
+                    "dealer_business_sales",
+                    "dealer_business_sale_lines",
+                    "dealer_business_stock_allocations",
+                    "dealer_business_collections",
+                    "dealer_business_collection_allocations",
+                    "dealer_business_sales_returns",
+                    "dealer_business_sales_return_allocations",
+                    "dealer_business_purchase_returns",
+                    "dealer_business_expenses",
+
                     // Agro
                     "agro_cycles",
                     "agro_costs",

@@ -73,6 +73,15 @@ data class DealerCustomerEntity(
     val createdAt: Long = System.currentTimeMillis()
 )
 
+data class DealerCustomerLedgerSummary(
+    val customerId: Long,
+    val customerName: String,
+    val customerCode: String,
+    val grossSales: Double,
+    val totalReturns: Double,
+    val totalCollections: Double
+)
+
 @Entity(
     tableName = "dealer_business_purchases",
     foreignKeys = [
@@ -487,6 +496,329 @@ data class DealerExpenseEntity(
     val category: String,
     val amount: Double,
     val expenseAt: Long = System.currentTimeMillis(),
+    val note: String = "",
+    val workspace: String = "SHOP",
+    val createdAt: Long = System.currentTimeMillis()
+)
+
+@Entity(
+    tableName = "dealer_business_product_packs",
+    foreignKeys = [
+        ForeignKey(
+            entity = ProductEntity::class,
+            parentColumns = ["id"],
+            childColumns = ["productId"],
+            onDelete = ForeignKey.CASCADE
+        )
+    ],
+    indices = [
+        Index("workspace")
+    ]
+)
+data class DealerProductPackEntity(
+    @PrimaryKey
+    val productId: Long,
+    val piecesPerBox: Int = 0,
+    val piecesPerSheet: Int = 0,
+    val workspace: String = "SHOP",
+    val createdAt: Long = System.currentTimeMillis(),
+    val updatedAt: Long = System.currentTimeMillis()
+)
+
+@Entity(
+    tableName = "dealer_business_delivery_people",
+    indices = [
+        Index(value = ["workspace", "name"])
+    ]
+)
+data class DealerDeliveryPersonEntity(
+    @PrimaryKey(autoGenerate = true)
+    val id: Long = 0,
+    val name: String,
+    val phone: String = "",
+    val note: String = "",
+    val workspace: String = "SHOP",
+    val createdAt: Long = System.currentTimeMillis()
+)
+
+@Entity(
+    tableName = "dealer_business_delivery_challans",
+    foreignKeys = [
+        ForeignKey(
+            entity = DealerDeliveryPersonEntity::class,
+            parentColumns = ["id"],
+            childColumns = ["deliveryPersonId"],
+            onDelete = ForeignKey.SET_NULL
+        )
+    ],
+    indices = [
+        Index("deliveryPersonId"),
+        Index(value = ["workspace", "status"]),
+        Index(value = ["workspace", "challanNo"])
+    ]
+)
+data class DealerDeliveryChallanEntity(
+    @PrimaryKey(autoGenerate = true)
+    val id: Long = 0,
+    val deliveryPersonId: Long? = null,
+    val deliveryPersonNameSnapshot: String = "",
+    val challanNo: String = "",
+    val issuedAt: Long = System.currentTimeMillis(),
+    val settledAt: Long? = null,
+    val status: String = "OPEN",
+    val note: String = "",
+    val workspace: String = "SHOP",
+    val createdAt: Long = System.currentTimeMillis()
+)
+
+@Entity(
+    tableName = "dealer_business_delivery_challan_lines",
+    foreignKeys = [
+        ForeignKey(
+            entity = DealerDeliveryChallanEntity::class,
+            parentColumns = ["id"],
+            childColumns = ["challanId"],
+            onDelete = ForeignKey.CASCADE
+        ),
+        ForeignKey(
+            entity = ProductEntity::class,
+            parentColumns = ["id"],
+            childColumns = ["productId"],
+            onDelete = ForeignKey.SET_NULL
+        )
+    ],
+    indices = [
+        Index("challanId"),
+        Index("productId")
+    ]
+)
+data class DealerDeliveryChallanLineEntity(
+    @PrimaryKey(autoGenerate = true)
+    val id: Long = 0,
+    val challanId: Long,
+    val productId: Long? = null,
+    val productNameSnapshot: String,
+    val boxCount: Int = 0,
+    val sheetCount: Int = 0,
+    val loosePieces: Int = 0,
+    val piecesPerBoxSnapshot: Int = 0,
+    val piecesPerSheetSnapshot: Int = 0,
+    val quantityPieces: Int
+)
+
+@Entity(
+    tableName = "dealer_business_delivery_challan_allocations",
+    foreignKeys = [
+        ForeignKey(
+            entity = DealerDeliveryChallanLineEntity::class,
+            parentColumns = ["id"],
+            childColumns = ["challanLineId"],
+            onDelete = ForeignKey.CASCADE
+        ),
+        ForeignKey(
+            entity = StockBatchEntity::class,
+            parentColumns = ["id"],
+            childColumns = ["sourceStockBatchId"],
+            onDelete = ForeignKey.SET_NULL
+        )
+    ],
+    indices = [
+        Index("challanLineId"),
+        Index("sourceStockBatchId")
+    ]
+)
+data class DealerDeliveryChallanAllocationEntity(
+    @PrimaryKey(autoGenerate = true)
+    val id: Long = 0,
+    val challanLineId: Long,
+    val sourceStockBatchId: Long? = null,
+    val batchNoSnapshot: String = "",
+    val quantityPieces: Int,
+    val unitCost: Double,
+    val totalCost: Double
+)
+
+@Entity(
+    tableName = "dealer_business_delivery_challan_sales",
+    foreignKeys = [
+        ForeignKey(
+            entity = DealerDeliveryChallanEntity::class,
+            parentColumns = ["id"],
+            childColumns = ["challanId"],
+            onDelete = ForeignKey.CASCADE
+        ),
+        ForeignKey(
+            entity = DealerSaleEntity::class,
+            parentColumns = ["id"],
+            childColumns = ["saleId"],
+            onDelete = ForeignKey.CASCADE
+        )
+    ],
+    indices = [
+        Index("challanId"),
+        Index("saleId"),
+        Index(
+            value = ["challanId", "saleId"],
+            unique = true
+        )
+    ]
+)
+data class DealerDeliveryChallanSaleEntity(
+    @PrimaryKey(autoGenerate = true)
+    val id: Long = 0,
+    val challanId: Long,
+    val saleId: Long
+)
+
+@Entity(
+    tableName = "dealer_business_delivery_sale_allocations",
+    foreignKeys = [
+        ForeignKey(
+            entity = DealerDeliveryChallanLineEntity::class,
+            parentColumns = ["id"],
+            childColumns = ["challanLineId"],
+            onDelete = ForeignKey.CASCADE
+        ),
+        ForeignKey(
+            entity = DealerDeliveryChallanAllocationEntity::class,
+            parentColumns = ["id"],
+            childColumns = ["challanAllocationId"],
+            onDelete = ForeignKey.CASCADE
+        ),
+        ForeignKey(
+            entity = DealerSaleLineEntity::class,
+            parentColumns = ["id"],
+            childColumns = ["saleLineId"],
+            onDelete = ForeignKey.CASCADE
+        )
+    ],
+    indices = [
+        Index("challanLineId"),
+        Index("challanAllocationId"),
+        Index("saleLineId")
+    ]
+)
+data class DealerDeliverySaleAllocationEntity(
+    @PrimaryKey(autoGenerate = true)
+    val id: Long = 0,
+    val challanLineId: Long,
+    val challanAllocationId: Long,
+    val saleLineId: Long,
+    val quantityPieces: Int,
+    val unitCost: Double,
+    val totalCost: Double
+)
+
+@Entity(
+    tableName = "dealer_business_delivery_settlements",
+    foreignKeys = [
+        ForeignKey(
+            entity = DealerDeliveryChallanEntity::class,
+            parentColumns = ["id"],
+            childColumns = ["challanId"],
+            onDelete = ForeignKey.CASCADE
+        )
+    ],
+    indices = [
+        Index(
+            value = ["challanId"],
+            unique = true
+        ),
+        Index("receivedAt")
+    ]
+)
+data class DealerDeliverySettlementEntity(
+    @PrimaryKey(autoGenerate = true)
+    val id: Long = 0,
+    val challanId: Long,
+    val cashHandedOver: Double = 0.0,
+    val receivedAt: Long = System.currentTimeMillis(),
+    val note: String = "",
+    val createdAt: Long = System.currentTimeMillis()
+)
+
+@Entity(
+    tableName = "dealer_business_delivery_settlement_lines",
+    foreignKeys = [
+        ForeignKey(
+            entity = DealerDeliverySettlementEntity::class,
+            parentColumns = ["id"],
+            childColumns = ["settlementId"],
+            onDelete = ForeignKey.CASCADE
+        ),
+        ForeignKey(
+            entity = DealerDeliveryChallanLineEntity::class,
+            parentColumns = ["id"],
+            childColumns = ["challanLineId"],
+            onDelete = ForeignKey.CASCADE
+        )
+    ],
+    indices = [
+        Index("settlementId"),
+        Index("challanLineId"),
+        Index(
+            value = [
+                "settlementId",
+                "challanLineId"
+            ],
+            unique = true
+        )
+    ]
+)
+data class DealerDeliverySettlementLineEntity(
+    @PrimaryKey(autoGenerate = true)
+    val id: Long = 0,
+    val settlementId: Long,
+    val challanLineId: Long,
+    val soldPieces: Int = 0,
+    val returnedPieces: Int = 0,
+    val damagedPieces: Int = 0,
+    val note: String = ""
+)
+
+@Entity(
+    tableName = "dealer_business_damages",
+    foreignKeys = [
+        ForeignKey(
+            entity = ProductEntity::class,
+            parentColumns = ["id"],
+            childColumns = ["productId"],
+            onDelete = ForeignKey.SET_NULL
+        ),
+        ForeignKey(
+            entity = StockBatchEntity::class,
+            parentColumns = ["id"],
+            childColumns = ["sourceStockBatchId"],
+            onDelete = ForeignKey.SET_NULL
+        ),
+        ForeignKey(
+            entity = DealerDeliveryChallanEntity::class,
+            parentColumns = ["id"],
+            childColumns = ["deliveryChallanId"],
+            onDelete = ForeignKey.SET_NULL
+        )
+    ],
+    indices = [
+        Index("productId"),
+        Index("sourceStockBatchId"),
+        Index("deliveryChallanId"),
+        Index(value = ["workspace", "damagedAt"])
+    ]
+)
+data class DealerDamageEntity(
+    @PrimaryKey(autoGenerate = true)
+    val id: Long = 0,
+    val productId: Long? = null,
+    val sourceStockBatchId: Long? = null,
+    val deliveryChallanId: Long? = null,
+    val productNameSnapshot: String,
+    val batchNoSnapshot: String = "",
+    val quantityPieces: Int,
+    val unitCost: Double,
+    val totalCost: Double,
+    val sourceType: String = "WAREHOUSE",
+    val reason: String = "",
+    val damagedAt: Long = System.currentTimeMillis(),
     val note: String = "",
     val workspace: String = "SHOP",
     val createdAt: Long = System.currentTimeMillis()

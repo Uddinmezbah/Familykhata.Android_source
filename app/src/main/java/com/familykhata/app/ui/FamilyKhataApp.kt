@@ -2982,7 +2982,7 @@ private fun tabLabel(
                 v15Text("ডিলার", "Dealers")
 
             BusinessMode.DEALER_BUSINESS ->
-                v15Text("ডিলার ব্যবসা", "Dealer")
+                v15Text("ডিলার", "Dealer")
 
             BusinessMode.SERVICE_JOB ->
                 v15Text("সার্ভিস", "Services")

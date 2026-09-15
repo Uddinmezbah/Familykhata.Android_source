@@ -105,6 +105,71 @@ interface DealerBusinessDao {
         item: DealerExpenseEntity
     ): Long
 
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun upsertProductPack(
+        item: DealerProductPackEntity
+    ): Long
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insertDeliveryPerson(
+        item: DealerDeliveryPersonEntity
+    ): Long
+
+    @Update
+    suspend fun updateDeliveryPerson(
+        item: DealerDeliveryPersonEntity
+    ): Int
+
+    @Insert(onConflict = OnConflictStrategy.ABORT)
+    suspend fun insertDeliveryChallan(
+        item: DealerDeliveryChallanEntity
+    ): Long
+
+    @Update
+    suspend fun updateDeliveryChallan(
+        item: DealerDeliveryChallanEntity
+    ): Int
+
+    @Insert(onConflict = OnConflictStrategy.ABORT)
+    suspend fun insertDeliveryChallanLine(
+        item: DealerDeliveryChallanLineEntity
+    ): Long
+
+    @Insert(onConflict = OnConflictStrategy.ABORT)
+    suspend fun insertDeliveryChallanAllocation(
+        item: DealerDeliveryChallanAllocationEntity
+    ): Long
+
+    @Insert(onConflict = OnConflictStrategy.ABORT)
+    suspend fun insertDeliveryChallanSale(
+        item: DealerDeliveryChallanSaleEntity
+    ): Long
+
+    @Insert(onConflict = OnConflictStrategy.ABORT)
+    suspend fun insertDeliverySaleAllocation(
+        item: DealerDeliverySaleAllocationEntity
+    ): Long
+
+    @Insert(onConflict = OnConflictStrategy.ABORT)
+    suspend fun insertDeliverySettlement(
+        item: DealerDeliverySettlementEntity
+    ): Long
+
+    @Update
+    suspend fun updateDeliverySettlement(
+        item: DealerDeliverySettlementEntity
+    ): Int
+
+    @Insert(onConflict = OnConflictStrategy.ABORT)
+    suspend fun insertDeliverySettlementLine(
+        item: DealerDeliverySettlementLineEntity
+    ): Long
+
+    @Insert(onConflict = OnConflictStrategy.ABORT)
+    suspend fun insertDamage(
+        item: DealerDamageEntity
+    ): Long
+
     @Update
     suspend fun updateExpense(
         item: DealerExpenseEntity
@@ -142,6 +207,173 @@ interface DealerBusinessDao {
 
     @Query("""
         SELECT *
+        FROM dealer_business_product_packs
+        WHERE workspace = :workspace
+        ORDER BY productId
+    """)
+    fun observeProductPacks(
+        workspace: String
+    ): Flow<List<DealerProductPackEntity>>
+
+    @Query("""
+        SELECT *
+        FROM dealer_business_product_packs
+        WHERE productId = :productId
+        LIMIT 1
+    """)
+    suspend fun getProductPackOnce(
+        productId: Long
+    ): DealerProductPackEntity?
+
+    @Query("""
+        SELECT *
+        FROM dealer_business_delivery_people
+        WHERE workspace = :workspace
+        ORDER BY name COLLATE NOCASE
+    """)
+    fun observeDeliveryPeople(
+        workspace: String
+    ): Flow<List<DealerDeliveryPersonEntity>>
+
+    @Query("""
+        SELECT *
+        FROM dealer_business_delivery_challans
+        WHERE workspace = :workspace
+        ORDER BY issuedAt DESC, id DESC
+    """)
+    fun observeDeliveryChallans(
+        workspace: String
+    ): Flow<List<DealerDeliveryChallanEntity>>
+
+    @Query("""
+        SELECT *
+        FROM dealer_business_damages
+        WHERE workspace = :workspace
+        ORDER BY damagedAt DESC, id DESC
+    """)
+    fun observeDamages(
+        workspace: String
+    ): Flow<List<DealerDamageEntity>>
+
+    @Query("""
+        SELECT *
+        FROM dealer_business_delivery_people
+        WHERE id = :id
+        LIMIT 1
+    """)
+    suspend fun getDeliveryPersonOnce(
+        id: Long
+    ): DealerDeliveryPersonEntity?
+
+    @Query("""
+        SELECT *
+        FROM dealer_business_delivery_challans
+        WHERE id = :id
+        LIMIT 1
+    """)
+    suspend fun getDeliveryChallanOnce(
+        id: Long
+    ): DealerDeliveryChallanEntity?
+
+    @Query("""
+        SELECT *
+        FROM dealer_business_delivery_challan_lines
+        WHERE challanId = :challanId
+        ORDER BY id
+    """)
+    suspend fun getDeliveryChallanLinesOnce(
+        challanId: Long
+    ): List<DealerDeliveryChallanLineEntity>
+
+    @Query("""
+        SELECT a.*
+        FROM dealer_business_delivery_challan_allocations a
+        INNER JOIN dealer_business_delivery_challan_lines l
+            ON l.id = a.challanLineId
+        WHERE l.challanId = :challanId
+        ORDER BY a.id
+    """)
+    suspend fun getDeliveryChallanAllocationsOnce(
+        challanId: Long
+    ): List<DealerDeliveryChallanAllocationEntity>
+
+    @Query("""
+        SELECT *
+        FROM dealer_business_delivery_challan_sales
+        WHERE challanId = :challanId
+        ORDER BY id
+    """)
+    suspend fun getDeliveryChallanSalesOnce(
+        challanId: Long
+    ): List<DealerDeliveryChallanSaleEntity>
+
+    @Query("""
+        SELECT *
+        FROM dealer_business_delivery_challan_lines
+        WHERE id = :id
+        LIMIT 1
+    """)
+    suspend fun getDeliveryChallanLineOnce(
+        id: Long
+    ): DealerDeliveryChallanLineEntity?
+
+    @Query("""
+        SELECT *
+        FROM dealer_business_delivery_challan_allocations
+        WHERE challanLineId = :challanLineId
+        ORDER BY id
+    """)
+    suspend fun getDeliveryAllocationsForLineOnce(
+        challanLineId: Long
+    ): List<DealerDeliveryChallanAllocationEntity>
+
+    @Query("""
+        SELECT COALESCE(
+            SUM(quantityPieces),
+            0
+        )
+        FROM dealer_business_delivery_sale_allocations
+        WHERE challanLineId = :challanLineId
+    """)
+    suspend fun getDeliverySoldQuantityForLine(
+        challanLineId: Long
+    ): Int
+
+    @Query("""
+        SELECT COALESCE(
+            SUM(quantityPieces),
+            0
+        )
+        FROM dealer_business_delivery_sale_allocations
+        WHERE challanAllocationId =
+            :challanAllocationId
+    """)
+    suspend fun getDeliverySoldQuantityForAllocation(
+        challanAllocationId: Long
+    ): Int
+
+    @Query("""
+        SELECT *
+        FROM dealer_business_delivery_settlements
+        WHERE challanId = :challanId
+        LIMIT 1
+    """)
+    suspend fun getDeliverySettlementOnce(
+        challanId: Long
+    ): DealerDeliverySettlementEntity?
+
+    @Query("""
+        SELECT *
+        FROM dealer_business_delivery_settlement_lines
+        WHERE settlementId = :settlementId
+        ORDER BY id
+    """)
+    suspend fun getDeliverySettlementLinesOnce(
+        settlementId: Long
+    ): List<DealerDeliverySettlementLineEntity>
+
+    @Query("""
+        SELECT *
         FROM dealer_business_companies
         WHERE workspace = :workspace
         ORDER BY name COLLATE NOCASE
@@ -169,6 +401,54 @@ interface DealerBusinessDao {
     fun observeCustomers(
         workspace: String
     ): Flow<List<DealerCustomerEntity>>
+
+    @Query("""
+        SELECT
+            c.id AS customerId,
+            c.name AS customerName,
+            c.customerCode AS customerCode,
+
+            COALESCE(
+                (
+                    SELECT SUM(sl.lineTotal)
+                    FROM dealer_business_sales s
+                    INNER JOIN dealer_business_sale_lines sl
+                        ON sl.saleId = s.id
+                    WHERE s.customerId = c.id
+                      AND s.workspace = :workspace
+                ),
+                0
+            ) AS grossSales,
+
+            COALESCE(
+                (
+                    SELECT SUM(r.totalRefund)
+                    FROM dealer_business_sales s
+                    INNER JOIN dealer_business_sales_returns r
+                        ON r.saleId = s.id
+                    WHERE s.customerId = c.id
+                      AND s.workspace = :workspace
+                ),
+                0
+            ) AS totalReturns,
+
+            COALESCE(
+                (
+                    SELECT SUM(col.amount)
+                    FROM dealer_business_collections col
+                    WHERE col.customerId = c.id
+                      AND col.workspace = :workspace
+                ),
+                0
+            ) AS totalCollections
+
+        FROM dealer_business_customers c
+        WHERE c.workspace = :workspace
+        ORDER BY c.name COLLATE NOCASE
+    """)
+    fun observeCustomerLedgerSummaries(
+        workspace: String
+    ): Flow<List<DealerCustomerLedgerSummary>>
 
     @Query("""
         SELECT *

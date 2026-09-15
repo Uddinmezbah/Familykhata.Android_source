@@ -136,6 +136,18 @@ object V15BusinessBackupBridge {
                     "dealer_business_purchase_returns",
                     "dealer_business_expenses",
 
+                    // Dealer Business packaging / delivery / damage
+                    "dealer_business_product_packs",
+                    "dealer_business_delivery_people",
+                    "dealer_business_delivery_challans",
+                    "dealer_business_delivery_challan_lines",
+                    "dealer_business_delivery_challan_allocations",
+                    "dealer_business_delivery_challan_sales",
+                    "dealer_business_delivery_sale_allocations",
+                    "dealer_business_delivery_settlements",
+                    "dealer_business_delivery_settlement_lines",
+                    "dealer_business_damages",
+
                     // Agro
                     "agro_cycles",
                     "agro_costs",

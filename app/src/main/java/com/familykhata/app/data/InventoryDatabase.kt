@@ -47,6 +47,16 @@ import com.familykhata.app.dealerbusiness.DealerSalesReturnAllocationEntity
 import com.familykhata.app.dealerbusiness.DealerStockAllocationEntity
 import com.familykhata.app.dealerbusiness.DealerSupplierPaymentEntity
 import com.familykhata.app.dealerbusiness.DealerSupplierPaymentAllocationEntity
+import com.familykhata.app.dealerbusiness.DealerDamageEntity
+import com.familykhata.app.dealerbusiness.DealerDeliveryChallanAllocationEntity
+import com.familykhata.app.dealerbusiness.DealerDeliveryChallanEntity
+import com.familykhata.app.dealerbusiness.DealerDeliveryChallanLineEntity
+import com.familykhata.app.dealerbusiness.DealerDeliveryChallanSaleEntity
+import com.familykhata.app.dealerbusiness.DealerDeliveryPersonEntity
+import com.familykhata.app.dealerbusiness.DealerDeliverySaleAllocationEntity
+import com.familykhata.app.dealerbusiness.DealerDeliverySettlementEntity
+import com.familykhata.app.dealerbusiness.DealerDeliverySettlementLineEntity
+import com.familykhata.app.dealerbusiness.DealerProductPackEntity
 import com.familykhata.app.production.ProductionBatchEntity
 import com.familykhata.app.production.ProductionConsumptionEntity
 import com.familykhata.app.production.ProductionCostEntity
@@ -87,6 +97,16 @@ import com.familykhata.app.production.ProductionItemRoleEntity
         DealerSalesReturnAllocationEntity::class,
         DealerPurchaseReturnEntity::class,
         DealerExpenseEntity::class,
+        DealerProductPackEntity::class,
+        DealerDeliveryPersonEntity::class,
+        DealerDeliveryChallanEntity::class,
+        DealerDeliveryChallanLineEntity::class,
+        DealerDeliveryChallanAllocationEntity::class,
+        DealerDeliveryChallanSaleEntity::class,
+        DealerDeliverySaleAllocationEntity::class,
+        DealerDeliverySettlementEntity::class,
+        DealerDeliverySettlementLineEntity::class,
+        DealerDamageEntity::class,
         AgroCycleEntity::class,
         AgroCostEntity::class,
         AgroLossEntity::class,
@@ -98,7 +118,7 @@ import com.familykhata.app.production.ProductionItemRoleEntity
         FoodStockAllocationEntity::class,
         FoodPaymentEntity::class
     ],
-    version = 11,
+    version = 12,
     exportSchema = false
 )
 abstract class InventoryDatabase : RoomDatabase() {
@@ -1912,6 +1932,376 @@ abstract class InventoryDatabase : RoomDatabase() {
                 }
             }
 
+
+        private val MIGRATION_11_12 =
+            object : Migration(
+                11,
+                12
+            ) {
+                override fun migrate(
+                    db: SupportSQLiteDatabase
+                ) {
+                    val statements =
+                        listOf(
+                            """
+                            CREATE TABLE IF NOT EXISTS
+                            `dealer_business_product_packs` (
+                                `productId` INTEGER NOT NULL,
+                                `piecesPerBox` INTEGER NOT NULL,
+                                `piecesPerSheet` INTEGER NOT NULL,
+                                `workspace` TEXT NOT NULL,
+                                `createdAt` INTEGER NOT NULL,
+                                `updatedAt` INTEGER NOT NULL,
+                                PRIMARY KEY(`productId`),
+                                FOREIGN KEY(`productId`)
+                                    REFERENCES `inventory_products`(`id`)
+                                    ON UPDATE NO ACTION
+                                    ON DELETE CASCADE
+                            )
+                            """,
+                            """
+                            CREATE INDEX IF NOT EXISTS
+                            `index_dealer_business_product_packs_workspace`
+                            ON `dealer_business_product_packs`
+                            (`workspace`)
+                            """,
+
+                            """
+                            CREATE TABLE IF NOT EXISTS
+                            `dealer_business_delivery_people` (
+                                `id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+                                `name` TEXT NOT NULL,
+                                `phone` TEXT NOT NULL,
+                                `note` TEXT NOT NULL,
+                                `workspace` TEXT NOT NULL,
+                                `createdAt` INTEGER NOT NULL
+                            )
+                            """,
+                            """
+                            CREATE INDEX IF NOT EXISTS
+                            `index_dealer_business_delivery_people_workspace_name`
+                            ON `dealer_business_delivery_people`
+                            (`workspace`, `name`)
+                            """,
+
+                            """
+                            CREATE TABLE IF NOT EXISTS
+                            `dealer_business_delivery_challans` (
+                                `id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+                                `deliveryPersonId` INTEGER,
+                                `deliveryPersonNameSnapshot` TEXT NOT NULL,
+                                `challanNo` TEXT NOT NULL,
+                                `issuedAt` INTEGER NOT NULL,
+                                `settledAt` INTEGER,
+                                `status` TEXT NOT NULL,
+                                `note` TEXT NOT NULL,
+                                `workspace` TEXT NOT NULL,
+                                `createdAt` INTEGER NOT NULL,
+                                FOREIGN KEY(`deliveryPersonId`)
+                                    REFERENCES `dealer_business_delivery_people`(`id`)
+                                    ON UPDATE NO ACTION
+                                    ON DELETE SET NULL
+                            )
+                            """,
+                            """
+                            CREATE INDEX IF NOT EXISTS
+                            `index_dealer_business_delivery_challans_deliveryPersonId`
+                            ON `dealer_business_delivery_challans`
+                            (`deliveryPersonId`)
+                            """,
+                            """
+                            CREATE INDEX IF NOT EXISTS
+                            `index_dealer_business_delivery_challans_workspace_status`
+                            ON `dealer_business_delivery_challans`
+                            (`workspace`, `status`)
+                            """,
+                            """
+                            CREATE INDEX IF NOT EXISTS
+                            `index_dealer_business_delivery_challans_workspace_challanNo`
+                            ON `dealer_business_delivery_challans`
+                            (`workspace`, `challanNo`)
+                            """,
+
+                            """
+                            CREATE TABLE IF NOT EXISTS
+                            `dealer_business_delivery_challan_lines` (
+                                `id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+                                `challanId` INTEGER NOT NULL,
+                                `productId` INTEGER,
+                                `productNameSnapshot` TEXT NOT NULL,
+                                `boxCount` INTEGER NOT NULL,
+                                `sheetCount` INTEGER NOT NULL,
+                                `loosePieces` INTEGER NOT NULL,
+                                `piecesPerBoxSnapshot` INTEGER NOT NULL,
+                                `piecesPerSheetSnapshot` INTEGER NOT NULL,
+                                `quantityPieces` INTEGER NOT NULL,
+                                FOREIGN KEY(`challanId`)
+                                    REFERENCES `dealer_business_delivery_challans`(`id`)
+                                    ON UPDATE NO ACTION
+                                    ON DELETE CASCADE,
+                                FOREIGN KEY(`productId`)
+                                    REFERENCES `inventory_products`(`id`)
+                                    ON UPDATE NO ACTION
+                                    ON DELETE SET NULL
+                            )
+                            """,
+                            """
+                            CREATE INDEX IF NOT EXISTS
+                            `index_dealer_business_delivery_challan_lines_challanId`
+                            ON `dealer_business_delivery_challan_lines`
+                            (`challanId`)
+                            """,
+                            """
+                            CREATE INDEX IF NOT EXISTS
+                            `index_dealer_business_delivery_challan_lines_productId`
+                            ON `dealer_business_delivery_challan_lines`
+                            (`productId`)
+                            """,
+
+                            """
+                            CREATE TABLE IF NOT EXISTS
+                            `dealer_business_delivery_challan_allocations` (
+                                `id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+                                `challanLineId` INTEGER NOT NULL,
+                                `sourceStockBatchId` INTEGER,
+                                `batchNoSnapshot` TEXT NOT NULL,
+                                `quantityPieces` INTEGER NOT NULL,
+                                `unitCost` REAL NOT NULL,
+                                `totalCost` REAL NOT NULL,
+                                FOREIGN KEY(`challanLineId`)
+                                    REFERENCES `dealer_business_delivery_challan_lines`(`id`)
+                                    ON UPDATE NO ACTION
+                                    ON DELETE CASCADE,
+                                FOREIGN KEY(`sourceStockBatchId`)
+                                    REFERENCES `inventory_batches`(`id`)
+                                    ON UPDATE NO ACTION
+                                    ON DELETE SET NULL
+                            )
+                            """,
+                            """
+                            CREATE INDEX IF NOT EXISTS
+                            `index_dealer_business_delivery_challan_allocations_challanLineId`
+                            ON `dealer_business_delivery_challan_allocations`
+                            (`challanLineId`)
+                            """,
+                            """
+                            CREATE INDEX IF NOT EXISTS
+                            `index_dealer_business_delivery_challan_allocations_sourceStockBatchId`
+                            ON `dealer_business_delivery_challan_allocations`
+                            (`sourceStockBatchId`)
+                            """,
+
+                            """
+                            CREATE TABLE IF NOT EXISTS
+                            `dealer_business_delivery_challan_sales` (
+                                `id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+                                `challanId` INTEGER NOT NULL,
+                                `saleId` INTEGER NOT NULL,
+                                FOREIGN KEY(`challanId`)
+                                    REFERENCES `dealer_business_delivery_challans`(`id`)
+                                    ON UPDATE NO ACTION
+                                    ON DELETE CASCADE,
+                                FOREIGN KEY(`saleId`)
+                                    REFERENCES `dealer_business_sales`(`id`)
+                                    ON UPDATE NO ACTION
+                                    ON DELETE CASCADE
+                            )
+                            """,
+                            """
+                            CREATE INDEX IF NOT EXISTS
+                            `index_dealer_business_delivery_challan_sales_challanId`
+                            ON `dealer_business_delivery_challan_sales`
+                            (`challanId`)
+                            """,
+                            """
+                            CREATE INDEX IF NOT EXISTS
+                            `index_dealer_business_delivery_challan_sales_saleId`
+                            ON `dealer_business_delivery_challan_sales`
+                            (`saleId`)
+                            """,
+                            """
+                            CREATE UNIQUE INDEX IF NOT EXISTS
+                            `index_dealer_business_delivery_challan_sales_challanId_saleId`
+                            ON `dealer_business_delivery_challan_sales`
+                            (`challanId`, `saleId`)
+                            """,
+
+                            """
+                            CREATE TABLE IF NOT EXISTS
+                            `dealer_business_delivery_sale_allocations` (
+                                `id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+                                `challanLineId` INTEGER NOT NULL,
+                                `challanAllocationId` INTEGER NOT NULL,
+                                `saleLineId` INTEGER NOT NULL,
+                                `quantityPieces` INTEGER NOT NULL,
+                                `unitCost` REAL NOT NULL,
+                                `totalCost` REAL NOT NULL,
+                                FOREIGN KEY(`challanLineId`)
+                                    REFERENCES `dealer_business_delivery_challan_lines`(`id`)
+                                    ON UPDATE NO ACTION
+                                    ON DELETE CASCADE,
+                                FOREIGN KEY(`challanAllocationId`)
+                                    REFERENCES `dealer_business_delivery_challan_allocations`(`id`)
+                                    ON UPDATE NO ACTION
+                                    ON DELETE CASCADE,
+                                FOREIGN KEY(`saleLineId`)
+                                    REFERENCES `dealer_business_sale_lines`(`id`)
+                                    ON UPDATE NO ACTION
+                                    ON DELETE CASCADE
+                            )
+                            """,
+                            """
+                            CREATE INDEX IF NOT EXISTS
+                            `index_dealer_business_delivery_sale_allocations_challanLineId`
+                            ON `dealer_business_delivery_sale_allocations`
+                            (`challanLineId`)
+                            """,
+                            """
+                            CREATE INDEX IF NOT EXISTS
+                            `index_dealer_business_delivery_sale_allocations_challanAllocationId`
+                            ON `dealer_business_delivery_sale_allocations`
+                            (`challanAllocationId`)
+                            """,
+                            """
+                            CREATE INDEX IF NOT EXISTS
+                            `index_dealer_business_delivery_sale_allocations_saleLineId`
+                            ON `dealer_business_delivery_sale_allocations`
+                            (`saleLineId`)
+                            """,
+
+                            """
+                            CREATE TABLE IF NOT EXISTS
+                            `dealer_business_delivery_settlements` (
+                                `id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+                                `challanId` INTEGER NOT NULL,
+                                `cashHandedOver` REAL NOT NULL,
+                                `receivedAt` INTEGER NOT NULL,
+                                `note` TEXT NOT NULL,
+                                `createdAt` INTEGER NOT NULL,
+                                FOREIGN KEY(`challanId`)
+                                    REFERENCES `dealer_business_delivery_challans`(`id`)
+                                    ON UPDATE NO ACTION
+                                    ON DELETE CASCADE
+                            )
+                            """,
+                            """
+                            CREATE UNIQUE INDEX IF NOT EXISTS
+                            `index_dealer_business_delivery_settlements_challanId`
+                            ON `dealer_business_delivery_settlements`
+                            (`challanId`)
+                            """,
+                            """
+                            CREATE INDEX IF NOT EXISTS
+                            `index_dealer_business_delivery_settlements_receivedAt`
+                            ON `dealer_business_delivery_settlements`
+                            (`receivedAt`)
+                            """,
+
+                            """
+                            CREATE TABLE IF NOT EXISTS
+                            `dealer_business_delivery_settlement_lines` (
+                                `id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+                                `settlementId` INTEGER NOT NULL,
+                                `challanLineId` INTEGER NOT NULL,
+                                `soldPieces` INTEGER NOT NULL,
+                                `returnedPieces` INTEGER NOT NULL,
+                                `damagedPieces` INTEGER NOT NULL,
+                                `note` TEXT NOT NULL,
+                                FOREIGN KEY(`settlementId`)
+                                    REFERENCES `dealer_business_delivery_settlements`(`id`)
+                                    ON UPDATE NO ACTION
+                                    ON DELETE CASCADE,
+                                FOREIGN KEY(`challanLineId`)
+                                    REFERENCES `dealer_business_delivery_challan_lines`(`id`)
+                                    ON UPDATE NO ACTION
+                                    ON DELETE CASCADE
+                            )
+                            """,
+                            """
+                            CREATE INDEX IF NOT EXISTS
+                            `index_dealer_business_delivery_settlement_lines_settlementId`
+                            ON `dealer_business_delivery_settlement_lines`
+                            (`settlementId`)
+                            """,
+                            """
+                            CREATE INDEX IF NOT EXISTS
+                            `index_dealer_business_delivery_settlement_lines_challanLineId`
+                            ON `dealer_business_delivery_settlement_lines`
+                            (`challanLineId`)
+                            """,
+                            """
+                            CREATE UNIQUE INDEX IF NOT EXISTS
+                            `index_dealer_business_delivery_settlement_lines_settlementId_challanLineId`
+                            ON `dealer_business_delivery_settlement_lines`
+                            (`settlementId`, `challanLineId`)
+                            """,
+
+                            """
+                            CREATE TABLE IF NOT EXISTS
+                            `dealer_business_damages` (
+                                `id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+                                `productId` INTEGER,
+                                `sourceStockBatchId` INTEGER,
+                                `deliveryChallanId` INTEGER,
+                                `productNameSnapshot` TEXT NOT NULL,
+                                `batchNoSnapshot` TEXT NOT NULL,
+                                `quantityPieces` INTEGER NOT NULL,
+                                `unitCost` REAL NOT NULL,
+                                `totalCost` REAL NOT NULL,
+                                `sourceType` TEXT NOT NULL,
+                                `reason` TEXT NOT NULL,
+                                `damagedAt` INTEGER NOT NULL,
+                                `note` TEXT NOT NULL,
+                                `workspace` TEXT NOT NULL,
+                                `createdAt` INTEGER NOT NULL,
+                                FOREIGN KEY(`productId`)
+                                    REFERENCES `inventory_products`(`id`)
+                                    ON UPDATE NO ACTION
+                                    ON DELETE SET NULL,
+                                FOREIGN KEY(`sourceStockBatchId`)
+                                    REFERENCES `inventory_batches`(`id`)
+                                    ON UPDATE NO ACTION
+                                    ON DELETE SET NULL,
+                                FOREIGN KEY(`deliveryChallanId`)
+                                    REFERENCES `dealer_business_delivery_challans`(`id`)
+                                    ON UPDATE NO ACTION
+                                    ON DELETE SET NULL
+                            )
+                            """,
+                            """
+                            CREATE INDEX IF NOT EXISTS
+                            `index_dealer_business_damages_productId`
+                            ON `dealer_business_damages`
+                            (`productId`)
+                            """,
+                            """
+                            CREATE INDEX IF NOT EXISTS
+                            `index_dealer_business_damages_sourceStockBatchId`
+                            ON `dealer_business_damages`
+                            (`sourceStockBatchId`)
+                            """,
+                            """
+                            CREATE INDEX IF NOT EXISTS
+                            `index_dealer_business_damages_deliveryChallanId`
+                            ON `dealer_business_damages`
+                            (`deliveryChallanId`)
+                            """,
+                            """
+                            CREATE INDEX IF NOT EXISTS
+                            `index_dealer_business_damages_workspace_damagedAt`
+                            ON `dealer_business_damages`
+                            (`workspace`, `damagedAt`)
+                            """
+                        )
+
+                    statements.forEach {
+                        db.execSQL(
+                            it.trimIndent()
+                        )
+                    }
+                }
+            }
+
         fun get(context: Context): InventoryDatabase = INSTANCE ?: synchronized(this) {
             INSTANCE ?: Room.databaseBuilder(
                 context.applicationContext,
@@ -1928,7 +2318,8 @@ abstract class InventoryDatabase : RoomDatabase() {
                     MIGRATION_7_8,
                     MIGRATION_8_9,
                     MIGRATION_9_10,
-                    MIGRATION_10_11
+                    MIGRATION_10_11,
+                    MIGRATION_11_12
                 )
                 .build()
                 .also { INSTANCE = it }

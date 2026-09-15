@@ -37,6 +37,9 @@ import com.familykhata.app.dealerbusiness.DealerCollectionEntity
 import com.familykhata.app.dealerbusiness.DealerCompanyEntity
 import com.familykhata.app.dealerbusiness.DealerCustomerEntity
 import com.familykhata.app.dealerbusiness.DealerExpenseEntity
+import com.familykhata.app.dealerbusiness.DealerDeliveryChallanEntity
+import com.familykhata.app.dealerbusiness.DealerDeliveryPersonEntity
+import com.familykhata.app.dealerbusiness.DealerProductPackEntity
 import com.familykhata.app.dealerbusiness.DealerPurchaseEntity
 import com.familykhata.app.dealerbusiness.DealerPurchaseLineEntity
 import com.familykhata.app.dealerbusiness.DealerPurchaseLineInput
@@ -126,6 +129,8 @@ internal fun V16DealerBusinessScreen(
     val companies by vm.companies.collectAsState()
     val areas by vm.areas.collectAsState()
     val customers by vm.customers.collectAsState()
+    val customerLedgers by
+        vm.customerLedgers.collectAsState()
     val products by vm.products.collectAsState()
     val purchases by vm.purchases.collectAsState()
     val sales by vm.sales.collectAsState()
@@ -133,6 +138,18 @@ internal fun V16DealerBusinessScreen(
     val collections by vm.collections.collectAsState()
     val supplierPayments by
         vm.supplierPayments.collectAsState()
+
+    val productPacks by
+        vm.productPacks.collectAsState()
+
+    val deliveryPeople by
+        vm.deliveryPeople.collectAsState()
+
+    val deliveryChallans by
+        vm.deliveryChallans.collectAsState()
+
+    val damages by
+        vm.damages.collectAsState()
 
     var showInventory by remember {
         mutableStateOf(false)
@@ -182,8 +199,46 @@ internal fun V16DealerBusinessScreen(
         mutableStateOf(false)
     }
 
+    var showPackSetup by remember {
+        mutableStateOf(false)
+    }
+
+    var showDeliveryPerson by remember {
+        mutableStateOf(false)
+    }
+
+    var editingDeliveryPerson by remember {
+        mutableStateOf<DealerDeliveryPersonEntity?>(
+            null
+        )
+    }
+
+    var showDeliveryChallan by remember {
+        mutableStateOf(false)
+    }
+
+    var showWarehouseDamage by remember {
+        mutableStateOf(false)
+    }
+
+    var deliverySaleChallan by remember {
+        mutableStateOf<DealerDeliveryChallanEntity?>(
+            null
+        )
+    }
+
+    var settlementChallan by remember {
+        mutableStateOf<DealerDeliveryChallanEntity?>(
+            null
+        )
+    }
+
     var editingExpense by remember {
         mutableStateOf<DealerExpenseEntity?>(null)
+    }
+
+    var selectedLedgerCustomer by remember {
+        mutableStateOf<DealerCustomerEntity?>(null)
     }
 
     var selectedPurchase by remember {
@@ -225,7 +280,8 @@ internal fun V16DealerBusinessScreen(
         active =
             showInventory ||
                 selectedPurchase != null ||
-                selectedSale != null
+                selectedSale != null ||
+                selectedLedgerCustomer != null
     )
 
     if (showInventory) {
@@ -278,6 +334,46 @@ internal fun V16DealerBusinessScreen(
                 canWrite = canWrite
             )
         }
+        return
+    }
+
+    selectedLedgerCustomer?.let { customer ->
+        val summary =
+            customerLedgers.firstOrNull {
+                it.customerId ==
+                    customer.id
+            }
+
+        V15DeepScreenContainer(
+            title =
+                v15Text(
+                    "বাকি খাতা",
+                    "Due ledger"
+                ),
+            onBack = {
+                selectedLedgerCustomer =
+                    null
+            }
+        ) {
+            DealerCustomerLedgerScreen(
+                customer = customer,
+                summary = summary,
+                sales =
+                    sales.filter {
+                        it.customerId ==
+                            customer.id
+                    },
+                collections =
+                    collections.filter {
+                        it.customerId ==
+                            customer.id
+                    },
+                onOpenSale = {
+                    selectedSale = it
+                }
+            )
+        }
+
         return
     }
 
@@ -715,6 +811,392 @@ internal fun V16DealerBusinessScreen(
                                     "Edit"
                                 )
                             )
+                        }
+                    }
+                }
+            }
+        }
+
+        Text(
+            v15Text(
+                "ডিলার সেটআপ",
+                "Dealer setup"
+            ),
+            fontWeight =
+                FontWeight.Bold
+        )
+
+        Row(
+            modifier =
+                Modifier.fillMaxWidth(),
+            horizontalArrangement =
+                Arrangement.spacedBy(6.dp)
+        ) {
+            OutlinedButton(
+                onClick = {
+                    showPackSetup = true
+                },
+                enabled =
+                    canWrite &&
+                        products.isNotEmpty(),
+                modifier =
+                    Modifier.weight(1f)
+            ) {
+                Text(
+                    v15Text(
+                        "বক্স / পাতা সেটআপ",
+                        "Box / sheet setup"
+                    )
+                )
+            }
+
+            OutlinedButton(
+                onClick = {
+                    editingDeliveryPerson =
+                        null
+
+                    showDeliveryPerson =
+                        true
+                },
+                enabled =
+                    canWrite,
+                modifier =
+                    Modifier.weight(1f)
+            ) {
+                Text(
+                    v15Text(
+                        "+ ডেলিভারি ম্যান",
+                        "+ Delivery man"
+                    )
+                )
+            }
+        }
+
+        Row(
+            modifier =
+                Modifier.fillMaxWidth(),
+            horizontalArrangement =
+                Arrangement.spacedBy(6.dp)
+        ) {
+            Button(
+                onClick = {
+                    showDeliveryChallan =
+                        true
+                },
+                enabled =
+                    canWrite &&
+                        deliveryPeople.isNotEmpty() &&
+                        products.isNotEmpty(),
+                modifier =
+                    Modifier.weight(1f)
+            ) {
+                Text(
+                    v15Text(
+                        "মাল দেওয়ার চালান",
+                        "Issue challan"
+                    )
+                )
+            }
+
+            OutlinedButton(
+                onClick = {
+                    showWarehouseDamage =
+                        true
+                },
+                enabled =
+                    canWrite &&
+                        products.isNotEmpty(),
+                modifier =
+                    Modifier.weight(1f)
+            ) {
+                Text(
+                    v15Text(
+                        "ড্যামেজ",
+                        "Damage"
+                    )
+                )
+            }
+        }
+
+        if (deliveryChallans.isNotEmpty()) {
+            Text(
+                v15Text(
+                    "ডেলিভারি চালান",
+                    "Delivery challans"
+                ),
+                fontWeight =
+                    FontWeight.Bold
+            )
+
+            deliveryChallans
+                .take(10)
+                .forEach { challan ->
+                    Card(
+                        modifier =
+                            Modifier.fillMaxWidth()
+                    ) {
+                        Column(
+                            modifier =
+                                Modifier.padding(
+                                    10.dp
+                                ),
+                            verticalArrangement =
+                                Arrangement.spacedBy(
+                                    3.dp
+                                )
+                        ) {
+                            Text(
+                                challan.challanNo,
+                                fontWeight =
+                                    FontWeight.Bold
+                            )
+
+                            Text(
+                                challan
+                                    .deliveryPersonNameSnapshot
+                            )
+
+                            Text(
+                                dealerBusinessDate(
+                                    challan.issuedAt
+                                )
+                            )
+
+                            Text(
+                                v15Text(
+                                    "স্ট্যাটাস: ${challan.status}",
+                                    "Status: ${challan.status}"
+                                )
+                            )
+
+                            if (
+                                canWrite &&
+                                challan.status ==
+                                    "OPEN"
+                            ) {
+                                Row(
+                                    modifier =
+                                        Modifier
+                                            .fillMaxWidth(),
+                                    horizontalArrangement =
+                                        Arrangement
+                                            .spacedBy(
+                                                6.dp
+                                            )
+                                ) {
+                                    OutlinedButton(
+                                        onClick = {
+                                            deliverySaleChallan =
+                                                challan
+                                        },
+                                        modifier =
+                                            Modifier
+                                                .weight(
+                                                    1f
+                                                )
+                                    ) {
+                                        Text(
+                                            v15Text(
+                                                "বিক্রি / বাকি",
+                                                "Sale / due"
+                                            )
+                                        )
+                                    }
+
+                                    Button(
+                                        onClick = {
+                                            settlementChallan =
+                                                challan
+                                        },
+                                        modifier =
+                                            Modifier
+                                                .weight(
+                                                    1f
+                                                )
+                                    ) {
+                                        Text(
+                                            v15Text(
+                                                "রাতে বুঝে নিন",
+                                                "Night settle"
+                                            )
+                                        )
+                                    }
+                                }
+                            }
+
+                            if (
+                                challan.status ==
+                                    "SETTLED" &&
+                                challan.settledAt !=
+                                    null
+                            ) {
+                                Text(
+                                    v15Text(
+                                        "বুঝে নেওয়া: ${
+                                            dealerBusinessDate(
+                                                challan.settledAt
+                                            )
+                                        }",
+                                        "Settled: ${
+                                            dealerBusinessDate(
+                                                challan.settledAt
+                                            )
+                                        }"
+                                    )
+                                )
+                            }
+                        }
+                    }
+                }
+        }
+
+        if (damages.isNotEmpty()) {
+            Text(
+                v15Text(
+                    "সাম্প্রতিক ড্যামেজ",
+                    "Recent damage"
+                ),
+                fontWeight =
+                    FontWeight.Bold
+            )
+
+            damages
+                .take(10)
+                .forEach { damage ->
+                    Card(
+                        modifier =
+                            Modifier.fillMaxWidth()
+                    ) {
+                        Column(
+                            modifier =
+                                Modifier.padding(
+                                    10.dp
+                                ),
+                            verticalArrangement =
+                                Arrangement.spacedBy(
+                                    3.dp
+                                )
+                        ) {
+                            Text(
+                                damage.productNameSnapshot,
+                                fontWeight =
+                                    FontWeight.Bold
+                            )
+
+                            Text(
+                                v15Text(
+                                    "পরিমাণ: ${damage.quantityPieces} পিস",
+                                    "Quantity: ${damage.quantityPieces} pcs"
+                                )
+                            )
+
+                            Text(
+                                v15Text(
+                                    "ক্ষতি: ${
+                                        dealerBusinessMoney(
+                                            damage.totalCost
+                                        )
+                                    }",
+                                    "Loss: ${
+                                        dealerBusinessMoney(
+                                            damage.totalCost
+                                        )
+                                    }"
+                                )
+                            )
+
+                            if (
+                                damage.reason
+                                    .isNotBlank()
+                            ) {
+                                Text(
+                                    damage.reason
+                                )
+                            }
+
+                            Text(
+                                dealerBusinessDate(
+                                    damage.damagedAt
+                                )
+                            )
+                        }
+                    }
+                }
+        }
+
+        if (deliveryPeople.isNotEmpty()) {
+            Text(
+                v15Text(
+                    "ডেলিভারি ম্যান",
+                    "Delivery people"
+                ),
+                fontWeight =
+                    FontWeight.Bold
+            )
+
+            deliveryPeople.forEach { person ->
+                Card(
+                    modifier =
+                        Modifier.fillMaxWidth()
+                ) {
+                    Row(
+                        modifier =
+                            Modifier
+                                .fillMaxWidth()
+                                .padding(10.dp),
+                        horizontalArrangement =
+                            Arrangement.SpaceBetween
+                    ) {
+                        Column(
+                            modifier =
+                                Modifier.weight(1f)
+                        ) {
+                            Text(
+                                person.name,
+                                fontWeight =
+                                    FontWeight.Bold
+                            )
+
+                            if (
+                                person.phone
+                                    .isNotBlank()
+                            ) {
+                                Text(
+                                    person.phone
+                                )
+                            }
+
+                            if (
+                                person.note
+                                    .isNotBlank()
+                            ) {
+                                Text(
+                                    person.note,
+                                    style =
+                                        MaterialTheme
+                                            .typography
+                                            .bodySmall
+                                )
+                            }
+                        }
+
+                        if (canWrite) {
+                            TextButton(
+                                onClick = {
+                                    editingDeliveryPerson =
+                                        person
+
+                                    showDeliveryPerson =
+                                        true
+                                }
+                            ) {
+                                Text(
+                                    v15Text(
+                                        "সম্পাদনা",
+                                        "Edit"
+                                    )
+                                )
+                            }
                         }
                     }
                 }
@@ -1631,6 +2113,231 @@ internal fun V16DealerBusinessScreen(
         )
     }
 
+    deliverySaleChallan?.let {
+            challan ->
+
+        DealerDeliverySaleDialog(
+            challan = challan,
+            customers = customers,
+            viewModel = vm,
+            onDismiss = {
+                deliverySaleChallan =
+                    null
+            },
+            onSave = {
+                    customerId,
+                    invoiceNo,
+                    lines,
+                    collectedNow,
+                    note ->
+
+                vm.createDeliverySale(
+                    challanId =
+                        challan.id,
+                    customerId =
+                        customerId,
+                    invoiceNo =
+                        invoiceNo,
+                    lines =
+                        lines,
+                    collectedNow =
+                        collectedNow,
+                    note =
+                        note
+                ) {
+                    if (it) {
+                        deliverySaleChallan =
+                            null
+                    }
+                }
+            }
+        )
+    }
+
+    settlementChallan?.let {
+            challan ->
+
+        DealerDeliverySettlementDialog(
+            challan = challan,
+            viewModel = vm,
+            onDismiss = {
+                settlementChallan =
+                    null
+            },
+            onSave = {
+                    lines,
+                    cashHandedOver,
+                    note ->
+
+                vm.settleDeliveryChallan(
+                    challanId =
+                        challan.id,
+                    lines =
+                        lines,
+                    cashHandedOver =
+                        cashHandedOver,
+                    note =
+                        note
+                ) {
+                    if (it) {
+                        settlementChallan =
+                            null
+                    }
+                }
+            }
+        )
+    }
+
+    if (showDeliveryChallan) {
+        DealerDeliveryChallanDialog(
+            deliveryPeople =
+                deliveryPeople,
+            products =
+                products,
+            packs =
+                productPacks,
+            onDismiss = {
+                showDeliveryChallan =
+                    false
+            },
+            onSave = {
+                    deliveryPersonId,
+                    challanNo,
+                    lines,
+                    note ->
+
+                vm.createDeliveryChallan(
+                    deliveryPersonId =
+                        deliveryPersonId,
+                    challanNo =
+                        challanNo,
+                    lines =
+                        lines,
+                    note =
+                        note
+                ) {
+                    if (it) {
+                        showDeliveryChallan =
+                            false
+                    }
+                }
+            }
+        )
+    }
+
+    if (showWarehouseDamage) {
+        DealerWarehouseDamageDialog(
+            products =
+                products,
+            viewModel =
+                vm,
+            onDismiss = {
+                showWarehouseDamage =
+                    false
+            },
+            onSave = {
+                    batchId,
+                    quantity,
+                    reason,
+                    note ->
+
+                vm.recordWarehouseDamage(
+                    batchId =
+                        batchId,
+                    quantityPieces =
+                        quantity,
+                    reason =
+                        reason,
+                    note =
+                        note
+                ) {
+                    if (it) {
+                        showWarehouseDamage =
+                            false
+                    }
+                }
+            }
+        )
+    }
+
+    if (showPackSetup) {
+        DealerPackSetupDialog(
+            products = products,
+            packs = productPacks,
+            onDismiss = {
+                showPackSetup = false
+            },
+            onSave = {
+                    productId,
+                    piecesPerBox,
+                    piecesPerSheet ->
+
+                vm.saveProductPack(
+                    productId = productId,
+                    piecesPerBox =
+                        piecesPerBox,
+                    piecesPerSheet =
+                        piecesPerSheet
+                ) {
+                    if (it) {
+                        showPackSetup =
+                            false
+                    }
+                }
+            }
+        )
+    }
+
+    if (showDeliveryPerson) {
+        DealerDeliveryPersonDialog(
+            initial =
+                editingDeliveryPerson,
+            onDismiss = {
+                showDeliveryPerson =
+                    false
+
+                editingDeliveryPerson =
+                    null
+            },
+            onSave = {
+                    name,
+                    phone,
+                    note ->
+
+                val editing =
+                    editingDeliveryPerson
+
+                if (editing == null) {
+                    vm.addDeliveryPerson(
+                        name = name,
+                        phone = phone,
+                        note = note
+                    ) {
+                        if (it) {
+                            showDeliveryPerson =
+                                false
+                        }
+                    }
+                } else {
+                    vm.updateDeliveryPerson(
+                        item = editing,
+                        name = name,
+                        phone = phone,
+                        note = note
+                    ) {
+                        if (it) {
+                            showDeliveryPerson =
+                                false
+
+                            editingDeliveryPerson =
+                                null
+                        }
+                    }
+                }
+            }
+        )
+    }
+
     if (showExpense) {
         DealerExpenseDialog(
             initial = editingExpense,
@@ -1673,6 +2380,385 @@ internal fun V16DealerBusinessScreen(
         )
     }
 
+}
+
+@Composable
+private fun DealerCustomerLedgerScreen(
+    customer: DealerCustomerEntity,
+    summary:
+        com.familykhata.app.dealerbusiness
+            .DealerCustomerLedgerSummary?,
+    sales: List<DealerSaleEntity>,
+    collections: List<DealerCollectionEntity>,
+    onOpenSale: (DealerSaleEntity) -> Unit
+) {
+    val grossSales =
+        summary?.grossSales ?: 0.0
+
+    val totalReturns =
+        summary?.totalReturns ?: 0.0
+
+    val netSales =
+        (
+            grossSales -
+                totalReturns
+        ).coerceAtLeast(0.0)
+
+    val totalCollections =
+        summary?.totalCollections ?: 0.0
+
+    val due =
+        (
+            netSales -
+                totalCollections
+        ).coerceAtLeast(0.0)
+
+    val advance =
+        (
+            totalCollections -
+                netSales
+        ).coerceAtLeast(0.0)
+
+    Column(
+        modifier =
+            Modifier
+                .fillMaxSize()
+                .verticalScroll(
+                    rememberScrollState()
+                )
+                .padding(bottom = 24.dp),
+        verticalArrangement =
+            Arrangement.spacedBy(10.dp)
+    ) {
+        Text(
+            customer.name,
+            style =
+                MaterialTheme
+                    .typography
+                    .titleLarge,
+            fontWeight =
+                FontWeight.ExtraBold
+        )
+
+        if (
+            customer.customerCode
+                .isNotBlank()
+        ) {
+            Text(
+                v15Text(
+                    "কোড: ${customer.customerCode}",
+                    "Code: ${customer.customerCode}"
+                )
+            )
+        }
+
+        if (customer.phone.isNotBlank()) {
+            Text(
+                v15Text(
+                    "ফোন: ${customer.phone}",
+                    "Phone: ${customer.phone}"
+                )
+            )
+        }
+
+        Row(
+            modifier =
+                Modifier.fillMaxWidth(),
+            horizontalArrangement =
+                Arrangement.spacedBy(8.dp)
+        ) {
+            DealerBusinessMetric(
+                title =
+                    v15Text(
+                        "মোট বিক্রি",
+                        "Gross sales"
+                    ),
+                value =
+                    dealerBusinessMoney(
+                        grossSales
+                    ),
+                modifier =
+                    Modifier.weight(1f)
+            )
+
+            DealerBusinessMetric(
+                title =
+                    v15Text(
+                        "রিটার্ন",
+                        "Returns"
+                    ),
+                value =
+                    dealerBusinessMoney(
+                        totalReturns
+                    ),
+                modifier =
+                    Modifier.weight(1f)
+            )
+        }
+
+        Row(
+            modifier =
+                Modifier.fillMaxWidth(),
+            horizontalArrangement =
+                Arrangement.spacedBy(8.dp)
+        ) {
+            DealerBusinessMetric(
+                title =
+                    v15Text(
+                        "নেট বিক্রি",
+                        "Net sales"
+                    ),
+                value =
+                    dealerBusinessMoney(
+                        netSales
+                    ),
+                modifier =
+                    Modifier.weight(1f)
+            )
+
+            DealerBusinessMetric(
+                title =
+                    v15Text(
+                        "মোট আদায়",
+                        "Collected"
+                    ),
+                value =
+                    dealerBusinessMoney(
+                        totalCollections
+                    ),
+                modifier =
+                    Modifier.weight(1f)
+            )
+        }
+
+        Row(
+            modifier =
+                Modifier.fillMaxWidth(),
+            horizontalArrangement =
+                Arrangement.spacedBy(8.dp)
+        ) {
+            DealerBusinessMetric(
+                title =
+                    v15Text(
+                        "বর্তমান বাকি",
+                        "Current due"
+                    ),
+                value =
+                    dealerBusinessMoney(
+                        due
+                    ),
+                modifier =
+                    Modifier.weight(1f)
+            )
+
+            DealerBusinessMetric(
+                title =
+                    v15Text(
+                        "অগ্রিম",
+                        "Advance"
+                    ),
+                value =
+                    dealerBusinessMoney(
+                        advance
+                    ),
+                modifier =
+                    Modifier.weight(1f)
+            )
+        }
+
+        if (customer.creditLimit > 0.0) {
+            Text(
+                v15Text(
+                    "ক্রেডিট সীমা: ${
+                        dealerBusinessMoney(
+                            customer.creditLimit
+                        )
+                    }",
+                    "Credit limit: ${
+                        dealerBusinessMoney(
+                            customer.creditLimit
+                        )
+                    }"
+                ),
+                fontWeight =
+                    FontWeight.Bold
+            )
+
+            val remainingCredit =
+                (
+                    customer.creditLimit -
+                        due
+                ).coerceAtLeast(0.0)
+
+            Text(
+                v15Text(
+                    "অবশিষ্ট ক্রেডিট: ${
+                        dealerBusinessMoney(
+                            remainingCredit
+                        )
+                    }",
+                    "Remaining credit: ${
+                        dealerBusinessMoney(
+                            remainingCredit
+                        )
+                    }"
+                )
+            )
+        }
+
+        Text(
+            v15Text(
+                "ইনভয়েস ইতিহাস",
+                "Invoice history"
+            ),
+            fontWeight =
+                FontWeight.Bold
+        )
+
+        if (sales.isEmpty()) {
+            Text(
+                v15Text(
+                    "কোনো বিক্রয় ইনভয়েস নেই।",
+                    "No sales invoice."
+                )
+            )
+        }
+
+        sales
+            .sortedWith(
+                compareByDescending<DealerSaleEntity> {
+                    it.soldAt
+                }.thenByDescending {
+                    it.id
+                }
+            )
+            .forEach { sale ->
+                Card(
+                    modifier =
+                        Modifier.fillMaxWidth()
+                ) {
+                    Column(
+                        modifier =
+                            Modifier.padding(
+                                12.dp
+                            ),
+                        verticalArrangement =
+                            Arrangement.spacedBy(
+                                3.dp
+                            )
+                    ) {
+                        Text(
+                            sale.invoiceNo
+                                .ifBlank {
+                                    v15Text(
+                                        "ইনভয়েস #${sale.id}",
+                                        "Invoice #${sale.id}"
+                                    )
+                                },
+                            fontWeight =
+                                FontWeight.Bold
+                        )
+
+                        Text(
+                            dealerBusinessDate(
+                                sale.soldAt
+                            )
+                        )
+
+                        Text(
+                            v15Text(
+                                "স্ট্যাটাস: ${sale.status}",
+                                "Status: ${sale.status}"
+                            )
+                        )
+
+                        OutlinedButton(
+                            onClick = {
+                                onOpenSale(sale)
+                            },
+                            modifier =
+                                Modifier
+                                    .fillMaxWidth()
+                        ) {
+                            Text(
+                                v15Text(
+                                    "ইনভয়েস বিস্তারিত",
+                                    "Invoice details"
+                                )
+                            )
+                        }
+                    }
+                }
+            }
+
+        Text(
+            v15Text(
+                "কালেকশন ইতিহাস",
+                "Collection history"
+            ),
+            fontWeight =
+                FontWeight.Bold
+        )
+
+        if (collections.isEmpty()) {
+            Text(
+                v15Text(
+                    "কোনো কালেকশন নেই।",
+                    "No collection."
+                )
+            )
+        }
+
+        collections
+            .sortedWith(
+                compareByDescending<DealerCollectionEntity> {
+                    it.collectedAt
+                }.thenByDescending {
+                    it.id
+                }
+            )
+            .forEach { collection ->
+                Card(
+                    modifier =
+                        Modifier.fillMaxWidth()
+                ) {
+                    Column(
+                        modifier =
+                            Modifier.padding(
+                                12.dp
+                            ),
+                        verticalArrangement =
+                            Arrangement.spacedBy(
+                                3.dp
+                            )
+                    ) {
+                        Text(
+                            dealerBusinessMoney(
+                                collection.amount
+                            ),
+                            fontWeight =
+                                FontWeight.Bold
+                        )
+
+                        Text(
+                            dealerBusinessDate(
+                                collection
+                                    .collectedAt
+                            )
+                        )
+
+                        if (
+                            collection.note
+                                .isNotBlank()
+                        ) {
+                            Text(
+                                collection.note
+                            )
+                        }
+                    }
+                }
+            }
+    }
 }
 
 @Composable
@@ -2426,17 +3512,7 @@ private fun DealerPurchaseDialog(
                             productId =
                                 product.id
 
-                            if (
-                                cost.isBlank()
-                            ) {
-                                cost =
-                                    product.sellingPrice
-                                        .takeIf {
-                                            it > 0
-                                        }
-                                        ?.toString()
-                                        .orEmpty()
-                            }
+                            cost = ""
                         },
                         modifier =
                             Modifier.fillMaxWidth()
@@ -4052,6 +5128,2017 @@ private fun DealerReturnMetaDialog(
         }
     )
 }
+
+@Composable
+private fun DealerDeliverySaleDialog(
+    challan: DealerDeliveryChallanEntity,
+    customers:
+        List<DealerCustomerEntity>,
+    viewModel:
+        DealerBusinessViewModel,
+    onDismiss: () -> Unit,
+    onSave: (
+        Long,
+        String,
+        List<
+            com.familykhata.app.dealerbusiness
+                .DealerDeliverySaleLineInput
+        >,
+        Double,
+        String
+    ) -> Unit
+) {
+    var customerId by
+        remember(challan.id) {
+            mutableStateOf<Long?>(null)
+        }
+
+    var invoiceNo by
+        remember(challan.id) {
+            mutableStateOf("")
+        }
+
+    var collectedNow by
+        remember(challan.id) {
+            mutableStateOf("")
+        }
+
+    var note by
+        remember(challan.id) {
+            mutableStateOf("")
+        }
+
+    var statuses by
+        remember(challan.id) {
+            mutableStateOf(
+                emptyList<
+                    com.familykhata.app
+                        .dealerbusiness
+                        .DealerDeliveryLineStatus
+                >()
+            )
+        }
+
+    var loading by
+        remember(challan.id) {
+            mutableStateOf(true)
+        }
+
+    var quantityValues by
+        remember(challan.id) {
+            mutableStateOf<
+                Map<Long, String>
+            >(
+                emptyMap()
+            )
+        }
+
+    var rateValues by
+        remember(challan.id) {
+            mutableStateOf<
+                Map<Long, String>
+            >(
+                emptyMap()
+            )
+        }
+
+    LaunchedEffect(
+        challan.id
+    ) {
+        loading = true
+
+        statuses =
+            viewModel
+                .loadDeliveryLineStatuses(
+                    challan.id
+                )
+
+        loading = false
+    }
+
+    AlertDialog(
+        onDismissRequest =
+            onDismiss,
+        title = {
+            Text(
+                v15Text(
+                    "ডেলিভারি বিক্রি / বাকি",
+                    "Delivery sale / due"
+                )
+            )
+        },
+        text = {
+            Column(
+                modifier =
+                    Modifier
+                        .heightIn(
+                            max = 600.dp
+                        )
+                        .verticalScroll(
+                            rememberScrollState()
+                        ),
+                verticalArrangement =
+                    Arrangement.spacedBy(
+                        8.dp
+                    )
+            ) {
+                Text(
+                    v15Text(
+                        "চালান: ${challan.challanNo}",
+                        "Challan: ${challan.challanNo}"
+                    ),
+                    fontWeight =
+                        FontWeight.Bold
+                )
+
+                Text(
+                    challan
+                        .deliveryPersonNameSnapshot
+                )
+
+                Text(
+                    v15Text(
+                        "রিটেইলার নির্বাচন",
+                        "Select retailer"
+                    ),
+                    fontWeight =
+                        FontWeight.Bold
+                )
+
+                customers.forEach {
+                        customer ->
+
+                    OutlinedButton(
+                        onClick = {
+                            customerId =
+                                customer.id
+                        },
+                        modifier =
+                            Modifier
+                                .fillMaxWidth()
+                    ) {
+                        Text(
+                            if (
+                                customerId ==
+                                    customer.id
+                            ) {
+                                "✓ ${customer.name}"
+                            } else {
+                                customer.name
+                            }
+                        )
+                    }
+                }
+
+                OutlinedTextField(
+                    value =
+                        invoiceNo,
+                    onValueChange = {
+                        invoiceNo = it
+                    },
+                    label = {
+                        Text(
+                            v15Text(
+                                "ইনভয়েস নং",
+                                "Invoice no."
+                            )
+                        )
+                    },
+                    modifier =
+                        Modifier.fillMaxWidth()
+                )
+
+                Text(
+                    v15Text(
+                        "বিক্রিত মাল",
+                        "Sold items"
+                    ),
+                    fontWeight =
+                        FontWeight.Bold
+                )
+
+                if (loading) {
+                    Text(
+                        v15Text(
+                            "লোড হচ্ছে...",
+                            "Loading..."
+                        )
+                    )
+                }
+
+                statuses.forEach {
+                        status ->
+
+                    val line =
+                        status.line
+
+                    Card(
+                        modifier =
+                            Modifier
+                                .fillMaxWidth()
+                    ) {
+                        Column(
+                            modifier =
+                                Modifier.padding(
+                                    10.dp
+                                ),
+                            verticalArrangement =
+                                Arrangement
+                                    .spacedBy(
+                                        6.dp
+                                    )
+                        ) {
+                            Text(
+                                line.productNameSnapshot,
+                                fontWeight =
+                                    FontWeight.Bold
+                            )
+
+                            Text(
+                                v15Text(
+                                    "দেওয়া ${line.quantityPieces} • আগে বিক্রি ${status.soldPieces} • বাকি ${status.remainingPieces}",
+                                    "Issued ${line.quantityPieces} • already sold ${status.soldPieces} • remaining ${status.remainingPieces}"
+                                )
+                            )
+
+                            if (
+                                status.remainingPieces >
+                                    0
+                            ) {
+                                OutlinedTextField(
+                                    value =
+                                        quantityValues[
+                                            line.id
+                                        ].orEmpty(),
+                                    onValueChange = {
+                                        value ->
+
+                                        quantityValues =
+                                            quantityValues +
+                                                (
+                                                    line.id to
+                                                        value
+                                                )
+                                    },
+                                    label = {
+                                        Text(
+                                            v15Text(
+                                                "এই রিটেইলারে বিক্রি পিস",
+                                                "Pieces sold to this retailer"
+                                            )
+                                        )
+                                    },
+                                    modifier =
+                                        Modifier
+                                            .fillMaxWidth()
+                                )
+
+                                OutlinedTextField(
+                                    value =
+                                        rateValues[
+                                            line.id
+                                        ].orEmpty(),
+                                    onValueChange = {
+                                        value ->
+
+                                        rateValues =
+                                            rateValues +
+                                                (
+                                                    line.id to
+                                                        value
+                                                )
+                                    },
+                                    label = {
+                                        Text(
+                                            v15Text(
+                                                "বিক্রয় দর / পিস",
+                                                "Selling rate / piece"
+                                            )
+                                        )
+                                    },
+                                    modifier =
+                                        Modifier
+                                            .fillMaxWidth()
+                                )
+                            } else {
+                                Text(
+                                    v15Text(
+                                        "এই পণ্যের সব মাল ইতিমধ্যে বিক্রি হয়েছে।",
+                                        "All issued pieces are already sold."
+                                    )
+                                )
+                            }
+                        }
+                    }
+                }
+
+                OutlinedTextField(
+                    value =
+                        collectedNow,
+                    onValueChange = {
+                        collectedNow = it
+                    },
+                    label = {
+                        Text(
+                            v15Text(
+                                "এখন আদায়",
+                                "Collected now"
+                            )
+                        )
+                    },
+                    modifier =
+                        Modifier.fillMaxWidth()
+                )
+
+                Text(
+                    v15Text(
+                        "এখন আদায় না হলে ০ রাখুন। বাকি স্বয়ংক্রিয়ভাবে রিটেইলারের বাকি খাতায় যাবে।",
+                        "Use 0 if unpaid. The balance automatically goes to the retailer due ledger."
+                    ),
+                    style =
+                        MaterialTheme
+                            .typography
+                            .bodySmall
+                )
+
+                OutlinedTextField(
+                    value =
+                        note,
+                    onValueChange = {
+                        note = it
+                    },
+                    label = {
+                        Text(
+                            v15Text(
+                                "নোট",
+                                "Note"
+                            )
+                        )
+                    },
+                    modifier =
+                        Modifier.fillMaxWidth()
+                )
+            }
+        },
+        confirmButton = {
+            TextButton(
+                onClick = {
+                    val selectedCustomer =
+                        customerId
+                            ?: return@TextButton
+
+                    val saleLines =
+                        statuses
+                            .mapNotNull {
+                                    status ->
+
+                                val quantity =
+                                    quantityValues[
+                                        status.line.id
+                                    ]
+                                        ?.dealerBusinessInt()
+                                        ?: 0
+
+                                val rate =
+                                    rateValues[
+                                        status.line.id
+                                    ]
+                                        ?.trim()
+                                        ?.replace(
+                                            ",",
+                                            ""
+                                        )
+                                        ?.toDoubleOrNull()
+                                        ?: 0.0
+
+                                if (
+                                    quantity > 0 &&
+                                    quantity <=
+                                        status
+                                            .remainingPieces &&
+                                    rate >= 0
+                                ) {
+                                    com.familykhata.app
+                                        .dealerbusiness
+                                        .DealerDeliverySaleLineInput(
+                                            challanLineId =
+                                                status
+                                                    .line
+                                                    .id,
+                                            quantityPieces =
+                                                quantity,
+                                            unitPrice =
+                                                rate
+                                        )
+                                } else {
+                                    null
+                                }
+                            }
+
+                    val invalidQuantity =
+                        statuses.any {
+                                status ->
+
+                            val raw =
+                                quantityValues[
+                                    status.line.id
+                                ]
+                                    ?.dealerBusinessInt()
+                                    ?: 0
+
+                            raw <
+                                0 ||
+                                raw >
+                                    status
+                                        .remainingPieces
+                        }
+
+                    val collection =
+                        collectedNow
+                            .trim()
+                            .replace(
+                                ",",
+                                ""
+                            )
+                            .toDoubleOrNull()
+                            ?: 0.0
+
+                    if (
+                        saleLines.isNotEmpty() &&
+                        !invalidQuantity &&
+                        collection >= 0
+                    ) {
+                        onSave(
+                            selectedCustomer,
+                            invoiceNo,
+                            saleLines,
+                            collection,
+                            note
+                        )
+                    }
+                }
+            ) {
+                Text(
+                    v15Text(
+                        "বিক্রি সেভ",
+                        "Save sale"
+                    )
+                )
+            }
+        },
+        dismissButton = {
+            TextButton(
+                onClick =
+                    onDismiss
+            ) {
+                Text(
+                    v15Text(
+                        "বাতিল",
+                        "Cancel"
+                    )
+                )
+            }
+        }
+    )
+}
+
+
+@Composable
+private fun DealerDeliverySettlementDialog(
+    challan:
+        DealerDeliveryChallanEntity,
+    viewModel:
+        DealerBusinessViewModel,
+    onDismiss: () -> Unit,
+    onSave: (
+        List<
+            com.familykhata.app.dealerbusiness
+                .DealerDeliverySettlementLineInput
+        >,
+        Double,
+        String
+    ) -> Unit
+) {
+    var statuses by
+        remember(challan.id) {
+            mutableStateOf(
+                emptyList<
+                    com.familykhata.app
+                        .dealerbusiness
+                        .DealerDeliveryLineStatus
+                >()
+            )
+        }
+
+    var loading by
+        remember(challan.id) {
+            mutableStateOf(true)
+        }
+
+    var returnedValues by
+        remember(challan.id) {
+            mutableStateOf<
+                Map<Long, String>
+            >(
+                emptyMap()
+            )
+        }
+
+    var damagedValues by
+        remember(challan.id) {
+            mutableStateOf<
+                Map<Long, String>
+            >(
+                emptyMap()
+            )
+        }
+
+    var lineNotes by
+        remember(challan.id) {
+            mutableStateOf<
+                Map<Long, String>
+            >(
+                emptyMap()
+            )
+        }
+
+    var cash by
+        remember(challan.id) {
+            mutableStateOf("")
+        }
+
+    var note by
+        remember(challan.id) {
+            mutableStateOf("")
+        }
+
+    LaunchedEffect(
+        challan.id
+    ) {
+        loading = true
+
+        statuses =
+            viewModel
+                .loadDeliveryLineStatuses(
+                    challan.id
+                )
+
+        loading = false
+    }
+
+    AlertDialog(
+        onDismissRequest =
+            onDismiss,
+        title = {
+            Text(
+                v15Text(
+                    "রাতে মাল বুঝে নেওয়া",
+                    "Night settlement"
+                )
+            )
+        },
+        text = {
+            Column(
+                modifier =
+                    Modifier
+                        .heightIn(
+                            max = 620.dp
+                        )
+                        .verticalScroll(
+                            rememberScrollState()
+                        ),
+                verticalArrangement =
+                    Arrangement.spacedBy(
+                        8.dp
+                    )
+            ) {
+                Text(
+                    v15Text(
+                        "চালান: ${challan.challanNo}",
+                        "Challan: ${challan.challanNo}"
+                    ),
+                    fontWeight =
+                        FontWeight.Bold
+                )
+
+                Text(
+                    challan
+                        .deliveryPersonNameSnapshot
+                )
+
+                Text(
+                    v15Text(
+                        "প্রতি পণ্যে: দেওয়া = বিক্রি + ফেরত + ড্যামেজ",
+                        "For every item: issued = sold + returned + damaged"
+                    ),
+                    fontWeight =
+                        FontWeight.Bold
+                )
+
+                if (loading) {
+                    Text(
+                        v15Text(
+                            "লোড হচ্ছে...",
+                            "Loading..."
+                        )
+                    )
+                }
+
+                statuses.forEach {
+                        status ->
+
+                    val line =
+                        status.line
+
+                    val returned =
+                        returnedValues[
+                            line.id
+                        ]
+                            ?.dealerBusinessInt()
+                            ?: 0
+
+                    val damaged =
+                        damagedValues[
+                            line.id
+                        ]
+                            ?.dealerBusinessInt()
+                            ?: 0
+
+                    val difference =
+                        status.remainingPieces -
+                            returned -
+                            damaged
+
+                    Card(
+                        modifier =
+                            Modifier
+                                .fillMaxWidth()
+                    ) {
+                        Column(
+                            modifier =
+                                Modifier.padding(
+                                    10.dp
+                                ),
+                            verticalArrangement =
+                                Arrangement
+                                    .spacedBy(
+                                        6.dp
+                                    )
+                        ) {
+                            Text(
+                                line.productNameSnapshot,
+                                fontWeight =
+                                    FontWeight.Bold
+                            )
+
+                            Text(
+                                v15Text(
+                                    "দেওয়া: ${line.quantityPieces} • বিক্রি: ${status.soldPieces} • বুঝে নিতে বাকি: ${status.remainingPieces}",
+                                    "Issued: ${line.quantityPieces} • sold: ${status.soldPieces} • remaining to settle: ${status.remainingPieces}"
+                                )
+                            )
+
+                            OutlinedTextField(
+                                value =
+                                    returnedValues[
+                                        line.id
+                                    ].orEmpty(),
+                                onValueChange = {
+                                    value ->
+
+                                    returnedValues =
+                                        returnedValues +
+                                            (
+                                                line.id to
+                                                    value
+                                            )
+                                },
+                                label = {
+                                    Text(
+                                        v15Text(
+                                            "ফেরত পিস",
+                                            "Returned pieces"
+                                        )
+                                    )
+                                },
+                                modifier =
+                                    Modifier
+                                        .fillMaxWidth()
+                            )
+
+                            OutlinedTextField(
+                                value =
+                                    damagedValues[
+                                        line.id
+                                    ].orEmpty(),
+                                onValueChange = {
+                                    value ->
+
+                                    damagedValues =
+                                        damagedValues +
+                                            (
+                                                line.id to
+                                                    value
+                                            )
+                                },
+                                label = {
+                                    Text(
+                                        v15Text(
+                                            "ড্যামেজ পিস",
+                                            "Damaged pieces"
+                                        )
+                                    )
+                                },
+                                modifier =
+                                    Modifier
+                                        .fillMaxWidth()
+                            )
+
+                            OutlinedTextField(
+                                value =
+                                    lineNotes[
+                                        line.id
+                                    ].orEmpty(),
+                                onValueChange = {
+                                    value ->
+
+                                    lineNotes =
+                                        lineNotes +
+                                            (
+                                                line.id to
+                                                    value
+                                            )
+                                },
+                                label = {
+                                    Text(
+                                        v15Text(
+                                            "লাইন নোট",
+                                            "Line note"
+                                        )
+                                    )
+                                },
+                                modifier =
+                                    Modifier
+                                        .fillMaxWidth()
+                            )
+
+                            Text(
+                                if (difference == 0) {
+                                    v15Text(
+                                        "✓ হিসাব মিলেছে",
+                                        "✓ Balanced"
+                                    )
+                                } else {
+                                    v15Text(
+                                        "আরও মিলাতে হবে: $difference পিস",
+                                        "Difference: $difference pcs"
+                                    )
+                                },
+                                fontWeight =
+                                    FontWeight.Bold
+                            )
+                        }
+                    }
+                }
+
+                OutlinedTextField(
+                    value =
+                        cash,
+                    onValueChange = {
+                        cash = it
+                    },
+                    label = {
+                        Text(
+                            v15Text(
+                                "ডেলিভারি ম্যানের জমা নগদ",
+                                "Cash handed over"
+                            )
+                        )
+                    },
+                    modifier =
+                        Modifier.fillMaxWidth()
+                )
+
+                Text(
+                    v15Text(
+                        "এই ঘরটি রাতের নগদ হস্তান্তরের রেকর্ড। রিটেইলারের বাকি/আদায়ের হিসাব বিক্রির সময়ের entry থেকেই হবে।",
+                        "This records the delivery person's night cash handover. Retailer due/collection accounting comes from the sale entries."
+                    ),
+                    style =
+                        MaterialTheme
+                            .typography
+                            .bodySmall
+                )
+
+                OutlinedTextField(
+                    value =
+                        note,
+                    onValueChange = {
+                        note = it
+                    },
+                    label = {
+                        Text(
+                            v15Text(
+                                "সেটেলমেন্ট নোট",
+                                "Settlement note"
+                            )
+                        )
+                    },
+                    modifier =
+                        Modifier.fillMaxWidth()
+                )
+            }
+        },
+        confirmButton = {
+            TextButton(
+                onClick = {
+                    if (
+                        statuses.isEmpty() ||
+                        loading
+                    ) {
+                        return@TextButton
+                    }
+
+                    val settlementLines =
+                        statuses.map {
+                                status ->
+
+                            val returned =
+                                returnedValues[
+                                    status.line.id
+                                ]
+                                    ?.dealerBusinessInt()
+                                    ?: 0
+
+                            val damaged =
+                                damagedValues[
+                                    status.line.id
+                                ]
+                                    ?.dealerBusinessInt()
+                                    ?: 0
+
+                            com.familykhata.app
+                                .dealerbusiness
+                                .DealerDeliverySettlementLineInput(
+                                    challanLineId =
+                                        status.line.id,
+                                    returnedPieces =
+                                        returned,
+                                    damagedPieces =
+                                        damaged,
+                                    note =
+                                        lineNotes[
+                                            status.line.id
+                                        ].orEmpty()
+                                )
+                        }
+
+                    val balanced =
+                        statuses.all {
+                                status ->
+
+                            val returned =
+                                returnedValues[
+                                    status.line.id
+                                ]
+                                    ?.dealerBusinessInt()
+                                    ?: 0
+
+                            val damaged =
+                                damagedValues[
+                                    status.line.id
+                                ]
+                                    ?.dealerBusinessInt()
+                                    ?: 0
+
+                            returned >= 0 &&
+                                damaged >= 0 &&
+                                status.soldPieces +
+                                    returned +
+                                    damaged ==
+                                    status.line
+                                        .quantityPieces
+                        }
+
+                    val cashValue =
+                        cash
+                            .trim()
+                            .replace(
+                                ",",
+                                ""
+                            )
+                            .toDoubleOrNull()
+                            ?: 0.0
+
+                    if (
+                        balanced &&
+                        cashValue >= 0
+                    ) {
+                        onSave(
+                            settlementLines,
+                            cashValue,
+                            note
+                        )
+                    }
+                }
+            ) {
+                Text(
+                    v15Text(
+                        "বুঝে নিন / চালান বন্ধ",
+                        "Settle / close challan"
+                    )
+                )
+            }
+        },
+        dismissButton = {
+            TextButton(
+                onClick =
+                    onDismiss
+            ) {
+                Text(
+                    v15Text(
+                        "বাতিল",
+                        "Cancel"
+                    )
+                )
+            }
+        }
+    )
+}
+
+
+@Composable
+private fun DealerDeliveryChallanDialog(
+    deliveryPeople:
+        List<DealerDeliveryPersonEntity>,
+    products:
+        List<com.familykhata.app.data.ProductEntity>,
+    packs:
+        List<DealerProductPackEntity>,
+    onDismiss: () -> Unit,
+    onSave: (
+        Long,
+        String,
+        List<com.familykhata.app.dealerbusiness.DealerDeliveryChallanLineInput>,
+        String
+    ) -> Unit
+) {
+    var deliveryPersonId by remember {
+        mutableStateOf<Long?>(null)
+    }
+
+    var challanNo by remember {
+        mutableStateOf("")
+    }
+
+    var note by remember {
+        mutableStateOf("")
+    }
+
+    var selectedProductId by remember {
+        mutableStateOf<Long?>(null)
+    }
+
+    var boxes by remember {
+        mutableStateOf("")
+    }
+
+    var sheets by remember {
+        mutableStateOf("")
+    }
+
+    var loose by remember {
+        mutableStateOf("")
+    }
+
+    var lines by remember {
+        mutableStateOf(
+            emptyList<
+                com.familykhata.app.dealerbusiness
+                    .DealerDeliveryChallanLineInput
+            >()
+        )
+    }
+
+    AlertDialog(
+        onDismissRequest =
+            onDismiss,
+        title = {
+            Text(
+                v15Text(
+                    "মাল দেওয়ার চালান",
+                    "Issue delivery challan"
+                )
+            )
+        },
+        text = {
+            Column(
+                modifier =
+                    Modifier
+                        .heightIn(
+                            max = 560.dp
+                        )
+                        .verticalScroll(
+                            rememberScrollState()
+                        ),
+                verticalArrangement =
+                    Arrangement.spacedBy(7.dp)
+            ) {
+                Text(
+                    v15Text(
+                        "ডেলিভারি ম্যান নির্বাচন",
+                        "Select delivery man"
+                    ),
+                    fontWeight =
+                        FontWeight.Bold
+                )
+
+                deliveryPeople.forEach {
+                        person ->
+
+                    OutlinedButton(
+                        onClick = {
+                            deliveryPersonId =
+                                person.id
+                        },
+                        modifier =
+                            Modifier.fillMaxWidth()
+                    ) {
+                        Text(
+                            if (
+                                deliveryPersonId ==
+                                    person.id
+                            ) {
+                                "✓ ${person.name}"
+                            } else {
+                                person.name
+                            }
+                        )
+                    }
+                }
+
+                OutlinedTextField(
+                    value =
+                        challanNo,
+                    onValueChange = {
+                        challanNo = it
+                    },
+                    label = {
+                        Text(
+                            v15Text(
+                                "চালান নং (ঐচ্ছিক)",
+                                "Challan no. (optional)"
+                            )
+                        )
+                    },
+                    modifier =
+                        Modifier.fillMaxWidth()
+                )
+
+                Text(
+                    v15Text(
+                        "মাল যোগ করুন",
+                        "Add products"
+                    ),
+                    fontWeight =
+                        FontWeight.Bold
+                )
+
+                products.forEach { product ->
+                    OutlinedButton(
+                        onClick = {
+                            selectedProductId =
+                                product.id
+
+                            boxes = ""
+                            sheets = ""
+                            loose = ""
+                        },
+                        modifier =
+                            Modifier.fillMaxWidth()
+                    ) {
+                        Text(
+                            if (
+                                selectedProductId ==
+                                    product.id
+                            ) {
+                                "✓ ${product.name}"
+                            } else {
+                                product.name
+                            }
+                        )
+                    }
+                }
+
+                selectedProductId?.let {
+                        productId ->
+
+                    val product =
+                        products.firstOrNull {
+                            it.id ==
+                                productId
+                        }
+
+                    val pack =
+                        packs.firstOrNull {
+                            it.productId ==
+                                productId
+                        }
+
+                    if (product != null) {
+                        Text(
+                            product.name,
+                            fontWeight =
+                                FontWeight.Bold
+                        )
+
+                        Text(
+                            v15Text(
+                                "১ বক্স = ${pack?.piecesPerBox ?: 0} পিস • ১ পাতা = ${pack?.piecesPerSheet ?: 0} পিস",
+                                "1 box = ${pack?.piecesPerBox ?: 0} pcs • 1 sheet = ${pack?.piecesPerSheet ?: 0} pcs"
+                            ),
+                            style =
+                                MaterialTheme
+                                    .typography
+                                    .bodySmall
+                        )
+
+                        OutlinedTextField(
+                            value =
+                                boxes,
+                            onValueChange = {
+                                boxes = it
+                            },
+                            label = {
+                                Text(
+                                    v15Text(
+                                        "বক্স",
+                                        "Boxes"
+                                    )
+                                )
+                            },
+                            modifier =
+                                Modifier.fillMaxWidth()
+                        )
+
+                        OutlinedTextField(
+                            value =
+                                sheets,
+                            onValueChange = {
+                                sheets = it
+                            },
+                            label = {
+                                Text(
+                                    v15Text(
+                                        "পাতা",
+                                        "Sheets"
+                                    )
+                                )
+                            },
+                            modifier =
+                                Modifier.fillMaxWidth()
+                        )
+
+                        OutlinedTextField(
+                            value =
+                                loose,
+                            onValueChange = {
+                                loose = it
+                            },
+                            label = {
+                                Text(
+                                    v15Text(
+                                        "খোলা পিস",
+                                        "Loose pieces"
+                                    )
+                                )
+                            },
+                            modifier =
+                                Modifier.fillMaxWidth()
+                        )
+
+                        OutlinedButton(
+                            onClick = {
+                                val boxCount =
+                                    boxes
+                                        .dealerBusinessInt()
+                                        ?: 0
+
+                                val sheetCount =
+                                    sheets
+                                        .dealerBusinessInt()
+                                        ?: 0
+
+                                val looseCount =
+                                    loose
+                                        .dealerBusinessInt()
+                                        ?: 0
+
+                                if (
+                                    boxCount >= 0 &&
+                                    sheetCount >= 0 &&
+                                    looseCount >= 0 &&
+                                    (
+                                        boxCount > 0 ||
+                                            sheetCount > 0 ||
+                                            looseCount > 0
+                                    )
+                                ) {
+                                    lines =
+                                        lines +
+                                            com.familykhata.app
+                                                .dealerbusiness
+                                                .DealerDeliveryChallanLineInput(
+                                                    productId =
+                                                        productId,
+                                                    boxCount =
+                                                        boxCount,
+                                                    sheetCount =
+                                                        sheetCount,
+                                                    loosePieces =
+                                                        looseCount
+                                                )
+
+                                    selectedProductId =
+                                        null
+
+                                    boxes = ""
+                                    sheets = ""
+                                    loose = ""
+                                }
+                            },
+                            modifier =
+                                Modifier.fillMaxWidth()
+                        ) {
+                            Text(
+                                v15Text(
+                                    "চালানে যোগ করুন",
+                                    "Add to challan"
+                                )
+                            )
+                        }
+                    }
+                }
+
+                if (lines.isNotEmpty()) {
+                    Text(
+                        v15Text(
+                            "চালানের মাল",
+                            "Challan items"
+                        ),
+                        fontWeight =
+                            FontWeight.Bold
+                    )
+                }
+
+                lines.forEachIndexed {
+                        index,
+                        line ->
+
+                    val productName =
+                        products.firstOrNull {
+                            it.id ==
+                                line.productId
+                        }?.name
+                            ?: "#${line.productId}"
+
+                    Card(
+                        modifier =
+                            Modifier.fillMaxWidth()
+                    ) {
+                        Column(
+                            modifier =
+                                Modifier.padding(
+                                    8.dp
+                                )
+                        ) {
+                            Text(
+                                productName,
+                                fontWeight =
+                                    FontWeight.Bold
+                            )
+
+                            Text(
+                                v15Text(
+                                    "বক্স ${line.boxCount} • পাতা ${line.sheetCount} • খোলা ${line.loosePieces}",
+                                    "Box ${line.boxCount} • Sheet ${line.sheetCount} • Loose ${line.loosePieces}"
+                                )
+                            )
+
+                            TextButton(
+                                onClick = {
+                                    lines =
+                                        lines.filterIndexed {
+                                                currentIndex,
+                                                _ ->
+                                            currentIndex !=
+                                                index
+                                        }
+                                }
+                            ) {
+                                Text(
+                                    v15Text(
+                                        "বাদ দিন",
+                                        "Remove"
+                                    )
+                                )
+                            }
+                        }
+                    }
+                }
+
+                OutlinedTextField(
+                    value =
+                        note,
+                    onValueChange = {
+                        note = it
+                    },
+                    label = {
+                        Text(
+                            v15Text(
+                                "নোট",
+                                "Note"
+                            )
+                        )
+                    },
+                    modifier =
+                        Modifier.fillMaxWidth()
+                )
+            }
+        },
+        confirmButton = {
+            TextButton(
+                onClick = {
+                    val personId =
+                        deliveryPersonId
+                            ?: return@TextButton
+
+                    if (lines.isNotEmpty()) {
+                        onSave(
+                            personId,
+                            challanNo,
+                            lines,
+                            note
+                        )
+                    }
+                }
+            ) {
+                Text(
+                    v15Text(
+                        "চালান তৈরি",
+                        "Create challan"
+                    )
+                )
+            }
+        },
+        dismissButton = {
+            TextButton(
+                onClick =
+                    onDismiss
+            ) {
+                Text(
+                    v15Text(
+                        "বাতিল",
+                        "Cancel"
+                    )
+                )
+            }
+        }
+    )
+}
+
+
+@Composable
+private fun DealerWarehouseDamageDialog(
+    products:
+        List<com.familykhata.app.data.ProductEntity>,
+    viewModel:
+        DealerBusinessViewModel,
+    onDismiss: () -> Unit,
+    onSave: (
+        Long,
+        Int,
+        String,
+        String
+    ) -> Unit
+) {
+    var productId by remember {
+        mutableStateOf<Long?>(null)
+    }
+
+    var batchId by remember {
+        mutableStateOf<Long?>(null)
+    }
+
+    var quantity by remember {
+        mutableStateOf("")
+    }
+
+    var reason by remember {
+        mutableStateOf("")
+    }
+
+    var note by remember {
+        mutableStateOf("")
+    }
+
+    AlertDialog(
+        onDismissRequest =
+            onDismiss,
+        title = {
+            Text(
+                v15Text(
+                    "ড্যামেজ হিসাব",
+                    "Record damage"
+                )
+            )
+        },
+        text = {
+            Column(
+                modifier =
+                    Modifier
+                        .heightIn(
+                            max = 560.dp
+                        )
+                        .verticalScroll(
+                            rememberScrollState()
+                        ),
+                verticalArrangement =
+                    Arrangement.spacedBy(7.dp)
+            ) {
+                Text(
+                    v15Text(
+                        "পণ্য নির্বাচন",
+                        "Select product"
+                    ),
+                    fontWeight =
+                        FontWeight.Bold
+                )
+
+                products.forEach { product ->
+                    OutlinedButton(
+                        onClick = {
+                            productId =
+                                product.id
+
+                            batchId =
+                                null
+                        },
+                        modifier =
+                            Modifier.fillMaxWidth()
+                    ) {
+                        Text(
+                            if (
+                                productId ==
+                                    product.id
+                            ) {
+                                "✓ ${product.name}"
+                            } else {
+                                product.name
+                            }
+                        )
+                    }
+                }
+
+                productId?.let {
+                        selectedProductId ->
+
+                    val flow =
+                        remember(
+                            selectedProductId
+                        ) {
+                            viewModel
+                                .observeProductBatches(
+                                    selectedProductId
+                                )
+                        }
+
+                    val batches by
+                        flow.collectAsState(
+                            initial =
+                                emptyList()
+                        )
+
+                    val available =
+                        batches.filter {
+                            it.quantity > 0
+                        }
+
+                    Text(
+                        v15Text(
+                            "ক্রয় রেট / ব্যাচ নির্বাচন",
+                            "Select purchase rate / batch"
+                        ),
+                        fontWeight =
+                            FontWeight.Bold
+                    )
+
+                    if (available.isEmpty()) {
+                        Text(
+                            v15Text(
+                                "এই পণ্যের স্টক নেই।",
+                                "No stock available."
+                            )
+                        )
+                    }
+
+                    available.forEach {
+                            batch ->
+
+                        OutlinedButton(
+                            onClick = {
+                                batchId =
+                                    batch.id
+                            },
+                            modifier =
+                                Modifier.fillMaxWidth()
+                        ) {
+                            Text(
+                                buildString {
+                                    if (
+                                        batchId ==
+                                            batch.id
+                                    ) {
+                                        append("✓ ")
+                                    }
+
+                                    append(
+                                        dealerBusinessMoney(
+                                            batch.purchasePrice
+                                        )
+                                    )
+
+                                    append(
+                                        " • "
+                                    )
+
+                                    append(
+                                        v15Text(
+                                            "স্টক ${batch.quantity}",
+                                            "Stock ${batch.quantity}"
+                                        )
+                                    )
+
+                                    if (
+                                        batch.batchNo
+                                            .isNotBlank()
+                                    ) {
+                                        append(
+                                            " • ${batch.batchNo}"
+                                        )
+                                    }
+                                }
+                            )
+                        }
+                    }
+                }
+
+                OutlinedTextField(
+                    value =
+                        quantity,
+                    onValueChange = {
+                        quantity = it
+                    },
+                    label = {
+                        Text(
+                            v15Text(
+                                "ড্যামেজ পিস",
+                                "Damaged pieces"
+                            )
+                        )
+                    },
+                    modifier =
+                        Modifier.fillMaxWidth()
+                )
+
+                OutlinedTextField(
+                    value =
+                        reason,
+                    onValueChange = {
+                        reason = it
+                    },
+                    label = {
+                        Text(
+                            v15Text(
+                                "ড্যামেজের কারণ",
+                                "Damage reason"
+                            )
+                        )
+                    },
+                    modifier =
+                        Modifier.fillMaxWidth()
+                )
+
+                OutlinedTextField(
+                    value =
+                        note,
+                    onValueChange = {
+                        note = it
+                    },
+                    label = {
+                        Text(
+                            v15Text(
+                                "নোট",
+                                "Note"
+                            )
+                        )
+                    },
+                    modifier =
+                        Modifier.fillMaxWidth()
+                )
+            }
+        },
+        confirmButton = {
+            TextButton(
+                onClick = {
+                    val selectedBatch =
+                        batchId
+                            ?: return@TextButton
+
+                    val qty =
+                        quantity
+                            .dealerBusinessInt()
+                            ?: return@TextButton
+
+                    if (qty > 0) {
+                        onSave(
+                            selectedBatch,
+                            qty,
+                            reason,
+                            note
+                        )
+                    }
+                }
+            ) {
+                Text(
+                    v15Text(
+                        "সেভ",
+                        "Save"
+                    )
+                )
+            }
+        },
+        dismissButton = {
+            TextButton(
+                onClick =
+                    onDismiss
+            ) {
+                Text(
+                    v15Text(
+                        "বাতিল",
+                        "Cancel"
+                    )
+                )
+            }
+        }
+    )
+}
+
+
+@Composable
+private fun DealerPackSetupDialog(
+    products:
+        List<com.familykhata.app.data.ProductEntity>,
+    packs:
+        List<DealerProductPackEntity>,
+    onDismiss: () -> Unit,
+    onSave: (
+        Long,
+        Int,
+        Int
+    ) -> Unit
+) {
+    var productId by remember {
+        mutableStateOf<Long?>(null)
+    }
+
+    var boxPieces by remember {
+        mutableStateOf("")
+    }
+
+    var sheetPieces by remember {
+        mutableStateOf("")
+    }
+
+    val selectedPack =
+        productId?.let { id ->
+            packs.firstOrNull {
+                it.productId == id
+            }
+        }
+
+    LaunchedEffect(
+        productId,
+        selectedPack?.updatedAt
+    ) {
+        boxPieces =
+            selectedPack
+                ?.piecesPerBox
+                ?.takeIf { it > 0 }
+                ?.toString()
+                .orEmpty()
+
+        sheetPieces =
+            selectedPack
+                ?.piecesPerSheet
+                ?.takeIf { it > 0 }
+                ?.toString()
+                .orEmpty()
+    }
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = {
+            Text(
+                v15Text(
+                    "বক্স / পাতা সেটআপ",
+                    "Box / sheet setup"
+                )
+            )
+        },
+        text = {
+            Column(
+                modifier =
+                    Modifier.verticalScroll(
+                        rememberScrollState()
+                    ),
+                verticalArrangement =
+                    Arrangement.spacedBy(7.dp)
+            ) {
+                Text(
+                    v15Text(
+                        "পণ্য নির্বাচন",
+                        "Select product"
+                    ),
+                    fontWeight =
+                        FontWeight.Bold
+                )
+
+                products.forEach { product ->
+                    OutlinedButton(
+                        onClick = {
+                            productId =
+                                product.id
+                        },
+                        modifier =
+                            Modifier.fillMaxWidth()
+                    ) {
+                        Text(
+                            if (
+                                productId ==
+                                    product.id
+                            ) {
+                                "✓ ${product.name}"
+                            } else {
+                                product.name
+                            }
+                        )
+                    }
+                }
+
+                OutlinedTextField(
+                    value =
+                        boxPieces,
+                    onValueChange = {
+                        boxPieces = it
+                    },
+                    label = {
+                        Text(
+                            v15Text(
+                                "১ বক্সে কয় পিস",
+                                "Pieces per box"
+                            )
+                        )
+                    },
+                    modifier =
+                        Modifier.fillMaxWidth()
+                )
+
+                OutlinedTextField(
+                    value =
+                        sheetPieces,
+                    onValueChange = {
+                        sheetPieces = it
+                    },
+                    label = {
+                        Text(
+                            v15Text(
+                                "১ পাতায় কয় পিস",
+                                "Pieces per sheet"
+                            )
+                        )
+                    },
+                    modifier =
+                        Modifier.fillMaxWidth()
+                )
+
+                Text(
+                    v15Text(
+                        "বক্স বা পাতার মান না থাকলে ০ রাখা যাবে। স্টকের মূল হিসাব পিসে থাকবে।",
+                        "Use 0 when box or sheet is not applicable. Stock is stored in pieces."
+                    ),
+                    style =
+                        MaterialTheme
+                            .typography
+                            .bodySmall
+                )
+            }
+        },
+        confirmButton = {
+            TextButton(
+                onClick = {
+                    val id =
+                        productId
+                            ?: return@TextButton
+
+                    val box =
+                        boxPieces
+                            .dealerBusinessInt()
+                            ?: 0
+
+                    val sheet =
+                        sheetPieces
+                            .dealerBusinessInt()
+                            ?: 0
+
+                    if (
+                        box >= 0 &&
+                        sheet >= 0
+                    ) {
+                        onSave(
+                            id,
+                            box,
+                            sheet
+                        )
+                    }
+                }
+            ) {
+                Text(
+                    v15Text(
+                        "সেভ",
+                        "Save"
+                    )
+                )
+            }
+        },
+        dismissButton = {
+            TextButton(
+                onClick = onDismiss
+            ) {
+                Text(
+                    v15Text(
+                        "বাতিল",
+                        "Cancel"
+                    )
+                )
+            }
+        }
+    )
+}
+
+
+@Composable
+private fun DealerDeliveryPersonDialog(
+    initial:
+        DealerDeliveryPersonEntity?,
+    onDismiss: () -> Unit,
+    onSave: (
+        String,
+        String,
+        String
+    ) -> Unit
+) {
+    var name by remember(initial?.id) {
+        mutableStateOf(
+            initial?.name.orEmpty()
+        )
+    }
+
+    var phone by remember(initial?.id) {
+        mutableStateOf(
+            initial?.phone.orEmpty()
+        )
+    }
+
+    var note by remember(initial?.id) {
+        mutableStateOf(
+            initial?.note.orEmpty()
+        )
+    }
+
+    AlertDialog(
+        onDismissRequest =
+            onDismiss,
+        title = {
+            Text(
+                if (initial == null) {
+                    v15Text(
+                        "ডেলিভারি ম্যান যোগ করুন",
+                        "Add delivery man"
+                    )
+                } else {
+                    v15Text(
+                        "ডেলিভারি ম্যান সম্পাদনা",
+                        "Edit delivery man"
+                    )
+                }
+            )
+        },
+        text = {
+            Column(
+                verticalArrangement =
+                    Arrangement.spacedBy(7.dp)
+            ) {
+                OutlinedTextField(
+                    value = name,
+                    onValueChange = {
+                        name = it
+                    },
+                    label = {
+                        Text(
+                            v15Text(
+                                "নাম",
+                                "Name"
+                            )
+                        )
+                    },
+                    modifier =
+                        Modifier.fillMaxWidth()
+                )
+
+                OutlinedTextField(
+                    value = phone,
+                    onValueChange = {
+                        phone = it
+                    },
+                    label = {
+                        Text(
+                            v15Text(
+                                "ফোন",
+                                "Phone"
+                            )
+                        )
+                    },
+                    modifier =
+                        Modifier.fillMaxWidth()
+                )
+
+                OutlinedTextField(
+                    value = note,
+                    onValueChange = {
+                        note = it
+                    },
+                    label = {
+                        Text(
+                            v15Text(
+                                "নোট",
+                                "Note"
+                            )
+                        )
+                    },
+                    modifier =
+                        Modifier.fillMaxWidth()
+                )
+            }
+        },
+        confirmButton = {
+            TextButton(
+                onClick = {
+                    if (
+                        name.isNotBlank()
+                    ) {
+                        onSave(
+                            name,
+                            phone,
+                            note
+                        )
+                    }
+                }
+            ) {
+                Text(
+                    v15Text(
+                        "সেভ",
+                        "Save"
+                    )
+                )
+            }
+        },
+        dismissButton = {
+            TextButton(
+                onClick =
+                    onDismiss
+            ) {
+                Text(
+                    v15Text(
+                        "বাতিল",
+                        "Cancel"
+                    )
+                )
+            }
+        }
+    )
+}
+
 
 @Composable
 private fun DealerBusinessMetric(

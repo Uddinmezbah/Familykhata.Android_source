@@ -30,6 +30,38 @@ data class DealerSaleLineInput(
     val unitPrice: Double
 )
 
+data class DealerDeliveryChallanLineInput(
+    val productId: Long,
+    val boxCount: Int = 0,
+    val sheetCount: Int = 0,
+    val loosePieces: Int = 0
+)
+
+data class DealerDeliverySaleLineInput(
+    val challanLineId: Long,
+    val quantityPieces: Int,
+    val unitPrice: Double
+)
+
+data class DealerDeliverySettlementLineInput(
+    val challanLineId: Long,
+    val returnedPieces: Int = 0,
+    val damagedPieces: Int = 0,
+    val note: String = ""
+)
+
+data class DealerDeliveryLineStatus(
+    val line: DealerDeliveryChallanLineEntity,
+    val soldPieces: Int
+) {
+    val remainingPieces: Int
+        get() =
+            (
+                line.quantityPieces -
+                    soldPieces
+            ).coerceAtLeast(0)
+}
+
 @OptIn(ExperimentalCoroutinesApi::class)
 class DealerBusinessViewModel(
     application: Application
@@ -76,6 +108,20 @@ class DealerBusinessViewModel(
         workspace
             .flatMapLatest {
                 dao.observeCustomers(it)
+            }
+            .stateIn(
+                viewModelScope,
+                SharingStarted.WhileSubscribed(5_000),
+                emptyList()
+            )
+
+    val customerLedgers:
+        StateFlow<List<DealerCustomerLedgerSummary>> =
+        workspace
+            .flatMapLatest {
+                dao.observeCustomerLedgerSummaries(
+                    it
+                )
             }
             .stateIn(
                 viewModelScope,
@@ -140,6 +186,54 @@ class DealerBusinessViewModel(
                 emptyList()
             )
 
+    val productPacks:
+        StateFlow<List<DealerProductPackEntity>> =
+        workspace
+            .flatMapLatest {
+                dao.observeProductPacks(it)
+            }
+            .stateIn(
+                viewModelScope,
+                SharingStarted.WhileSubscribed(5_000),
+                emptyList()
+            )
+
+    val deliveryPeople:
+        StateFlow<List<DealerDeliveryPersonEntity>> =
+        workspace
+            .flatMapLatest {
+                dao.observeDeliveryPeople(it)
+            }
+            .stateIn(
+                viewModelScope,
+                SharingStarted.WhileSubscribed(5_000),
+                emptyList()
+            )
+
+    val deliveryChallans:
+        StateFlow<List<DealerDeliveryChallanEntity>> =
+        workspace
+            .flatMapLatest {
+                dao.observeDeliveryChallans(it)
+            }
+            .stateIn(
+                viewModelScope,
+                SharingStarted.WhileSubscribed(5_000),
+                emptyList()
+            )
+
+    val damages:
+        StateFlow<List<DealerDamageEntity>> =
+        workspace
+            .flatMapLatest {
+                dao.observeDamages(it)
+            }
+            .stateIn(
+                viewModelScope,
+                SharingStarted.WhileSubscribed(5_000),
+                emptyList()
+            )
+
     val products: StateFlow<List<ProductEntity>> =
         workspace
             .flatMapLatest { workspaceValue ->
@@ -167,6 +261,47 @@ class DealerBusinessViewModel(
                 key
             } else {
                 "dealer_business"
+            }
+    }
+
+    fun observeProductBatches(
+        productId: Long
+    ): Flow<List<StockBatchEntity>> =
+        inventoryDao.observeBatches(
+            productId
+        )
+
+    suspend fun loadDeliveryLineStatuses(
+        challanId: Long
+    ): List<DealerDeliveryLineStatus> {
+        if (challanId <= 0) {
+            return emptyList()
+        }
+
+        val challan =
+            dao.getDeliveryChallanOnce(
+                challanId
+            ) ?: return emptyList()
+
+        if (
+            challan.workspace !=
+            workspace.value
+        ) {
+            return emptyList()
+        }
+
+        return dao
+            .getDeliveryChallanLinesOnce(
+                challanId
+            )
+            .map { line ->
+                DealerDeliveryLineStatus(
+                    line = line,
+                    soldPieces =
+                        dao.getDeliverySoldQuantityForLine(
+                            line.id
+                        )
+                )
             }
     }
 
@@ -199,6 +334,1273 @@ class DealerBusinessViewModel(
         purchaseId: Long
     ): Flow<List<DealerPurchaseReturnEntity>> =
         dao.observePurchaseReturns(purchaseId)
+
+    private fun packedQuantityPieces(
+        boxCount: Int,
+        sheetCount: Int,
+        loosePieces: Int,
+        pack: DealerProductPackEntity
+    ): Int {
+        require(boxCount >= 0)
+        require(sheetCount >= 0)
+        require(loosePieces >= 0)
+
+        if (boxCount > 0) {
+            require(
+                pack.piecesPerBox > 0
+            )
+        }
+
+        if (sheetCount > 0) {
+            require(
+                pack.piecesPerSheet > 0
+            )
+        }
+
+        return (
+            boxCount *
+                pack.piecesPerBox
+            ) +
+            (
+                sheetCount *
+                    pack.piecesPerSheet
+            ) +
+            loosePieces
+    }
+
+    fun saveProductPack(
+        productId: Long,
+        piecesPerBox: Int,
+        piecesPerSheet: Int,
+        onDone: (Boolean) -> Unit = {}
+    ) {
+        if (
+            productId <= 0 ||
+            piecesPerBox < 0 ||
+            piecesPerSheet < 0
+        ) {
+            onDone(false)
+            return
+        }
+
+        val currentWorkspace =
+            workspace.value
+
+        val currentBusinessKey =
+            businessKey.value
+
+        viewModelScope.launch {
+            val success =
+                runCatching {
+                    database.withTransaction {
+                        val product =
+                            requireNotNull(
+                                inventoryDao
+                                    .getProductOnce(
+                                        productId
+                                    )
+                            )
+
+                        require(
+                            product.workspace ==
+                                currentWorkspace
+                        )
+
+                        require(
+                            product.businessKey ==
+                                currentBusinessKey
+                        )
+
+                        val old =
+                            dao.getProductPackOnce(
+                                product.id
+                            )
+
+                        dao.upsertProductPack(
+                            DealerProductPackEntity(
+                                productId =
+                                    product.id,
+                                piecesPerBox =
+                                    piecesPerBox,
+                                piecesPerSheet =
+                                    piecesPerSheet,
+                                workspace =
+                                    currentWorkspace,
+                                createdAt =
+                                    old?.createdAt
+                                        ?: System.currentTimeMillis(),
+                                updatedAt =
+                                    System.currentTimeMillis()
+                            )
+                        )
+                    }
+                }.isSuccess
+
+            onDone(success)
+        }
+    }
+
+    fun addDeliveryPerson(
+        name: String,
+        phone: String = "",
+        note: String = "",
+        onDone: (Boolean) -> Unit = {}
+    ) {
+        if (name.isBlank()) {
+            onDone(false)
+            return
+        }
+
+        val currentWorkspace =
+            workspace.value
+
+        viewModelScope.launch {
+            val success =
+                runCatching {
+                    dao.insertDeliveryPerson(
+                        DealerDeliveryPersonEntity(
+                            name = name.trim(),
+                            phone = phone.trim(),
+                            note = note.trim(),
+                            workspace =
+                                currentWorkspace
+                        )
+                    ) > 0
+                }.getOrDefault(false)
+
+            onDone(success)
+        }
+    }
+
+    fun updateDeliveryPerson(
+        item: DealerDeliveryPersonEntity,
+        name: String,
+        phone: String = "",
+        note: String = "",
+        onDone: (Boolean) -> Unit = {}
+    ) {
+        if (
+            item.id <= 0 ||
+            name.isBlank() ||
+            item.workspace != workspace.value
+        ) {
+            onDone(false)
+            return
+        }
+
+        viewModelScope.launch {
+            val success =
+                runCatching {
+                    dao.updateDeliveryPerson(
+                        item.copy(
+                            name = name.trim(),
+                            phone = phone.trim(),
+                            note = note.trim()
+                        )
+                    ) == 1
+                }.getOrDefault(false)
+
+            onDone(success)
+        }
+    }
+
+    fun createDeliveryChallan(
+        deliveryPersonId: Long,
+        challanNo: String,
+        lines: List<DealerDeliveryChallanLineInput>,
+        note: String = "",
+        issuedAt: Long =
+            System.currentTimeMillis(),
+        onDone: (Boolean) -> Unit = {}
+    ) {
+        val cleanLines =
+            lines.filter {
+                it.productId > 0 &&
+                    it.boxCount >= 0 &&
+                    it.sheetCount >= 0 &&
+                    it.loosePieces >= 0 &&
+                    (
+                        it.boxCount > 0 ||
+                            it.sheetCount > 0 ||
+                            it.loosePieces > 0
+                    )
+            }
+
+        if (
+            deliveryPersonId <= 0 ||
+            cleanLines.isEmpty()
+        ) {
+            onDone(false)
+            return
+        }
+
+        val currentWorkspace =
+            workspace.value
+
+        val currentBusinessKey =
+            businessKey.value
+
+        viewModelScope.launch {
+            val success =
+                runCatching {
+                    database.withTransaction {
+                        val deliveryPerson =
+                            requireNotNull(
+                                dao.getDeliveryPersonOnce(
+                                    deliveryPersonId
+                                )
+                            )
+
+                        require(
+                            deliveryPerson.workspace ==
+                                currentWorkspace
+                        )
+
+                        val challanId =
+                            dao.insertDeliveryChallan(
+                                DealerDeliveryChallanEntity(
+                                    deliveryPersonId =
+                                        deliveryPerson.id,
+                                    deliveryPersonNameSnapshot =
+                                        deliveryPerson.name,
+                                    challanNo =
+                                        challanNo
+                                            .trim()
+                                            .ifBlank {
+                                                "DC-$issuedAt"
+                                            },
+                                    issuedAt =
+                                        issuedAt,
+                                    note =
+                                        note.trim(),
+                                    workspace =
+                                        currentWorkspace
+                                )
+                            )
+
+                        for (input in cleanLines) {
+                            val product =
+                                requireNotNull(
+                                    inventoryDao
+                                        .getProductOnce(
+                                            input.productId
+                                        )
+                                )
+
+                            require(
+                                product.workspace ==
+                                    currentWorkspace
+                            )
+
+                            require(
+                                product.businessKey ==
+                                    currentBusinessKey
+                            )
+
+                            val pack =
+                                dao.getProductPackOnce(
+                                    product.id
+                                )
+                                    ?: DealerProductPackEntity(
+                                        productId =
+                                            product.id,
+                                        workspace =
+                                            currentWorkspace
+                                    )
+
+                            val pieces =
+                                packedQuantityPieces(
+                                    boxCount =
+                                        input.boxCount,
+                                    sheetCount =
+                                        input.sheetCount,
+                                    loosePieces =
+                                        input.loosePieces,
+                                    pack =
+                                        pack
+                                )
+
+                            require(pieces > 0)
+
+                            val batches =
+                                inventoryDao
+                                    .getBatchesOnce(
+                                        product.id
+                                    )
+                                    .filter {
+                                        it.quantity > 0
+                                    }
+
+                            require(
+                                batches.sumOf {
+                                    it.quantity
+                                } >= pieces
+                            )
+
+                            val lineId =
+                                dao.insertDeliveryChallanLine(
+                                    DealerDeliveryChallanLineEntity(
+                                        challanId =
+                                            challanId,
+                                        productId =
+                                            product.id,
+                                        productNameSnapshot =
+                                            product.name,
+                                        boxCount =
+                                            input.boxCount,
+                                        sheetCount =
+                                            input.sheetCount,
+                                        loosePieces =
+                                            input.loosePieces,
+                                        piecesPerBoxSnapshot =
+                                            pack.piecesPerBox,
+                                        piecesPerSheetSnapshot =
+                                            pack.piecesPerSheet,
+                                        quantityPieces =
+                                            pieces
+                                    )
+                                )
+
+                            var remaining =
+                                pieces
+
+                            for (batch in batches) {
+                                if (remaining <= 0) {
+                                    break
+                                }
+
+                                val used =
+                                    minOf(
+                                        batch.quantity,
+                                        remaining
+                                    )
+
+                                dao.insertDeliveryChallanAllocation(
+                                    DealerDeliveryChallanAllocationEntity(
+                                        challanLineId =
+                                            lineId,
+                                        sourceStockBatchId =
+                                            batch.id,
+                                        batchNoSnapshot =
+                                            batch.batchNo,
+                                        quantityPieces =
+                                            used,
+                                        unitCost =
+                                            batch.purchasePrice,
+                                        totalCost =
+                                            used *
+                                                batch.purchasePrice
+                                    )
+                                )
+
+                                inventoryDao
+                                    .updateBatchQuantity(
+                                        batch.id,
+                                        batch.quantity -
+                                            used
+                                    )
+
+                                remaining -= used
+                            }
+
+                            require(
+                                remaining == 0
+                            )
+                        }
+                    }
+                }.isSuccess
+
+            onDone(success)
+        }
+    }
+
+    fun createDeliverySale(
+        challanId: Long,
+        customerId: Long,
+        invoiceNo: String,
+        lines: List<DealerDeliverySaleLineInput>,
+        collectedNow: Double = 0.0,
+        note: String = "",
+        soldAt: Long =
+            System.currentTimeMillis(),
+        onDone: (Boolean) -> Unit = {}
+    ) {
+        val cleanLines =
+            lines.filter {
+                it.challanLineId > 0 &&
+                    it.quantityPieces > 0 &&
+                    it.unitPrice >= 0
+            }
+
+        if (
+            challanId <= 0 ||
+            customerId <= 0 ||
+            cleanLines.isEmpty() ||
+            collectedNow < 0
+        ) {
+            onDone(false)
+            return
+        }
+
+        val currentWorkspace =
+            workspace.value
+
+        val currentBusinessKey =
+            businessKey.value
+
+        viewModelScope.launch {
+            val success =
+                runCatching {
+                    database.withTransaction {
+                        val challan =
+                            requireNotNull(
+                                dao.getDeliveryChallanOnce(
+                                    challanId
+                                )
+                            )
+
+                        require(
+                            challan.workspace ==
+                                currentWorkspace
+                        )
+
+                        require(
+                            challan.status == "OPEN"
+                        )
+
+                        require(
+                            dao.getDeliverySettlementOnce(
+                                challan.id
+                            ) == null
+                        )
+
+                        val customer =
+                            requireNotNull(
+                                dao.getCustomerOnce(
+                                    customerId
+                                )
+                            )
+
+                        require(
+                            customer.workspace ==
+                                currentWorkspace
+                        )
+
+                        val resolved =
+                            cleanLines.map { input ->
+                                val challanLine =
+                                    requireNotNull(
+                                        dao.getDeliveryChallanLineOnce(
+                                            input.challanLineId
+                                        )
+                                    )
+
+                                require(
+                                    challanLine.challanId ==
+                                        challan.id
+                                )
+
+                                val productId =
+                                    requireNotNull(
+                                        challanLine.productId
+                                    )
+
+                                val product =
+                                    requireNotNull(
+                                        inventoryDao
+                                            .getProductOnce(
+                                                productId
+                                            )
+                                    )
+
+                                require(
+                                    product.workspace ==
+                                        currentWorkspace
+                                )
+
+                                require(
+                                    product.businessKey ==
+                                        currentBusinessKey
+                                )
+
+                                val alreadySold =
+                                    dao.getDeliverySoldQuantityForLine(
+                                        challanLine.id
+                                    )
+
+                                require(
+                                    alreadySold +
+                                        input.quantityPieces <=
+                                        challanLine.quantityPieces
+                                )
+
+                                Triple(
+                                    input,
+                                    challanLine,
+                                    product
+                                )
+                            }
+
+                        val total =
+                            resolved.sumOf {
+                                it.first.quantityPieces *
+                                    it.first.unitPrice
+                            }
+
+                        val existingSales =
+                            dao.getSalesForCustomerOnce(
+                                customer.id,
+                                currentWorkspace
+                            )
+
+                        var existingDue = 0.0
+
+                        for (sale in existingSales) {
+                            val saleTotal =
+                                dao.getSaleTotal(
+                                    sale.id
+                                )
+
+                            val returnTotal =
+                                dao.getSaleReturnTotal(
+                                    sale.id
+                                )
+
+                            val collected =
+                                dao.getSaleCollected(
+                                    sale.id
+                                )
+
+                            existingDue +=
+                                (
+                                    saleTotal -
+                                        returnTotal -
+                                        collected
+                                ).coerceAtLeast(0.0)
+                        }
+
+                        val oldCollections =
+                            dao.getCollectionsForCustomerOnce(
+                                customer.id,
+                                currentWorkspace
+                            )
+
+                        var availableAdvance = 0.0
+
+                        for (
+                            collection in
+                            oldCollections
+                        ) {
+                            val allocated =
+                                dao.getCollectionAllocated(
+                                    collection.id
+                                )
+
+                            availableAdvance +=
+                                (
+                                    collection.amount -
+                                        allocated
+                                ).coerceAtLeast(0.0)
+                        }
+
+                        val newDue =
+                            (
+                                total -
+                                    availableAdvance -
+                                    collectedNow
+                            ).coerceAtLeast(0.0)
+
+                        if (
+                            customer.creditLimit > 0.0
+                        ) {
+                            require(
+                                existingDue +
+                                    newDue <=
+                                    customer.creditLimit +
+                                        0.0001
+                            )
+                        }
+
+                        val saleId =
+                            dao.insertSale(
+                                DealerSaleEntity(
+                                    customerId =
+                                        customer.id,
+                                    customerNameSnapshot =
+                                        customer.name,
+                                    invoiceNo =
+                                        invoiceNo
+                                            .trim(),
+                                    soldAt =
+                                        soldAt,
+                                    note =
+                                        note.trim(),
+                                    workspace =
+                                        currentWorkspace
+                                )
+                            )
+
+                        dao.insertDeliveryChallanSale(
+                            DealerDeliveryChallanSaleEntity(
+                                challanId =
+                                    challan.id,
+                                saleId =
+                                    saleId
+                            )
+                        )
+
+                        for (
+                            resolvedLine in
+                            resolved
+                        ) {
+                            val input =
+                                resolvedLine.first
+
+                            val challanLine =
+                                resolvedLine.second
+
+                            val product =
+                                resolvedLine.third
+
+                            val saleLineId =
+                                dao.insertSaleLine(
+                                    DealerSaleLineEntity(
+                                        saleId =
+                                            saleId,
+                                        productId =
+                                            product.id,
+                                        productNameSnapshot =
+                                            product.name,
+                                        quantity =
+                                            input.quantityPieces,
+                                        unitPrice =
+                                            input.unitPrice,
+                                        lineTotal =
+                                            input.quantityPieces *
+                                                input.unitPrice
+                                    )
+                                )
+
+                            val allocations =
+                                dao.getDeliveryAllocationsForLineOnce(
+                                    challanLine.id
+                                )
+
+                            var remaining =
+                                input.quantityPieces
+
+                            for (
+                                allocation in
+                                allocations
+                            ) {
+                                if (remaining <= 0) {
+                                    break
+                                }
+
+                                val usedBefore =
+                                    dao.getDeliverySoldQuantityForAllocation(
+                                        allocation.id
+                                    )
+
+                                val free =
+                                    (
+                                        allocation.quantityPieces -
+                                            usedBefore
+                                    ).coerceAtLeast(0)
+
+                                if (free <= 0) {
+                                    continue
+                                }
+
+                                val used =
+                                    minOf(
+                                        free,
+                                        remaining
+                                    )
+
+                                dao.insertDeliverySaleAllocation(
+                                    DealerDeliverySaleAllocationEntity(
+                                        challanLineId =
+                                            challanLine.id,
+                                        challanAllocationId =
+                                            allocation.id,
+                                        saleLineId =
+                                            saleLineId,
+                                        quantityPieces =
+                                            used,
+                                        unitCost =
+                                            allocation.unitCost,
+                                        totalCost =
+                                            used *
+                                                allocation.unitCost
+                                    )
+                                )
+
+                                /*
+                                 * Existing sale-return / COGS logic
+                                 * reads DealerStockAllocationEntity.
+                                 * Stock itself is NOT reduced here:
+                                 * it was already removed when the
+                                 * delivery challan was issued.
+                                 */
+                                dao.insertStockAllocation(
+                                    DealerStockAllocationEntity(
+                                        saleLineId =
+                                            saleLineId,
+                                        sourceStockBatchId =
+                                            allocation.sourceStockBatchId,
+                                        batchNoSnapshot =
+                                            allocation.batchNoSnapshot,
+                                        quantity =
+                                            used,
+                                        unitCost =
+                                            allocation.unitCost,
+                                        totalCost =
+                                            used *
+                                                allocation.unitCost
+                                    )
+                                )
+
+                                remaining -= used
+                            }
+
+                            require(
+                                remaining == 0
+                            )
+                        }
+
+                        var due = total
+
+                        for (
+                            collection in
+                            oldCollections
+                        ) {
+                            if (due <= 0.0001) {
+                                break
+                            }
+
+                            val allocated =
+                                dao.getCollectionAllocated(
+                                    collection.id
+                                )
+
+                            val free =
+                                (
+                                    collection.amount -
+                                        allocated
+                                ).coerceAtLeast(0.0)
+
+                            val use =
+                                minOf(
+                                    free,
+                                    due
+                                )
+
+                            if (use > 0.0001) {
+                                dao.insertCollectionAllocation(
+                                    DealerCollectionAllocationEntity(
+                                        collectionId =
+                                            collection.id,
+                                        saleId =
+                                            saleId,
+                                        amount =
+                                            use
+                                    )
+                                )
+
+                                due -= use
+                            }
+                        }
+
+                        if (
+                            collectedNow > 0.0001
+                        ) {
+                            val collectionId =
+                                dao.insertCollection(
+                                    DealerCollectionEntity(
+                                        customerId =
+                                            customer.id,
+                                        customerNameSnapshot =
+                                            customer.name,
+                                        amount =
+                                            collectedNow,
+                                        collectedAt =
+                                            soldAt,
+                                        note =
+                                            "Delivery ${challan.challanNo}",
+                                        workspace =
+                                            currentWorkspace
+                                    )
+                                )
+
+                            val use =
+                                minOf(
+                                    collectedNow,
+                                    due.coerceAtLeast(
+                                        0.0
+                                    )
+                                )
+
+                            if (use > 0.0001) {
+                                dao.insertCollectionAllocation(
+                                    DealerCollectionAllocationEntity(
+                                        collectionId =
+                                            collectionId,
+                                        saleId =
+                                            saleId,
+                                        amount =
+                                            use
+                                    )
+                                )
+
+                                due -= use
+                            }
+                        }
+
+                        val status =
+                            when {
+                                due <= 0.0001 ->
+                                    "PAID"
+
+                                due <
+                                    total -
+                                        0.0001 ->
+                                    "PARTIAL"
+
+                                else ->
+                                    "OPEN"
+                            }
+
+                        dao.updateSaleStatus(
+                            saleId,
+                            status
+                        )
+                    }
+                }.isSuccess
+
+            onDone(success)
+        }
+    }
+
+    private suspend fun restoreDeliveryStock(
+        line: DealerDeliveryChallanLineEntity,
+        allocation:
+            DealerDeliveryChallanAllocationEntity,
+        quantity: Int,
+        receivedAt: Long
+    ) {
+        if (quantity <= 0) {
+            return
+        }
+
+        val productId =
+            requireNotNull(
+                line.productId
+            )
+
+        val oldBatch =
+            allocation.sourceStockBatchId
+                ?.let {
+                    inventoryDao
+                        .getBatchOnce(it)
+                }
+
+        if (oldBatch != null) {
+            require(
+                oldBatch.productId ==
+                    productId
+            )
+
+            inventoryDao.updateBatchQuantity(
+                oldBatch.id,
+                oldBatch.quantity +
+                    quantity
+            )
+        } else {
+            inventoryDao.insertBatch(
+                StockBatchEntity(
+                    productId =
+                        productId,
+                    batchNo =
+                        allocation
+                            .batchNoSnapshot,
+                    quantity =
+                        quantity,
+                    purchasePrice =
+                        allocation.unitCost,
+                    purchaseDate =
+                        receivedAt
+                )
+            )
+        }
+    }
+
+    fun settleDeliveryChallan(
+        challanId: Long,
+        lines:
+            List<DealerDeliverySettlementLineInput>,
+        cashHandedOver: Double = 0.0,
+        note: String = "",
+        receivedAt: Long =
+            System.currentTimeMillis(),
+        onDone: (Boolean) -> Unit = {}
+    ) {
+        if (
+            challanId <= 0 ||
+            lines.isEmpty() ||
+            cashHandedOver < 0
+        ) {
+            onDone(false)
+            return
+        }
+
+        val currentWorkspace =
+            workspace.value
+
+        viewModelScope.launch {
+            val success =
+                runCatching {
+                    database.withTransaction {
+                        val challan =
+                            requireNotNull(
+                                dao.getDeliveryChallanOnce(
+                                    challanId
+                                )
+                            )
+
+                        require(
+                            challan.workspace ==
+                                currentWorkspace
+                        )
+
+                        require(
+                            challan.status == "OPEN"
+                        )
+
+                        require(
+                            dao.getDeliverySettlementOnce(
+                                challan.id
+                            ) == null
+                        )
+
+                        val challanLines =
+                            dao.getDeliveryChallanLinesOnce(
+                                challan.id
+                            )
+
+                        val inputMap =
+                            lines.associateBy {
+                                it.challanLineId
+                            }
+
+                        require(
+                            inputMap.size ==
+                                lines.size
+                        )
+
+                        require(
+                            inputMap.keys ==
+                                challanLines
+                                    .map {
+                                        it.id
+                                    }
+                                    .toSet()
+                        )
+
+                        val settlementId =
+                            dao.insertDeliverySettlement(
+                                DealerDeliverySettlementEntity(
+                                    challanId =
+                                        challan.id,
+                                    cashHandedOver =
+                                        cashHandedOver,
+                                    receivedAt =
+                                        receivedAt,
+                                    note =
+                                        note.trim()
+                                )
+                            )
+
+                        for (
+                            challanLine in
+                            challanLines
+                        ) {
+                            val input =
+                                requireNotNull(
+                                    inputMap[
+                                        challanLine.id
+                                    ]
+                                )
+
+                            require(
+                                input.returnedPieces >= 0
+                            )
+
+                            require(
+                                input.damagedPieces >= 0
+                            )
+
+                            val soldPieces =
+                                dao.getDeliverySoldQuantityForLine(
+                                    challanLine.id
+                                )
+
+                            require(
+                                soldPieces +
+                                    input.returnedPieces +
+                                    input.damagedPieces ==
+                                    challanLine.quantityPieces
+                            )
+
+                            dao.insertDeliverySettlementLine(
+                                DealerDeliverySettlementLineEntity(
+                                    settlementId =
+                                        settlementId,
+                                    challanLineId =
+                                        challanLine.id,
+                                    soldPieces =
+                                        soldPieces,
+                                    returnedPieces =
+                                        input.returnedPieces,
+                                    damagedPieces =
+                                        input.damagedPieces,
+                                    note =
+                                        input.note.trim()
+                                )
+                            )
+
+                            var returnRemaining =
+                                input.returnedPieces
+
+                            var damageRemaining =
+                                input.damagedPieces
+
+                            val allocations =
+                                dao.getDeliveryAllocationsForLineOnce(
+                                    challanLine.id
+                                )
+
+                            for (
+                                allocation in
+                                allocations
+                            ) {
+                                val soldFromAllocation =
+                                    dao.getDeliverySoldQuantityForAllocation(
+                                        allocation.id
+                                    )
+
+                                var free =
+                                    (
+                                        allocation.quantityPieces -
+                                            soldFromAllocation
+                                    ).coerceAtLeast(0)
+
+                                if (
+                                    free <= 0
+                                ) {
+                                    continue
+                                }
+
+                                val returned =
+                                    minOf(
+                                        free,
+                                        returnRemaining
+                                    )
+
+                                if (
+                                    returned > 0
+                                ) {
+                                    restoreDeliveryStock(
+                                        line =
+                                            challanLine,
+                                        allocation =
+                                            allocation,
+                                        quantity =
+                                            returned,
+                                        receivedAt =
+                                            receivedAt
+                                    )
+
+                                    returnRemaining -=
+                                        returned
+
+                                    free -=
+                                        returned
+                                }
+
+                                val damaged =
+                                    minOf(
+                                        free,
+                                        damageRemaining
+                                    )
+
+                                if (
+                                    damaged > 0
+                                ) {
+                                    dao.insertDamage(
+                                        DealerDamageEntity(
+                                            productId =
+                                                challanLine.productId,
+                                            sourceStockBatchId =
+                                                allocation
+                                                    .sourceStockBatchId,
+                                            deliveryChallanId =
+                                                challan.id,
+                                            productNameSnapshot =
+                                                challanLine
+                                                    .productNameSnapshot,
+                                            batchNoSnapshot =
+                                                allocation
+                                                    .batchNoSnapshot,
+                                            quantityPieces =
+                                                damaged,
+                                            unitCost =
+                                                allocation.unitCost,
+                                            totalCost =
+                                                damaged *
+                                                    allocation.unitCost,
+                                            sourceType =
+                                                "DELIVERY",
+                                            reason =
+                                                "Night settlement damage",
+                                            damagedAt =
+                                                receivedAt,
+                                            note =
+                                                input.note.trim(),
+                                            workspace =
+                                                currentWorkspace
+                                        )
+                                    )
+
+                                    damageRemaining -=
+                                        damaged
+                                }
+                            }
+
+                            require(
+                                returnRemaining == 0
+                            )
+
+                            require(
+                                damageRemaining == 0
+                            )
+                        }
+
+                        dao.updateDeliveryChallan(
+                            challan.copy(
+                                settledAt =
+                                    receivedAt,
+                                status =
+                                    "SETTLED"
+                            )
+                        )
+                    }
+                }.isSuccess
+
+            onDone(success)
+        }
+    }
+
+    fun recordWarehouseDamage(
+        batchId: Long,
+        quantityPieces: Int,
+        reason: String = "",
+        note: String = "",
+        damagedAt: Long =
+            System.currentTimeMillis(),
+        onDone: (Boolean) -> Unit = {}
+    ) {
+        if (
+            batchId <= 0 ||
+            quantityPieces <= 0
+        ) {
+            onDone(false)
+            return
+        }
+
+        val currentWorkspace =
+            workspace.value
+
+        val currentBusinessKey =
+            businessKey.value
+
+        viewModelScope.launch {
+            val success =
+                runCatching {
+                    database.withTransaction {
+                        val batch =
+                            requireNotNull(
+                                inventoryDao
+                                    .getBatchOnce(
+                                        batchId
+                                    )
+                            )
+
+                        val product =
+                            requireNotNull(
+                                inventoryDao
+                                    .getProductOnce(
+                                        batch.productId
+                                    )
+                            )
+
+                        require(
+                            product.workspace ==
+                                currentWorkspace
+                        )
+
+                        require(
+                            product.businessKey ==
+                                currentBusinessKey
+                        )
+
+                        require(
+                            quantityPieces <=
+                                batch.quantity
+                        )
+
+                        dao.insertDamage(
+                            DealerDamageEntity(
+                                productId =
+                                    product.id,
+                                sourceStockBatchId =
+                                    batch.id,
+                                productNameSnapshot =
+                                    product.name,
+                                batchNoSnapshot =
+                                    batch.batchNo,
+                                quantityPieces =
+                                    quantityPieces,
+                                unitCost =
+                                    batch.purchasePrice,
+                                totalCost =
+                                    quantityPieces *
+                                        batch.purchasePrice,
+                                sourceType =
+                                    "WAREHOUSE",
+                                reason =
+                                    reason.trim(),
+                                damagedAt =
+                                    damagedAt,
+                                note =
+                                    note.trim(),
+                                workspace =
+                                    currentWorkspace
+                            )
+                        )
+
+                        inventoryDao
+                            .updateBatchQuantity(
+                                batch.id,
+                                batch.quantity -
+                                    quantityPieces
+                            )
+                    }
+                }.isSuccess
+
+            onDone(success)
+        }
+    }
 
     fun addCompany(
         name: String,
@@ -728,6 +2130,112 @@ class DealerBusinessViewModel(
         // unallocated as supplier advance.
     }
 
+    private suspend fun rebuildCustomerCollectionAllocations(
+        customerId: Long,
+        workspaceValue: String
+    ) {
+        val sales =
+            dao.getSalesForCustomerOnce(
+                customerId,
+                workspaceValue
+            )
+
+        val collections =
+            dao.getCollectionsForCustomerOnce(
+                customerId,
+                workspaceValue
+            )
+
+        /*
+         * Remove every allocation for this customer first.
+         * Collections are returned oldest-first, so rebuilding
+         * below reproduces chronological allocation.
+         */
+        for (collection in collections) {
+            dao.deleteCollectionAllocationsByCollection(
+                collection.id
+            )
+        }
+
+        for (sale in sales) {
+            refreshSaleStatus(
+                sale.id
+            )
+        }
+
+        for (collection in collections) {
+            allocateCollectionAmount(
+                collectionId =
+                    collection.id,
+                customerId =
+                    customerId,
+                amount =
+                    collection.amount,
+                workspaceValue =
+                    workspaceValue
+            )
+        }
+
+        for (sale in sales) {
+            refreshSaleStatus(
+                sale.id
+            )
+        }
+    }
+
+    private suspend fun rebuildCompanyPaymentAllocations(
+        companyId: Long,
+        workspaceValue: String
+    ) {
+        val purchases =
+            dao.getPurchasesForCompanyOnce(
+                companyId,
+                workspaceValue
+            )
+
+        val payments =
+            dao.getSupplierPaymentsForCompanyOnce(
+                companyId,
+                workspaceValue
+            )
+
+        /*
+         * Remove every allocation for this company first.
+         * Payments are returned oldest-first, so rebuilding
+         * below reproduces chronological allocation.
+         */
+        for (payment in payments) {
+            dao.deleteSupplierPaymentAllocationsByPayment(
+                payment.id
+            )
+        }
+
+        for (purchase in purchases) {
+            refreshPurchaseStatus(
+                purchase.id
+            )
+        }
+
+        for (payment in payments) {
+            allocateSupplierPaymentAmount(
+                paymentId =
+                    payment.id,
+                companyId =
+                    companyId,
+                amount =
+                    payment.amount,
+                workspaceValue =
+                    workspaceValue
+            )
+        }
+
+        for (purchase in purchases) {
+            refreshPurchaseStatus(
+                purchase.id
+            )
+        }
+    }
+
     fun updatePurchaseMeta(
         item: DealerPurchaseEntity,
         invoiceNo: String,
@@ -833,23 +2341,14 @@ class DealerBusinessViewModel(
                                 currentWorkspace
                         )
 
-                        val oldAllocations =
-                            dao.getCollectionAllocationsForCollectionOnce(
-                                item.id
-                            )
-
+                        /*
+                         * Critical when customer/date/amount changes:
+                         * remove the edited receipt's old allocation
+                         * before rebuilding either ledger.
+                         */
                         dao.deleteCollectionAllocationsByCollection(
                             item.id
                         )
-
-                        oldAllocations
-                            .map {
-                                it.saleId
-                            }
-                            .distinct()
-                            .forEach {
-                                refreshSaleStatus(it)
-                            }
 
                         require(
                             dao.updateCollection(
@@ -868,16 +2367,23 @@ class DealerBusinessViewModel(
                             ) == 1
                         )
 
-                        allocateCollectionAmount(
-                            collectionId =
-                                item.id,
-                            customerId =
-                                customer.id,
-                            amount =
-                                amount,
-                            workspaceValue =
-                                currentWorkspace
-                        )
+                        val affectedCustomers =
+                            listOfNotNull(
+                                item.customerId,
+                                customer.id
+                            ).distinct()
+
+                        for (
+                            affectedCustomerId in
+                            affectedCustomers
+                        ) {
+                            rebuildCustomerCollectionAllocations(
+                                customerId =
+                                    affectedCustomerId,
+                                workspaceValue =
+                                    currentWorkspace
+                            )
+                        }
                     }
                 }.isSuccess
 
@@ -922,25 +2428,14 @@ class DealerBusinessViewModel(
                                 currentWorkspace
                         )
 
-                        val oldAllocations =
-                            dao.getSupplierPaymentAllocationsForPaymentOnce(
-                                item.id
-                            )
-
+                        /*
+                         * Critical when company/date/amount changes:
+                         * remove the edited payment's old allocation
+                         * before rebuilding either ledger.
+                         */
                         dao.deleteSupplierPaymentAllocationsByPayment(
                             item.id
                         )
-
-                        oldAllocations
-                            .map {
-                                it.purchaseId
-                            }
-                            .distinct()
-                            .forEach {
-                                refreshPurchaseStatus(
-                                    it
-                                )
-                            }
 
                         require(
                             dao.updateSupplierPayment(
@@ -959,16 +2454,23 @@ class DealerBusinessViewModel(
                             ) == 1
                         )
 
-                        allocateSupplierPaymentAmount(
-                            paymentId =
-                                item.id,
-                            companyId =
-                                company.id,
-                            amount =
-                                amount,
-                            workspaceValue =
-                                currentWorkspace
-                        )
+                        val affectedCompanies =
+                            listOfNotNull(
+                                item.companyId,
+                                company.id
+                            ).distinct()
+
+                        for (
+                            affectedCompanyId in
+                            affectedCompanies
+                        ) {
+                            rebuildCompanyPaymentAllocations(
+                                companyId =
+                                    affectedCompanyId,
+                                workspaceValue =
+                                    currentWorkspace
+                            )
+                        }
                     }
                 }.isSuccess
 

@@ -95,3 +95,98 @@ data class ProductStockSummary(
     val potentialProfit: Double,
     val nextExpiry: Long?
 )
+
+@Entity(
+    tableName = "retail_sales",
+    indices = [
+        Index(
+            value = [
+                "workspace",
+                "businessKey",
+                "soldAt"
+            ]
+        ),
+        Index(
+            value = [
+                "workspace",
+                "businessKey",
+                "invoiceNo"
+            ],
+            unique = true
+        )
+    ]
+)
+data class RetailSaleEntity(
+    @PrimaryKey(autoGenerate = true)
+    val id: Long = 0,
+    val invoiceNo: String,
+    val bakiPersonId: Long? = null,
+    val customerName: String = "",
+    val customerPhone: String = "",
+    val subtotal: Double,
+    val discount: Double = 0.0,
+    val total: Double,
+    val paid: Double = 0.0,
+    val paymentMethod: String = "CASH",
+    val status: String = "DUE",
+    val note: String = "",
+    val workspace: String = "SHOP",
+    val businessKey: String = "legacy",
+    val soldAt: Long = System.currentTimeMillis(),
+    val createdAt: Long = System.currentTimeMillis()
+)
+
+@Entity(
+    tableName = "retail_sale_lines",
+    foreignKeys = [
+        ForeignKey(
+            entity = RetailSaleEntity::class,
+            parentColumns = ["id"],
+            childColumns = ["saleId"],
+            onDelete = ForeignKey.CASCADE
+        )
+    ],
+    indices = [
+        Index("saleId"),
+        Index("productId")
+    ]
+)
+data class RetailSaleLineEntity(
+    @PrimaryKey(autoGenerate = true)
+    val id: Long = 0,
+    val saleId: Long,
+    val productId: Long,
+    val productNameSnapshot: String,
+    val skuSnapshot: String = "",
+    val unitSnapshot: String = "pcs",
+    val quantity: Int,
+    val unitPrice: Double,
+    val unitCost: Double,
+    val lineTotal: Double,
+    val createdAt: Long = System.currentTimeMillis()
+)
+
+@Entity(
+    tableName = "retail_sale_stock_allocations",
+    foreignKeys = [
+        ForeignKey(
+            entity = RetailSaleLineEntity::class,
+            parentColumns = ["id"],
+            childColumns = ["saleLineId"],
+            onDelete = ForeignKey.CASCADE
+        )
+    ],
+    indices = [
+        Index("saleLineId"),
+        Index("batchId")
+    ]
+)
+data class RetailSaleStockAllocationEntity(
+    @PrimaryKey(autoGenerate = true)
+    val id: Long = 0,
+    val saleLineId: Long,
+    val batchId: Long,
+    val quantity: Int,
+    val unitCost: Double,
+    val createdAt: Long = System.currentTimeMillis()
+)

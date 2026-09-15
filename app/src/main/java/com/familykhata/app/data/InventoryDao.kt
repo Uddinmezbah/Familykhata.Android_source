@@ -187,4 +187,101 @@ interface InventoryDao {
 
     @Query("DELETE FROM inventory_products")
     suspend fun clearProducts()
+
+    // -----------------------------------------------------------------
+    // Retail sales
+    // -----------------------------------------------------------------
+
+    @Insert
+    suspend fun insertRetailSale(
+        item: RetailSaleEntity
+    ): Long
+
+    @Insert
+    suspend fun insertRetailSaleLine(
+        item: RetailSaleLineEntity
+    ): Long
+
+    @Insert
+    suspend fun insertRetailSaleStockAllocation(
+        item: RetailSaleStockAllocationEntity
+    ): Long
+
+    @Query(
+        """
+        SELECT *
+        FROM retail_sales
+        WHERE workspace = :workspace
+          AND businessKey = :businessKey
+        ORDER BY soldAt DESC, id DESC
+        """
+    )
+    fun observeRetailSales(
+        workspace: String,
+        businessKey: String
+    ): Flow<List<RetailSaleEntity>>
+
+    @Query(
+        """
+        SELECT *
+        FROM retail_sale_lines
+        WHERE saleId = :saleId
+        ORDER BY id ASC
+        """
+    )
+    fun observeRetailSaleLines(
+        saleId: Long
+    ): Flow<List<RetailSaleLineEntity>>
+
+    @Query(
+        """
+        SELECT *
+        FROM retail_sale_stock_allocations
+        WHERE saleLineId = :saleLineId
+        ORDER BY id ASC
+        """
+    )
+    fun observeRetailSaleStockAllocations(
+        saleLineId: Long
+    ): Flow<List<RetailSaleStockAllocationEntity>>
+
+    @Query(
+        """
+        SELECT *
+        FROM retail_sales
+        WHERE id = :saleId
+        LIMIT 1
+        """
+    )
+    suspend fun getRetailSaleOnce(
+        saleId: Long
+    ): RetailSaleEntity?
+
+    @Query(
+        """
+        SELECT *
+        FROM retail_sale_lines
+        WHERE saleId = :saleId
+        ORDER BY id ASC
+        """
+    )
+    suspend fun getRetailSaleLinesOnce(
+        saleId: Long
+    ): List<RetailSaleLineEntity>
+
+    @Query(
+        """
+        SELECT COUNT(*)
+        FROM retail_sales
+        WHERE workspace = :workspace
+          AND businessKey = :businessKey
+          AND invoiceNo = :invoiceNo
+        """
+    )
+    suspend fun retailInvoiceNumberCount(
+        workspace: String,
+        businessKey: String,
+        invoiceNo: String
+    ): Int
+
 }

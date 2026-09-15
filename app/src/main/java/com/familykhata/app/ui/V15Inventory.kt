@@ -186,6 +186,7 @@ internal fun V15InventoryScreen(
     val securityViewModel: FamilyKhataViewModel = viewModel()
     val products by vm.products.collectAsState()
     var selectedId by remember { mutableStateOf<Long?>(null) }
+    var showRetailSales by remember { mutableStateOf(false) }
     val selected = selectedId?.let { id -> products.firstOrNull { it.id == id } }
 
     LaunchedEffect(
@@ -201,13 +202,42 @@ internal fun V15InventoryScreen(
         owner = "inventory-product",
         active =
             selected != null ||
+                showRetailSales ||
                 nestedEntry
     )
 
-    BackHandler(enabled = selected != null) { selectedId = null }
-    BackHandler(enabled = selected == null) { onExit() }
+    BackHandler(
+        enabled = showRetailSales
+    ) {
+        showRetailSales = false
+    }
 
-    if (selected == null) {
+    BackHandler(
+        enabled =
+            !showRetailSales &&
+                selected != null
+    ) {
+        selectedId = null
+    }
+
+    BackHandler(
+        enabled =
+            !showRetailSales &&
+                selected == null
+    ) {
+        onExit()
+    }
+
+    if (showRetailSales) {
+        V16RetailSalesScreen(
+            workspace = workspace,
+            shopType = shopType,
+            canWrite = canWrite,
+            onExit = {
+                showRetailSales = false
+            }
+        )
+    } else if (selected == null) {
         if (nestedEntry) {
             V15DeepScreenContainer(
                 title = v15Text(
@@ -222,6 +252,9 @@ internal fun V15InventoryScreen(
                     canWrite = canWrite,
                     viewModel = vm,
                     securityViewModel = securityViewModel,
+                    onOpenSales = {
+                        showRetailSales = true
+                    },
                     onSelect = {
                         selectedId = it.id
                     }
@@ -234,6 +267,9 @@ internal fun V15InventoryScreen(
                 canWrite = canWrite,
                 viewModel = vm,
                 securityViewModel = securityViewModel,
+                onOpenSales = {
+                    showRetailSales = true
+                },
                 onSelect = {
                     selectedId = it.id
                 }
@@ -266,6 +302,7 @@ private fun ProductListScreen(
     canWrite: Boolean,
     viewModel: InventoryViewModel,
     securityViewModel: FamilyKhataViewModel,
+    onOpenSales: () -> Unit,
     onSelect: (ProductStockSummary) -> Unit
 ) {
     val context = LocalContext.current
@@ -409,8 +446,31 @@ private fun ProductListScreen(
             )
         }
 
-        Button(onClick = { showAdd = true }, modifier = Modifier.fillMaxWidth(), enabled = canWrite) {
-            Text(v15Text("＋ নতুন পণ্য যোগ করুন", "＋ Add product"))
+        Button(
+            onClick = onOpenSales,
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            Text(
+                v15Text(
+                    "▣ বিক্রি ও ইনভয়েস",
+                    "▣ Sales & Invoices"
+                )
+            )
+        }
+
+        OutlinedButton(
+            onClick = {
+                showAdd = true
+            },
+            modifier = Modifier.fillMaxWidth(),
+            enabled = canWrite
+        ) {
+            Text(
+                v15Text(
+                    "＋ নতুন পণ্য যোগ করুন",
+                    "＋ Add product"
+                )
+            )
         }
         OutlinedTextField(
             value = query,

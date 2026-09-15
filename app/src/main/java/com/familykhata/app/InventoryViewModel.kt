@@ -7,6 +7,9 @@ import androidx.room.withTransaction
 import com.familykhata.app.data.InventoryDatabase
 import com.familykhata.app.data.ProductEntity
 import com.familykhata.app.data.ProductStockSummary
+import com.familykhata.app.data.RetailSaleEntity
+import com.familykhata.app.data.RetailSaleLineEntity
+import com.familykhata.app.data.RetailSaleStockAllocationEntity
 import com.familykhata.app.data.StockBatchEntity
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.Flow
@@ -17,6 +20,12 @@ import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
+
+data class RetailSaleLineInput(
+    val productId: Long,
+    val quantity: Int,
+    val unitPrice: Double
+)
 
 @OptIn(ExperimentalCoroutinesApi::class)
 class InventoryViewModel(application: Application) : AndroidViewModel(application) {
@@ -45,6 +54,20 @@ class InventoryViewModel(application: Application) : AndroidViewModel(applicatio
             )
         }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
+
+    val retailSales: StateFlow<List<RetailSaleEntity>> =
+        inventoryContext
+            .flatMapLatest { context ->
+                dao.observeRetailSales(
+                    workspace = context.first,
+                    businessKey = context.second
+                )
+            }
+            .stateIn(
+                viewModelScope,
+                SharingStarted.WhileSubscribed(5_000),
+                emptyList()
+            )
 
     fun setContext(
         workspaceValue: String,
@@ -81,7 +104,13 @@ class InventoryViewModel(application: Application) : AndroidViewModel(applicatio
         if (workspace.value != value) workspace.value = value
     }
 
-    fun observeBatches(productId: Long): Flow<List<StockBatchEntity>> = dao.observeBatches(productId)
+    fun observeBatches(productId: Long): Flow<List<StockBatchEntity>> =
+        dao.observeBatches(productId)
+
+    fun observeRetailSaleLines(
+        saleId: Long
+    ): Flow<List<RetailSaleLineEntity>> =
+        dao.observeRetailSaleLines(saleId)
 
     fun addProduct(
         name: String,
@@ -244,6 +273,351 @@ class InventoryViewModel(application: Application) : AndroidViewModel(applicatio
                 expiryDate = expiryDate,
                 batchNo = batchNo.trim()
             )
+        }
+    }
+
+    fun createRetailSale(
+        invoiceNo: String = "",
+        lines: List<RetailSaleLineInput>,
+        discount: Double = 0.0,
+        paid: Double = 0.0,
+        paymentMethod: String = "CASH",
+        customerName: String = "",
+        customerPhone: String = "",
+        bakiPersonId: Long? = null,
+        note: String = "",
+        soldAt: Long = System.currentTimeMillis(),
+        onDone: (Long?) -> Unit = {}
+    ) {
+        val cleanLines =
+            lines.filter {
+                it.productId > 0L &&
+                    it.quantity > 0 &&
+                    it.unitPrice.isFinite() &&
+                    it.unitPrice >= 0.0
+            }
+
+        if (
+            cleanLines.isEmpty() ||
+            cleanLines.size != lines.size ||
+            !discount.isFinite() ||
+            !paid.isFinite() ||
+            discount < 0.0 ||
+            paid < 0.0 ||
+            soldAt <= 0L
+        ) {
+            onDone(null)
+            return
+        }
+
+        // One product may appear only once per sale.
+        // The UI can increase quantity instead of adding duplicate rows.
+        if (
+            cleanLines.map { it.productId }
+                .distinct()
+                .size != cleanLines.size
+        ) {
+            onDone(null)
+            return
+        }
+
+        val currentWorkspace = workspace.value
+        val currentBusinessKey = businessKey.value
+
+        viewModelScope.launch {
+            val saleId =
+                runCatching {
+                    database.withTransaction {
+                        data class BatchUse(
+                            val batch: StockBatchEntity,
+                            val quantity: Int
+                        )
+
+                        data class ResolvedLine(
+                            val input: RetailSaleLineInput,
+                            val product: ProductEntity,
+                            val allocations: List<BatchUse>,
+                            val unitCost: Double,
+                            val lineTotal: Double
+                        )
+
+                        val resolvedLines =
+                            cleanLines.map { input ->
+                                val product =
+                                    requireNotNull(
+                                        dao.getProductOnce(
+                                            input.productId
+                                        )
+                                    ) {
+                                        "Product not found"
+                                    }
+
+                                require(
+                                    product.workspace ==
+                                        currentWorkspace
+                                ) {
+                                    "Product belongs to another workspace"
+                                }
+
+                                require(
+                                    product.businessKey ==
+                                        currentBusinessKey
+                                ) {
+                                    "Product belongs to another business"
+                                }
+
+                                val batches =
+                                    dao.getBatchesOnce(product.id)
+                                        .filter {
+                                            it.quantity > 0
+                                        }
+
+                                require(
+                                    batches.sumOf {
+                                        it.quantity
+                                    } >= input.quantity
+                                ) {
+                                    "Not enough stock"
+                                }
+
+                                var remaining =
+                                    input.quantity
+
+                                val allocations =
+                                    mutableListOf<BatchUse>()
+
+                                for (batch in batches) {
+                                    if (remaining <= 0) break
+
+                                    val used =
+                                        minOf(
+                                            batch.quantity,
+                                            remaining
+                                        )
+
+                                    allocations +=
+                                        BatchUse(
+                                            batch = batch,
+                                            quantity = used
+                                        )
+
+                                    remaining -= used
+                                }
+
+                                require(remaining == 0)
+
+                                val totalCost =
+                                    allocations.sumOf {
+                                        it.quantity *
+                                            it.batch.purchasePrice
+                                    }
+
+                                val unitCost =
+                                    totalCost /
+                                        input.quantity.toDouble()
+
+                                ResolvedLine(
+                                    input = input,
+                                    product = product,
+                                    allocations = allocations,
+                                    unitCost = unitCost,
+                                    lineTotal =
+                                        input.quantity *
+                                            input.unitPrice
+                                )
+                            }
+
+                        val subtotal =
+                            resolvedLines.sumOf {
+                                it.lineTotal
+                            }
+
+                        require(subtotal.isFinite()) {
+                            "Sale total is invalid"
+                        }
+
+                        require(
+                            discount <=
+                                subtotal + 0.0001
+                        ) {
+                            "Discount exceeds subtotal"
+                        }
+
+                        val total =
+                            (
+                                subtotal -
+                                    discount
+                            ).coerceAtLeast(0.0)
+
+                        require(
+                            paid <=
+                                total + 0.0001
+                        ) {
+                            "Paid amount exceeds total"
+                        }
+
+                        val finalPaid =
+                            paid.coerceAtMost(total)
+
+                        val status =
+                            when {
+                                total <= 0.0001 ->
+                                    "PAID"
+
+                                finalPaid >=
+                                    total - 0.0001 ->
+                                    "PAID"
+
+                                finalPaid > 0.0001 ->
+                                    "PARTIAL"
+
+                                else ->
+                                    "DUE"
+                            }
+
+                        val requestedInvoice =
+                            invoiceNo.trim()
+
+                        val finalInvoiceNo =
+                            if (requestedInvoice.isNotBlank()) {
+                                require(
+                                    dao.retailInvoiceNumberCount(
+                                        workspace =
+                                            currentWorkspace,
+                                        businessKey =
+                                            currentBusinessKey,
+                                        invoiceNo =
+                                            requestedInvoice
+                                    ) == 0
+                                ) {
+                                    "Invoice number already exists"
+                                }
+
+                                requestedInvoice
+                            } else {
+                                var candidate =
+                                    "R-$soldAt"
+
+                                var suffix = 1
+
+                                while (
+                                    dao.retailInvoiceNumberCount(
+                                        workspace =
+                                            currentWorkspace,
+                                        businessKey =
+                                            currentBusinessKey,
+                                        invoiceNo =
+                                            candidate
+                                    ) > 0
+                                ) {
+                                    candidate =
+                                        "R-$soldAt-$suffix"
+                                    suffix++
+                                }
+
+                                candidate
+                            }
+
+                        val createdSaleId =
+                            dao.insertRetailSale(
+                                RetailSaleEntity(
+                                    invoiceNo =
+                                        finalInvoiceNo,
+                                    bakiPersonId =
+                                        bakiPersonId
+                                            ?.takeIf {
+                                                it > 0L
+                                            },
+                                    customerName =
+                                        customerName.trim(),
+                                    customerPhone =
+                                        customerPhone.trim(),
+                                    subtotal = subtotal,
+                                    discount = discount,
+                                    total = total,
+                                    paid = finalPaid,
+                                    paymentMethod =
+                                        paymentMethod
+                                            .trim()
+                                            .uppercase()
+                                            .ifBlank {
+                                                "CASH"
+                                            },
+                                    status = status,
+                                    note = note.trim(),
+                                    workspace =
+                                        currentWorkspace,
+                                    businessKey =
+                                        currentBusinessKey,
+                                    soldAt = soldAt
+                                )
+                            )
+
+                        require(createdSaleId > 0L)
+
+                        for (resolved in resolvedLines) {
+                            val lineId =
+                                dao.insertRetailSaleLine(
+                                    RetailSaleLineEntity(
+                                        saleId =
+                                            createdSaleId,
+                                        productId =
+                                            resolved.product.id,
+                                        productNameSnapshot =
+                                            resolved.product.name,
+                                        skuSnapshot =
+                                            resolved.product.sku,
+                                        unitSnapshot =
+                                            resolved.product.unit,
+                                        quantity =
+                                            resolved.input.quantity,
+                                        unitPrice =
+                                            resolved.input.unitPrice,
+                                        unitCost =
+                                            resolved.unitCost,
+                                        lineTotal =
+                                            resolved.lineTotal
+                                    )
+                                )
+
+                            require(lineId > 0L)
+
+                            for (
+                                allocation in
+                                resolved.allocations
+                            ) {
+                                dao.updateBatchQuantity(
+                                    batchId =
+                                        allocation.batch.id,
+                                    quantity =
+                                        allocation.batch.quantity -
+                                            allocation.quantity
+                                )
+
+                                val allocationId =
+                                    dao.insertRetailSaleStockAllocation(
+                                        RetailSaleStockAllocationEntity(
+                                            saleLineId =
+                                                lineId,
+                                            batchId =
+                                                allocation.batch.id,
+                                            quantity =
+                                                allocation.quantity,
+                                            unitCost =
+                                                allocation.batch
+                                                    .purchasePrice
+                                        )
+                                    )
+
+                                require(allocationId > 0L)
+                            }
+                        }
+
+                        createdSaleId
+                    }
+                }.getOrNull()
+
+            onDone(saleId)
         }
     }
 

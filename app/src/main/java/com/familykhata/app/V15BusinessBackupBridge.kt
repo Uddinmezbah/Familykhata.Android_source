@@ -118,6 +118,11 @@ object V15BusinessBackupBridge {
                     "dealership_payments",
                     "dealership_returns",
 
+                    // Retail sales
+                    "retail_sales",
+                    "retail_sale_lines",
+                    "retail_sale_stock_allocations",
+
                     // Dealer Business
                     "dealer_business_companies",
                     "dealer_business_areas",

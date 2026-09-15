@@ -116,9 +116,12 @@ import com.familykhata.app.production.ProductionItemRoleEntity
         FoodOrderEntity::class,
         FoodOrderLineEntity::class,
         FoodStockAllocationEntity::class,
-        FoodPaymentEntity::class
+        FoodPaymentEntity::class,
+        RetailSaleEntity::class,
+        RetailSaleLineEntity::class,
+        RetailSaleStockAllocationEntity::class
     ],
-    version = 12,
+    version = 13,
     exportSchema = false
 )
 abstract class InventoryDatabase : RoomDatabase() {
@@ -2302,6 +2305,119 @@ abstract class InventoryDatabase : RoomDatabase() {
                 }
             }
 
+
+        private val MIGRATION_12_13 =
+            object : Migration(
+                12,
+                13
+            ) {
+                override fun migrate(
+                    db: SupportSQLiteDatabase
+                ) {
+                    val statements =
+                        listOf(
+                            """
+                            CREATE TABLE IF NOT EXISTS
+                            `retail_sales` (
+                                `id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+                                `invoiceNo` TEXT NOT NULL,
+                                `bakiPersonId` INTEGER,
+                                `customerName` TEXT NOT NULL,
+                                `customerPhone` TEXT NOT NULL,
+                                `subtotal` REAL NOT NULL,
+                                `discount` REAL NOT NULL,
+                                `total` REAL NOT NULL,
+                                `paid` REAL NOT NULL,
+                                `paymentMethod` TEXT NOT NULL,
+                                `status` TEXT NOT NULL,
+                                `note` TEXT NOT NULL,
+                                `workspace` TEXT NOT NULL,
+                                `businessKey` TEXT NOT NULL,
+                                `soldAt` INTEGER NOT NULL,
+                                `createdAt` INTEGER NOT NULL
+                            )
+                            """,
+                            """
+                            CREATE INDEX IF NOT EXISTS
+                            `index_retail_sales_workspace_businessKey_soldAt`
+                            ON `retail_sales`
+                            (`workspace`, `businessKey`, `soldAt`)
+                            """,
+                            """
+                            CREATE UNIQUE INDEX IF NOT EXISTS
+                            `index_retail_sales_workspace_businessKey_invoiceNo`
+                            ON `retail_sales`
+                            (`workspace`, `businessKey`, `invoiceNo`)
+                            """,
+                            """
+                            CREATE TABLE IF NOT EXISTS
+                            `retail_sale_lines` (
+                                `id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+                                `saleId` INTEGER NOT NULL,
+                                `productId` INTEGER NOT NULL,
+                                `productNameSnapshot` TEXT NOT NULL,
+                                `skuSnapshot` TEXT NOT NULL,
+                                `unitSnapshot` TEXT NOT NULL,
+                                `quantity` INTEGER NOT NULL,
+                                `unitPrice` REAL NOT NULL,
+                                `unitCost` REAL NOT NULL,
+                                `lineTotal` REAL NOT NULL,
+                                `createdAt` INTEGER NOT NULL,
+                                FOREIGN KEY(`saleId`)
+                                    REFERENCES `retail_sales`(`id`)
+                                    ON UPDATE NO ACTION
+                                    ON DELETE CASCADE
+                            )
+                            """,
+                            """
+                            CREATE INDEX IF NOT EXISTS
+                            `index_retail_sale_lines_saleId`
+                            ON `retail_sale_lines`
+                            (`saleId`)
+                            """,
+                            """
+                            CREATE INDEX IF NOT EXISTS
+                            `index_retail_sale_lines_productId`
+                            ON `retail_sale_lines`
+                            (`productId`)
+                            """,
+                            """
+                            CREATE TABLE IF NOT EXISTS
+                            `retail_sale_stock_allocations` (
+                                `id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+                                `saleLineId` INTEGER NOT NULL,
+                                `batchId` INTEGER NOT NULL,
+                                `quantity` INTEGER NOT NULL,
+                                `unitCost` REAL NOT NULL,
+                                `createdAt` INTEGER NOT NULL,
+                                FOREIGN KEY(`saleLineId`)
+                                    REFERENCES `retail_sale_lines`(`id`)
+                                    ON UPDATE NO ACTION
+                                    ON DELETE CASCADE
+                            )
+                            """,
+                            """
+                            CREATE INDEX IF NOT EXISTS
+                            `index_retail_sale_stock_allocations_saleLineId`
+                            ON `retail_sale_stock_allocations`
+                            (`saleLineId`)
+                            """,
+                            """
+                            CREATE INDEX IF NOT EXISTS
+                            `index_retail_sale_stock_allocations_batchId`
+                            ON `retail_sale_stock_allocations`
+                            (`batchId`)
+                            """
+                        )
+
+                    statements.forEach {
+                        db.execSQL(
+                            it.trimIndent()
+                        )
+                    }
+                }
+            }
+
         fun get(context: Context): InventoryDatabase = INSTANCE ?: synchronized(this) {
             INSTANCE ?: Room.databaseBuilder(
                 context.applicationContext,
@@ -2319,7 +2435,8 @@ abstract class InventoryDatabase : RoomDatabase() {
                     MIGRATION_8_9,
                     MIGRATION_9_10,
                     MIGRATION_10_11,
-                    MIGRATION_11_12
+                    MIGRATION_11_12,
+                    MIGRATION_12_13
                 )
                 .build()
                 .also { INSTANCE = it }

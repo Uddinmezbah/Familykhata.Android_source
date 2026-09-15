@@ -2725,7 +2725,8 @@ private fun DealershipInvoiceLedger(
                             v15Text(
                                 "ড্যামেজ পণ্য বিক্রয়যোগ্য স্টকে ফেরত যাবে না।",
                                 "Damaged items will not return to sellable stock."
-                            ),
+                            )
+                        },
                         style =
                             MaterialTheme.typography.bodySmall
                     )

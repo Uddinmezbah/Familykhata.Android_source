@@ -31,6 +31,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
+import com.familykhata.app.FamilyKhataViewModel
 import com.familykhata.app.data.ProductEntity
 import com.familykhata.app.dealerbusiness.DealerAreaEntity
 import com.familykhata.app.dealerbusiness.DealerBusinessViewModel
@@ -7063,9 +7064,6 @@ private fun DealerDeliveryChallanDialog(
     packs:
         List<DealerProductPackEntity>,
     onDismiss: () -> Unit,
-    onDelete: (
-        DealerProductPackEntity
-    ) -> Unit,
     onSave: (
         Long,
         String,
@@ -8350,6 +8348,9 @@ private fun DealerPackSetupDialog(
     packs:
         List<DealerProductPackEntity>,
     onDismiss: () -> Unit,
+    onDelete: (
+        DealerProductPackEntity
+    ) -> Unit,
     onSave: (
         Long,
         Int,

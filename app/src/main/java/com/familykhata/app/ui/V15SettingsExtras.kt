@@ -1,5 +1,7 @@
 package com.familykhata.app.ui
 
+import com.familykhata.app.FamilyKhataViewModel
+
 import android.Manifest
 import android.app.Activity
 import android.content.Context
@@ -127,6 +129,7 @@ private val V15_SHOP_TYPES = listOf(
 
 @Composable
 internal fun V15BusinessProfileDialog(
+    viewModel: FamilyKhataViewModel,
     initialName: String,
     initialBusiness: String,
     initialPhone: String,
@@ -153,6 +156,7 @@ internal fun V15BusinessProfileDialog(
     var logoPath by remember { mutableStateOf(initialLogoPath) }
 
     var showTypePicker by remember { mutableStateOf(false) }
+    var showLogoDelete by remember { mutableStateOf(false) }
 
     val logoLauncher =
         rememberLauncherForActivityResult(
@@ -230,10 +234,7 @@ internal fun V15BusinessProfileDialog(
                 if (logoPath.isNotBlank()) {
                     TextButton(
                         onClick = {
-                            runCatching {
-                                File(logoPath).delete()
-                            }
-                            logoPath = ""
+                            showLogoDelete = true
                         }
                     ) {
                         Text(
@@ -347,6 +348,34 @@ internal fun V15BusinessProfileDialog(
             onSelect = {
                 businessType = it
                 showTypePicker = false
+            }
+        )
+    }
+
+    if (showLogoDelete) {
+        ProtectedDeleteDialog(
+            viewModel = viewModel,
+            title = v15Text(
+                "লোগো সরাবেন?",
+                "Remove logo?"
+            ),
+            message = v15Text(
+                "লোগোটি ডিভাইস থেকে মুছে যাবে। চালিয়ে যেতে নিরাপত্তা PIN দিন।",
+                "The logo will be deleted from this device. Enter your security PIN to continue."
+            ),
+            confirmLabel = v15Text(
+                "লোগো সরান",
+                "Remove logo"
+            ),
+            onDismiss = {
+                showLogoDelete = false
+            },
+            onConfirmed = {
+                runCatching {
+                    File(logoPath).delete()
+                }
+                logoPath = ""
+                showLogoDelete = false
             }
         )
     }
@@ -652,6 +681,7 @@ internal fun V15InventoryNotificationSettingsDialog(
             }
         }
     )
+
 }
 
 @Composable
@@ -872,7 +902,7 @@ internal fun V15PremiumDialog(
                         "✓ Low-stock & expiry alerts"
                     ),
                     "✓ Backup / Restore / Report",
-                    "✓ PIN lock",
+                    "✓ Delete protection PIN",
                     v15Text(
                         "✓ বাংলা + English",
                         "✓ Bangla + English"

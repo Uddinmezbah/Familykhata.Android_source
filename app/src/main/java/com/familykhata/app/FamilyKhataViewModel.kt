@@ -69,9 +69,6 @@ class FamilyKhataViewModel(application: Application) : AndroidViewModel(applicat
     )
     val isPinConfigured: StateFlow<Boolean> = _isPinConfigured.asStateFlow()
 
-    private val _isAppUnlocked = MutableStateFlow(!_isPinConfigured.value)
-    val isAppUnlocked: StateFlow<Boolean> = _isAppUnlocked.asStateFlow()
-
     private val allowedWorkspaces = setOf("PERSONAL", "FAMILY", "SHOP")
     private val _selectedWorkspace = MutableStateFlow(
         preferences.getString("selected_workspace", "FAMILY")
@@ -371,18 +368,12 @@ class FamilyKhataViewModel(application: Application) : AndroidViewModel(applicat
             .putString("pin_hash", hashPin(pin, salt))
             .apply()
         _isPinConfigured.value = true
-        _isAppUnlocked.value = true
         return true
     }
 
     fun verifyPin(pin: String): Boolean {
-        if (!_isPinConfigured.value) {
-            _isAppUnlocked.value = true
-            return true
-        }
-        val ok = matchesStoredPin(pin)
-        if (ok) _isAppUnlocked.value = true
-        return ok
+        if (!_isPinConfigured.value) return false
+        return matchesStoredPin(pin)
     }
 
     fun changePin(currentPin: String, newPin: String): Boolean {
@@ -393,23 +384,7 @@ class FamilyKhataViewModel(application: Application) : AndroidViewModel(applicat
             .putString("pin_hash", hashPin(newPin, salt))
             .apply()
         _isPinConfigured.value = true
-        _isAppUnlocked.value = true
         return true
-    }
-
-    fun disablePin(currentPin: String): Boolean {
-        if (!matchesStoredPin(currentPin)) return false
-        preferences.edit()
-            .remove("pin_salt")
-            .remove("pin_hash")
-            .apply()
-        _isPinConfigured.value = false
-        _isAppUnlocked.value = true
-        return true
-    }
-
-    fun lockApp() {
-        if (_isPinConfigured.value) _isAppUnlocked.value = false
     }
 
     private fun matchesStoredPin(pin: String): Boolean {

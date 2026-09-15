@@ -110,8 +110,11 @@ internal fun TrialLockedMessage() {
 }
 
 @Composable
-internal fun AppLockScreen(viewModel: FamilyKhataViewModel) {
+internal fun RequiredPinSetupScreen(
+    viewModel: FamilyKhataViewModel
+) {
     var pin by remember { mutableStateOf("") }
+    var confirmPin by remember { mutableStateOf("") }
     var error by remember { mutableStateOf<String?>(null) }
 
     Surface(
@@ -125,42 +128,92 @@ internal fun AppLockScreen(viewModel: FamilyKhataViewModel) {
             verticalArrangement = Arrangement.Center,
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
-            Surface(
-                shape = RoundedCornerShape(24.dp),
-                color = MaterialTheme.colorScheme.primaryContainer
-            ) {
-                Text(
-                    "৳",
-                    modifier = Modifier.padding(horizontal = 22.dp, vertical = 14.dp),
-                    style = MaterialTheme.typography.headlineLarge,
-                    fontWeight = FontWeight.ExtraBold,
-                    color = MaterialTheme.colorScheme.primary
-                )
-            }
-            Spacer(Modifier.height(18.dp))
             Text(
-                v15Text("হিসাবী খাতা লক করা আছে","Hisabi Khata is locked"),
+                "🔐",
+                style = MaterialTheme.typography.displaySmall
+            )
+
+            Spacer(Modifier.height(18.dp))
+
+            Text(
+                v15Text(
+                    "নিরাপত্তা PIN সেট করুন",
+                    "Set security PIN"
+                ),
                 style = MaterialTheme.typography.headlineSmall,
                 fontWeight = FontWeight.ExtraBold
             )
+
             Text(
-                v15Text("আপনার ৪–৬ সংখ্যার PIN লিখুন","Enter your 4–6 digit PIN"),
-                modifier = Modifier.padding(top = 6.dp, bottom = 14.dp),
+                v15Text(
+                    "অ্যাপ ব্যবহার শুরু করার আগে ৪–৬ সংখ্যার PIN সেট করুন। গুরুত্বপূর্ণ তথ্য ডিলিট করার সময় এই PIN লাগবে।",
+                    "Set a 4–6 digit PIN before using the app. This PIN will be required when deleting important data."
+                ),
+                modifier = Modifier.padding(
+                    top = 6.dp,
+                    bottom = 14.dp
+                ),
                 style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                textAlign = TextAlign.Center
             )
+
             OutlinedTextField(
                 value = pin,
                 onValueChange = { value ->
-                    pin = value.filter { ch -> ch.isDigit() }.take(6)
+                    pin = value
+                        .filter { it.isDigit() }
+                        .take(6)
                     error = null
                 },
                 modifier = Modifier.fillMaxWidth(),
-                label = { Text("PIN") },
+                label = {
+                    Text(
+                        v15Text(
+                            "নতুন PIN",
+                            "New PIN"
+                        )
+                    )
+                },
                 singleLine = true,
-                visualTransformation = PasswordVisualTransformation(),
-                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.NumberPassword)
+                visualTransformation =
+                    PasswordVisualTransformation(),
+                keyboardOptions =
+                    KeyboardOptions(
+                        keyboardType =
+                            KeyboardType.NumberPassword
+                    )
             )
+
+            OutlinedTextField(
+                value = confirmPin,
+                onValueChange = { value ->
+                    confirmPin = value
+                        .filter { it.isDigit() }
+                        .take(6)
+                    error = null
+                },
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(top = 10.dp),
+                label = {
+                    Text(
+                        v15Text(
+                            "PIN আবার লিখুন",
+                            "Confirm PIN"
+                        )
+                    )
+                },
+                singleLine = true,
+                visualTransformation =
+                    PasswordVisualTransformation(),
+                keyboardOptions =
+                    KeyboardOptions(
+                        keyboardType =
+                            KeyboardType.NumberPassword
+                    )
+            )
+
             error?.let {
                 Text(
                     it,
@@ -169,22 +222,51 @@ internal fun AppLockScreen(viewModel: FamilyKhataViewModel) {
                     style = MaterialTheme.typography.bodySmall
                 )
             }
+
             Button(
                 onClick = {
-                    if (!viewModel.verifyPin(pin)) {
-                        error = v15Text("PIN সঠিক নয়","Incorrect PIN")
-                        pin = ""
+                    error = when {
+                        pin.length !in 4..6 ->
+                            v15Text(
+                                "PIN ৪–৬ সংখ্যার হতে হবে",
+                                "PIN must be 4–6 digits"
+                            )
+
+                        pin != confirmPin ->
+                            v15Text(
+                                "দুইটি PIN মিলছে না",
+                                "PINs do not match"
+                            )
+
+                        !viewModel.setPin(pin) ->
+                            v15Text(
+                                "PIN সেট করা যায়নি",
+                                "Unable to set PIN"
+                            )
+
+                        else -> null
                     }
                 },
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(top = 12.dp),
-                enabled = pin.length in 4..6
+                    .padding(top = 14.dp),
+                enabled =
+                    pin.length in 4..6 &&
+                        confirmPin.length in 4..6
             ) {
-                Text(v15Text("আনলক করুন","Unlock"))
+                Text(
+                    v15Text(
+                        "PIN সেভ করে শুরু করুন",
+                        "Save PIN and continue"
+                    )
+                )
             }
+
             Text(
-                v15Text("PIN আপনার ডিভাইসেই সুরক্ষিতভাবে hash আকারে রাখা হয়। PIN মনে রাখুন।","Your PIN is stored securely on this device as a hash. Please remember it."),
+                v15Text(
+                    "অ্যাপ খুলতে PIN লাগবে না। ডাটা ডিলিট করার সময় এই PIN প্রয়োজন হবে।",
+                    "You will not need the PIN to open the app. It will be required when deleting data."
+                ),
                 modifier = Modifier.padding(top = 12.dp),
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
@@ -206,7 +288,6 @@ internal fun CommercialToolsSection(viewModel: FamilyKhataViewModel) {
     var reportFileName by remember { mutableStateOf<String?>(null) }
     var showSetPin by remember { mutableStateOf(false) }
     var showChangePin by remember { mutableStateOf(false) }
-    var showDisablePin by remember { mutableStateOf(false) }
 
     val createReportFile = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.CreateDocument("text/csv")
@@ -316,37 +397,48 @@ internal fun CommercialToolsSection(viewModel: FamilyKhataViewModel) {
             verticalArrangement = Arrangement.spacedBy(8.dp)
         ) {
             Text(
-                if (pinConfigured) v15Text("PIN App Lock চালু আছে","PIN App Lock is enabled") else v15Text("PIN App Lock বন্ধ আছে","PIN App Lock is disabled"),
+                if (pinConfigured) {
+                    v15Text(
+                        "ডিলিট সুরক্ষা PIN চালু আছে",
+                        "Delete protection PIN is enabled"
+                    )
+                } else {
+                    v15Text(
+                        "নিরাপত্তা PIN সেট করা প্রয়োজন",
+                        "Security PIN setup required"
+                    )
+                },
                 fontWeight = FontWeight.Bold
             )
             Text(
-                if (pinConfigured) v15Text("অ্যাপ পুনরায় চালু হলে PIN দিয়ে খুলতে হবে। চাইলে এখনই লক করতে পারেন।","You will need the PIN when reopening the app. You can lock it now.")
-                else v15Text("৪–৬ সংখ্যার PIN দিয়ে আপনার হিসাব অন্যের কাছ থেকে সুরক্ষিত রাখুন।","Protect your accounts with a 4–6 digit PIN."),
+                if (pinConfigured) {
+                    v15Text(
+                        "গুরুত্বপূর্ণ ডাটা ডিলিট করার সময় PIN দিতে হবে। অ্যাপ খুলতে PIN লাগবে না।",
+                        "PIN is required when deleting important data. It is not required to open the app."
+                    )
+                } else {
+                    v15Text(
+                        "ডাটা ডিলিট সুরক্ষিত রাখতে ৪–৬ সংখ্যার PIN সেট করুন।",
+                        "Set a 4–6 digit PIN to protect data deletion."
+                    )
+                },
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
+
             if (!pinConfigured) {
                 Button(
                     onClick = { showSetPin = true },
                     modifier = Modifier.fillMaxWidth()
-                ) { Text(v15Text("PIN সেট করুন","Set PIN")) }
-            } else {
-                Button(
-                    onClick = { viewModel.lockApp() },
-                    modifier = Modifier.fillMaxWidth()
-                ) { Text(v15Text("এখনই অ্যাপ লক করুন","Lock app now")) }
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
-                    OutlinedButton(
-                        onClick = { showChangePin = true },
-                        modifier = Modifier.weight(1f)
-                    ) { Text(v15Text("PIN বদলান","Change PIN")) }
-                    OutlinedButton(
-                        onClick = { showDisablePin = true },
-                        modifier = Modifier.weight(1f)
-                    ) { Text(v15Text("PIN বন্ধ","Disable PIN")) }
+                    Text(v15Text("PIN সেট করুন","Set PIN"))
+                }
+            } else {
+                OutlinedButton(
+                    onClick = { showChangePin = true },
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Text(v15Text("PIN পরিবর্তন করুন","Change PIN"))
                 }
             }
         }
@@ -360,7 +452,7 @@ internal fun CommercialToolsSection(viewModel: FamilyKhataViewModel) {
                 val ok = viewModel.setPin(pin)
                 if (ok) {
                     showSetPin = false
-                    commercialToast(context, v15Text("PIN App Lock চালু হয়েছে","PIN App Lock enabled"))
+                    commercialToast(context, v15Text("নিরাপত্তা PIN সেট হয়েছে","Security PIN set"))
                 }
                 ok
             }
@@ -381,21 +473,6 @@ internal fun CommercialToolsSection(viewModel: FamilyKhataViewModel) {
         )
     }
 
-    if (showDisablePin) {
-        CurrentPinDialog(
-            title = v15Text("PIN App Lock বন্ধ করবেন?","Disable PIN App Lock?"),
-            actionLabel = v15Text("PIN বন্ধ করুন","Disable PIN"),
-            onDismiss = { showDisablePin = false },
-            onConfirm = { currentPin ->
-                val ok = viewModel.disablePin(currentPin)
-                if (ok) {
-                    showDisablePin = false
-                    commercialToast(context, v15Text("PIN App Lock বন্ধ হয়েছে","PIN App Lock disabled"))
-                }
-                ok
-            }
-        )
-    }
 }
 
 @Composable

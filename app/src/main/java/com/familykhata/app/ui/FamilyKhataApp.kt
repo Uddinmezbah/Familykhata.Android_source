@@ -96,7 +96,7 @@ fun FamilyKhataApp(viewModel: FamilyKhataViewModel) {
     var historyFilterPreset by remember { mutableStateOf("ALL") }
     val workspace by viewModel.selectedWorkspace.collectAsState()
     val trialStatus by viewModel.trialStatus.collectAsState()
-    val isAppUnlocked by viewModel.isAppUnlocked.collectAsState()
+    val isPinConfigured by viewModel.isPinConfigured.collectAsState()
     val appContext = LocalContext.current
 
     val premiumBillingManager =
@@ -151,8 +151,8 @@ fun FamilyKhataApp(viewModel: FamilyKhataViewModel) {
     HisabiKhataTheme {
         if (V15LanguageState.languageCode == null) {
             LanguageOnboardingScreen()
-        } else if (!isAppUnlocked) {
-            AppLockScreen(viewModel)
+        } else if (!isPinConfigured) {
+            RequiredPinSetupScreen(viewModel)
         } else if (showSettingsMenu) {
             V14SettingsScreen(
                 viewModel = viewModel,

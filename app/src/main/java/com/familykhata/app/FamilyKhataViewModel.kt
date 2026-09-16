@@ -511,7 +511,7 @@ class FamilyKhataViewModel(application: Application) : AndroidViewModel(applicat
 
                 JSONObject().apply {
                     put("format", "hisabi-khata-backup")
-                    put("version", 5)
+                    put("version", 6)
                     put("createdAt", System.currentTimeMillis())
                     put("transactions", JSONArray().apply {
                         transactions.forEach { item ->
@@ -547,7 +547,12 @@ class FamilyKhataViewModel(application: Application) : AndroidViewModel(applicat
                                 put("amount", entry.amount)
                                 put("balanceDelta", entry.balanceDelta)
                                 put("note", entry.note)
-                                if (entry.dueAt != null) put("dueAt", entry.dueAt)
+                                if (entry.dueAt != null) {
+                                    put("dueAt", entry.dueAt)
+                                }
+                                if (entry.sourceKey != null) {
+                                    put("sourceKey", entry.sourceKey)
+                                }
                                 put("createdAt", entry.createdAt)
                             })
                         }
@@ -624,7 +629,7 @@ class FamilyKhataViewModel(application: Application) : AndroidViewModel(applicat
                     "এটি হিসাবী খাতার সঠিক ব্যাকআপ ফাইল নয়"
                 }
                 val backupVersion = root.optInt("version")
-                require(backupVersion in 1..5) {
+                require(backupVersion in 1..6) {
                     "এই ব্যাকআপ ভার্সনটি এখনো সমর্থিত নয়"
                 }
 
@@ -698,9 +703,44 @@ class FamilyKhataViewModel(application: Application) : AndroidViewModel(applicat
                         amount = amount,
                         balanceDelta = delta,
                         note = item.optString("note", ""),
-                        dueAt = item.optLong("dueAt", 0L).takeIf { it > 0L },
-                        createdAt = item.optLong("createdAt", System.currentTimeMillis())
+                        dueAt =
+                            item.optLong(
+                                "dueAt",
+                                0L
+                            ).takeIf {
+                                it > 0L
+                            },
+                        sourceKey =
+                            if (
+                                backupVersion >= 6
+                            ) {
+                                item.optString(
+                                    "sourceKey",
+                                    ""
+                                ).trim().takeIf {
+                                    it.isNotEmpty()
+                                }
+                            } else {
+                                null
+                            },
+                        createdAt =
+                            item.optLong(
+                                "createdAt",
+                                System.currentTimeMillis()
+                            )
                     )
+                }
+
+                val restoredSourceKeys =
+                    entries.mapNotNull {
+                        it.sourceKey
+                    }
+
+                require(
+                    restoredSourceKeys.size ==
+                        restoredSourceKeys.toSet().size
+                ) {
+                    "ব্যাকআপে একই sourceKey একাধিকবার আছে"
                 }
 
                 if (backupVersion >= 3) {

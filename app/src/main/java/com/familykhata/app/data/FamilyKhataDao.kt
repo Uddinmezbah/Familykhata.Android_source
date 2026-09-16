@@ -62,6 +62,33 @@ interface FamilyKhataDao {
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertBakiEntry(entry: BakiEntryEntity)
 
+    @Insert(onConflict = OnConflictStrategy.IGNORE)
+    suspend fun insertBakiEntryIgnore(
+        entry: BakiEntryEntity
+    ): Long
+
+    @Query(
+        """
+        SELECT *
+        FROM baki_entries
+        WHERE sourceKey = :sourceKey
+        LIMIT 1
+        """
+    )
+    suspend fun getBakiEntryBySourceKey(
+        sourceKey: String
+    ): BakiEntryEntity?
+
+    @Query(
+        """
+        DELETE FROM baki_entries
+        WHERE sourceKey = :sourceKey
+        """
+    )
+    suspend fun deleteBakiEntryBySourceKey(
+        sourceKey: String
+    ): Int
+
     @Delete
     suspend fun deleteBakiEntry(entry: BakiEntryEntity)
 

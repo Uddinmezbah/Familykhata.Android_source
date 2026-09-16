@@ -37,7 +37,13 @@ data class BakiPersonEntity(
             onDelete = ForeignKey.CASCADE
         )
     ],
-    indices = [Index("personId")]
+    indices = [
+        Index("personId"),
+        Index(
+            value = ["sourceKey"],
+            unique = true
+        )
+    ]
 )
 data class BakiEntryEntity(
     @PrimaryKey(autoGenerate = true) val id: Long = 0,
@@ -47,6 +53,7 @@ data class BakiEntryEntity(
     val balanceDelta: Double,
     val note: String = "",
     val dueAt: Long? = null,
+    val sourceKey: String? = null,
     val createdAt: Long = System.currentTimeMillis()
 )
 

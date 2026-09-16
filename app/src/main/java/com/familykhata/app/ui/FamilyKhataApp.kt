@@ -907,6 +907,11 @@ private fun BusinessDashboard(
             mutableStateOf(false)
         }
 
+    var showDigitalServiceMode by
+        remember {
+            mutableStateOf<String?>(null)
+        }
+
     val activeFinancialAccounts =
         financialAccounts.filter {
             it.isActive
@@ -1147,6 +1152,47 @@ private fun BusinessDashboard(
             horizontalArrangement = Arrangement.spacedBy(10.dp)
         ) {
             BusinessActionCard(
+                symbol = "↗",
+                title = v15Text(
+                    "এজেন্ট ক্যাশ আউট",
+                    "Agent Cash Out"
+                ),
+                subtitle = v15Text(
+                    "Cash → Wallet • লাভ আলাদা",
+                    "Cash → Wallet • profit tracked"
+                ),
+                accentColor = ShopAccent,
+                modifier = Modifier.weight(1f),
+                onClick = {
+                    showDigitalServiceMode =
+                        "AGENT_CASH_OUT"
+                }
+            )
+
+            BusinessActionCard(
+                symbol = "R",
+                title = v15Text(
+                    "মোবাইল রিচার্জ",
+                    "Mobile Recharge"
+                ),
+                subtitle = v15Text(
+                    "রিচার্জ • কমিশন/লাভ",
+                    "Recharge • commission/profit"
+                ),
+                accentColor = IncomeAccent,
+                modifier = Modifier.weight(1f),
+                onClick = {
+                    showDigitalServiceMode =
+                        "MOBILE_RECHARGE"
+                }
+            )
+        }
+
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(10.dp)
+        ) {
+            BusinessActionCard(
                 symbol = "৳",
                 title = v15Text("খাতা", "Ledger"),
                 subtitle = v15Text("কাস্টমার/সাপ্লায়ার", "Customer/Supplier"),
@@ -1197,6 +1243,21 @@ private fun BusinessDashboard(
             onDismiss = {
                 showFinancialAccounts =
                     false
+            }
+        )
+    }
+
+    showDigitalServiceMode?.let {
+            initialMode ->
+
+        V16DigitalServicesDialog(
+            viewModel = viewModel,
+            initialMode = initialMode,
+            canWrite =
+                !trialStatus.expired,
+            onDismiss = {
+                showDigitalServiceMode =
+                    null
             }
         )
     }

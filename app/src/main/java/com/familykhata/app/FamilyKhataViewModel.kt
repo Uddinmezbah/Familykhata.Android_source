@@ -534,6 +534,18 @@ class FamilyKhataViewModel(application: Application) : AndroidViewModel(applicat
                                 destination.isActive
                         )
 
+                        if (
+                            serviceType ==
+                                "AGENT_CASH_OUT"
+                        ) {
+                            require(
+                                source.type ==
+                                    "CASH" &&
+                                    destination.type ==
+                                        "MOBILE_WALLET"
+                            )
+                        }
+
                         val available =
                             requireNotNull(
                                 dao.getFinancialAccountBalanceOnce(

@@ -42,6 +42,7 @@ import androidx.core.content.FileProvider
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.familykhata.app.InventoryViewModel
 import com.familykhata.app.RetailSaleLineInput
+import com.familykhata.app.data.BakiPersonSummary
 import com.familykhata.app.data.ProductStockSummary
 import com.familykhata.app.data.RetailSaleEntity
 import com.familykhata.app.report.writeRetailInvoicePdf
@@ -76,6 +77,7 @@ private data class RetailSaleDraft(
     val discount: Double,
     val paid: Double,
     val paymentMethod: String,
+    val bakiPersonId: Long?,
     val customerName: String,
     val customerPhone: String,
     val note: String
@@ -91,6 +93,7 @@ internal fun V16RetailSalesScreen(
     val vm: InventoryViewModel = viewModel()
     val products by vm.products.collectAsState()
     val sales by vm.retailSales.collectAsState()
+    val bakiPeople by vm.bakiPeople.collectAsState()
     val context = LocalContext.current
 
     var showNewSale by remember {
@@ -106,6 +109,18 @@ internal fun V16RetailSalesScreen(
     }
 
     var cancellationBusy by remember {
+        mutableStateOf(false)
+    }
+
+    var collectingSale by remember {
+        mutableStateOf<RetailSaleEntity?>(null)
+    }
+
+    var collectionAmount by remember {
+        mutableStateOf("")
+    }
+
+    var collectionBusy by remember {
         mutableStateOf(false)
     }
 
@@ -313,6 +328,19 @@ internal fun V16RetailSalesScreen(
                             selectedSaleId =
                                 sale.id
                         },
+                        onCollect = {
+                            collectingSale =
+                                sale
+                            collectionAmount =
+                                retailMoney(
+                                    (
+                                        sale.total -
+                                            sale.paid
+                                    ).coerceAtLeast(
+                                        0.0
+                                    )
+                                )
+                        },
                         onCancel = {
                             cancellingSale =
                                 sale
@@ -323,6 +351,164 @@ internal fun V16RetailSalesScreen(
         }
     }
 
+    }
+
+    collectingSale?.let { sale ->
+        val remainingDue =
+            (
+                sale.total -
+                    sale.paid
+            ).coerceAtLeast(
+                0.0
+            )
+
+        AlertDialog(
+            onDismissRequest = {
+                if (!collectionBusy) {
+                    collectingSale = null
+                }
+            },
+            title = {
+                Text(
+                    v15Text(
+                        "বাকি আদায়",
+                        "Collect due"
+                    )
+                )
+            },
+            text = {
+                Column(
+                    verticalArrangement =
+                        Arrangement.spacedBy(
+                            8.dp
+                        )
+                ) {
+                    Text(
+                        v15Text(
+                            "বর্তমান বাকি: ${V14DisplayState.currencySymbol}${retailMoney(remainingDue)}",
+                            "Current due: ${V14DisplayState.currencySymbol}${retailMoney(remainingDue)}"
+                        )
+                    )
+
+                    OutlinedTextField(
+                        value =
+                            collectionAmount,
+                        onValueChange = {
+                            collectionAmount =
+                                it
+                        },
+                        label = {
+                            Text(
+                                v15Text(
+                                    "আদায়ের পরিমাণ",
+                                    "Amount collected"
+                                )
+                            )
+                        },
+                        singleLine = true,
+                        modifier =
+                            Modifier.fillMaxWidth()
+                    )
+                }
+            },
+            confirmButton = {
+                Button(
+                    enabled =
+                        !collectionBusy,
+                    onClick = {
+                        val amount =
+                            collectionAmount
+                                .retailDoubleOrNull()
+
+                        if (
+                            amount == null ||
+                            amount <= 0.0 ||
+                            amount >
+                                remainingDue +
+                                    0.0001
+                        ) {
+                            Toast.makeText(
+                                context,
+                                v15Text(
+                                    "আদায়ের পরিমাণ সঠিক নয়",
+                                    "Invalid collection amount"
+                                ),
+                                Toast.LENGTH_SHORT
+                            ).show()
+
+                            return@Button
+                        }
+
+                        collectionBusy =
+                            true
+
+                        vm.recordRetailSalePayment(
+                            saleId =
+                                sale.id,
+                            amount =
+                                amount
+                        ) { success ->
+                            collectionBusy =
+                                false
+
+                            if (success) {
+                                collectingSale =
+                                    null
+
+                                Toast.makeText(
+                                    context,
+                                    v15Text(
+                                        "বাকি আদায় সংরক্ষণ হয়েছে",
+                                        "Collection saved"
+                                    ),
+                                    Toast.LENGTH_SHORT
+                                ).show()
+                            } else {
+                                Toast.makeText(
+                                    context,
+                                    v15Text(
+                                        "আদায় সংরক্ষণ করা যায়নি",
+                                        "Could not save collection"
+                                    ),
+                                    Toast.LENGTH_LONG
+                                ).show()
+                            }
+                        }
+                    }
+                ) {
+                    Text(
+                        if (collectionBusy) {
+                            v15Text(
+                                "সংরক্ষণ হচ্ছে…",
+                                "Saving…"
+                            )
+                        } else {
+                            v15Text(
+                                "আদায় সংরক্ষণ",
+                                "Save collection"
+                            )
+                        }
+                    )
+                }
+            },
+            dismissButton = {
+                TextButton(
+                    enabled =
+                        !collectionBusy,
+                    onClick = {
+                        collectingSale =
+                            null
+                    }
+                ) {
+                    Text(
+                        v15Text(
+                            "বাতিল",
+                            "Cancel"
+                        )
+                    )
+                }
+            }
+        )
     }
 
     cancellingSale?.let { sale ->
@@ -425,6 +611,7 @@ internal fun V16RetailSalesScreen(
     if (showNewSale) {
         RetailSaleDialog(
             viewModel = vm,
+            bakiPeople = bakiPeople,
             products =
                 products.filter {
                     it.totalStock > 0
@@ -453,6 +640,8 @@ internal fun V16RetailSalesScreen(
                         draft.paid,
                     paymentMethod =
                         draft.paymentMethod,
+                    bakiPersonId =
+                        draft.bakiPersonId,
                     customerName =
                         draft.customerName,
                     customerPhone =
@@ -995,6 +1184,7 @@ private fun RetailSaleCard(
     sale: RetailSaleEntity,
     canWrite: Boolean,
     onOpen: () -> Unit,
+    onCollect: () -> Unit,
     onCancel: () -> Unit
 ) {
     val due =
@@ -1128,6 +1318,25 @@ private fun RetailSaleCard(
 
             if (
                 canWrite &&
+                sale.status != "CANCELLED" &&
+                due > 0.0001
+            ) {
+                OutlinedButton(
+                    onClick = onCollect,
+                    modifier =
+                        Modifier.fillMaxWidth()
+                ) {
+                    Text(
+                        v15Text(
+                            "বাকি আদায়",
+                            "Collect due"
+                        )
+                    )
+                }
+            }
+
+            if (
+                canWrite &&
                 sale.status != "CANCELLED"
             ) {
                 TextButton(
@@ -1148,6 +1357,7 @@ private fun RetailSaleCard(
 @Composable
 private fun RetailSaleDialog(
     viewModel: InventoryViewModel,
+    bakiPeople: List<BakiPersonSummary>,
     products: List<ProductStockSummary>,
     saving: Boolean,
     onDismiss: () -> Unit,
@@ -1162,6 +1372,14 @@ private fun RetailSaleDialog(
     }
 
     var customerPhone by remember {
+        mutableStateOf("")
+    }
+
+    var selectedBakiPersonId by remember {
+        mutableStateOf<Long?>(null)
+    }
+
+    var bakiSearch by remember {
         mutableStateOf("")
     }
 
@@ -1243,6 +1461,19 @@ private fun RetailSaleDialog(
     val paidValue =
         paid.retailDoubleOrNull()
             ?: 0.0
+
+    val filteredBakiPeople =
+        bakiPeople.filter { person ->
+            bakiSearch.isBlank() ||
+                person.name.contains(
+                    bakiSearch,
+                    ignoreCase = true
+                ) ||
+                person.phone.contains(
+                    bakiSearch,
+                    ignoreCase = true
+                )
+        }
 
     val due =
         (
@@ -1895,6 +2126,118 @@ private fun RetailSaleDialog(
                     )
                 }
 
+                if (due > 0.0001) {
+                    Text(
+                        v15Text(
+                            "বাকির খাতা নির্বাচন",
+                            "Select Baki ledger"
+                        ),
+                        fontWeight =
+                            FontWeight.Bold
+                    )
+
+                    Text(
+                        v15Text(
+                            "বাকি বিক্রি হলে একটি বাকির খাতার সাথে যুক্ত করা আবশ্যক।",
+                            "A due sale must be linked to an existing Baki ledger."
+                        ),
+                        style =
+                            MaterialTheme
+                                .typography
+                                .bodySmall,
+                        color =
+                            MaterialTheme
+                                .colorScheme
+                                .onSurfaceVariant
+                    )
+
+                    if (bakiPeople.isEmpty()) {
+                        Text(
+                            v15Text(
+                                "আগে বাকির খাতায় ক্রেতা যোগ করুন, তারপর বাকি বিক্রি সংরক্ষণ করুন।",
+                                "Add the customer to Baki first, then save the due sale."
+                            ),
+                            color =
+                                MaterialTheme
+                                    .colorScheme
+                                    .error,
+                            fontWeight =
+                                FontWeight.SemiBold
+                        )
+                    } else {
+                        OutlinedTextField(
+                            value =
+                                bakiSearch,
+                            onValueChange = {
+                                bakiSearch = it
+                            },
+                            label = {
+                                Text(
+                                    v15Text(
+                                        "নাম / মোবাইল দিয়ে খুঁজুন",
+                                        "Search name / phone"
+                                    )
+                                )
+                            },
+                            singleLine = true,
+                            modifier =
+                                Modifier.fillMaxWidth()
+                        )
+
+                        filteredBakiPeople
+                            .take(10)
+                            .forEach { person ->
+                                OutlinedButton(
+                                    onClick = {
+                                        selectedBakiPersonId =
+                                            person.id
+
+                                        customerName =
+                                            person.name
+
+                                        if (
+                                            person.phone
+                                                .isNotBlank()
+                                        ) {
+                                            customerPhone =
+                                                person.phone
+                                        }
+                                    },
+                                    enabled = !saving,
+                                    modifier =
+                                        Modifier.fillMaxWidth()
+                                ) {
+                                    Text(
+                                        if (
+                                            selectedBakiPersonId ==
+                                            person.id
+                                        ) {
+                                            "✓ ${person.name}"
+                                        } else {
+                                            person.name
+                                        }
+                                    )
+                                }
+                            }
+
+                        if (
+                            filteredBakiPeople.size >
+                            10
+                        ) {
+                            Text(
+                                v15Text(
+                                    "আরও নির্দিষ্ট নাম বা মোবাইল লিখুন।",
+                                    "Type a more specific name or phone number."
+                                ),
+                                style =
+                                    MaterialTheme
+                                        .typography
+                                        .bodySmall
+                            )
+                        }
+                    }
+                }
+
                 OutlinedTextField(
                     value = customerName,
                     onValueChange = {
@@ -2063,6 +2406,25 @@ private fun RetailSaleDialog(
                                 )
                         }
 
+                        (
+                            total -
+                                cleanPaid
+                        ) > 0.0001 &&
+                            (
+                                selectedBakiPersonId ==
+                                    null ||
+                                    bakiPeople.none {
+                                        it.id ==
+                                            selectedBakiPersonId
+                                    }
+                            ) -> {
+                            error =
+                                v15Text(
+                                    "বাকি বিক্রির জন্য বাকির খাতা নির্বাচন করুন।",
+                                    "Select a Baki ledger for the due sale."
+                                )
+                        }
+
                         else -> {
                             error = null
 
@@ -2078,6 +2440,15 @@ private fun RetailSaleDialog(
                                         cleanPaid,
                                     paymentMethod =
                                         paymentMethod,
+                                    bakiPersonId =
+                                        selectedBakiPersonId
+                                            ?.takeIf {
+                                                (
+                                                    total -
+                                                        cleanPaid
+                                                ) >
+                                                    0.0001
+                                            },
                                     customerName =
                                         customerName
                                             .trim(),

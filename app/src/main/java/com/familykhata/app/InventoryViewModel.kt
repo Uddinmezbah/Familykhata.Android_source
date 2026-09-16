@@ -4,6 +4,9 @@ import android.app.Application
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import androidx.room.withTransaction
+import com.familykhata.app.data.AppDatabase
+import com.familykhata.app.data.BakiEntryEntity
+import com.familykhata.app.data.BakiPersonSummary
 import com.familykhata.app.data.InventoryDatabase
 import com.familykhata.app.data.ProductEntity
 import com.familykhata.app.data.ProductUnitConversionEntity
@@ -41,6 +44,8 @@ data class RetailSaleLineInput(
 class InventoryViewModel(application: Application) : AndroidViewModel(application) {
     private val database = InventoryDatabase.get(application)
     private val dao = database.dao()
+    private val bakiDatabase = AppDatabase.get(application)
+    private val bakiDao = bakiDatabase.dao()
     private val workspace =
         MutableStateFlow("SHOP")
 
@@ -79,6 +84,19 @@ class InventoryViewModel(application: Application) : AndroidViewModel(applicatio
                 emptyList()
             )
 
+    val bakiPeople: StateFlow<List<BakiPersonSummary>> =
+        workspace
+            .flatMapLatest { workspaceValue ->
+                bakiDao.observeBakiSummaries(
+                    workspaceValue
+                )
+            }
+            .stateIn(
+                viewModelScope,
+                SharingStarted.WhileSubscribed(5_000),
+                emptyList()
+            )
+
     fun setContext(
         workspaceValue: String,
         shopType: String
@@ -107,6 +125,17 @@ class InventoryViewModel(application: Application) : AndroidViewModel(applicatio
                 workspace = workspaceValue,
                 businessKey = key
             )
+
+            dao.getRetailSalesOnce(
+                workspace = workspaceValue,
+                businessKey = key
+            ).forEach { sale ->
+                runCatching {
+                    reconcileRetailSaleBaki(
+                        sale
+                    )
+                }
+            }
         }
     }
 
@@ -794,6 +823,218 @@ class InventoryViewModel(application: Application) : AndroidViewModel(applicatio
         }
     }
 
+    private fun retailSaleDueSourceKey(
+        saleId: Long
+    ): String =
+        "RETAIL_SALE_DUE:$saleId"
+
+    private fun retailSalePaymentSourceKey(
+        saleId: Long
+    ): String =
+        "RETAIL_SALE_PAYMENT:$saleId"
+
+    private suspend fun reconcileRetailSaleBaki(
+        sale: RetailSaleEntity
+    ) {
+        val dueKey =
+            retailSaleDueSourceKey(
+                sale.id
+            )
+
+        val paymentKey =
+            retailSalePaymentSourceKey(
+                sale.id
+            )
+
+        if (
+            sale.status ==
+            "CANCELLED"
+        ) {
+            bakiDao.deleteBakiEntryBySourceKey(
+                dueKey
+            )
+            bakiDao.deleteBakiEntryBySourceKey(
+                paymentKey
+            )
+            return
+        }
+
+        val personId =
+            sale.bakiPersonId
+
+        if (personId == null) {
+            bakiDao.deleteBakiEntryBySourceKey(
+                dueKey
+            )
+            bakiDao.deleteBakiEntryBySourceKey(
+                paymentKey
+            )
+            return
+        }
+
+        val person =
+            requireNotNull(
+                bakiDao.getStatementPerson(
+                    personId = personId,
+                    workspace = sale.workspace
+                )
+            ) {
+                "Baki person not found"
+            }
+
+        val currentDue =
+            (
+                sale.total -
+                    sale.paid
+            ).coerceAtLeast(
+                0.0
+            )
+
+        var dueEntry =
+            bakiDao.getBakiEntryBySourceKey(
+                dueKey
+            )
+
+        /*
+         * The first successful reconciliation freezes the
+         * original remaining due. Future collections are
+         * represented by one cumulative RECEIVED_BACK entry.
+         */
+        if (
+            dueEntry == null &&
+            currentDue > 0.0001
+        ) {
+            bakiDao.insertBakiEntryIgnore(
+                BakiEntryEntity(
+                    personId = person.id,
+                    action = "GAVE",
+                    amount = currentDue,
+                    balanceDelta = currentDue,
+                    note =
+                        "Retail sale ${sale.invoiceNo}",
+                    sourceKey = dueKey,
+                    createdAt = sale.soldAt
+                )
+            )
+
+            dueEntry =
+                bakiDao.getBakiEntryBySourceKey(
+                    dueKey
+                )
+        }
+
+        /*
+         * A sale that was fully paid from the beginning does
+         * not need to create anything in Baki.
+         */
+        if (dueEntry == null) {
+            bakiDao.deleteBakiEntryBySourceKey(
+                paymentKey
+            )
+            return
+        }
+
+        require(
+            dueEntry.personId ==
+                person.id
+        ) {
+            "Retail sale Baki person mismatch"
+        }
+
+        val originalDue =
+            dueEntry.amount
+
+        require(
+            originalDue > 0.0001
+        ) {
+            "Invalid retail sale due entry"
+        }
+
+        require(
+            currentDue <=
+                originalDue + 0.0001
+        ) {
+            "Retail sale due increased unexpectedly"
+        }
+
+        bakiDao.updateBakiEntry(
+            entryId = dueEntry.id,
+            action = "GAVE",
+            amount = originalDue,
+            balanceDelta = originalDue,
+            note =
+                "Retail sale ${sale.invoiceNo}",
+            dueAt = dueEntry.dueAt
+        )
+
+        val collectedAfterSale =
+            (
+                originalDue -
+                    currentDue
+            ).coerceIn(
+                0.0,
+                originalDue
+            )
+
+        if (
+            collectedAfterSale <=
+            0.0001
+        ) {
+            bakiDao.deleteBakiEntryBySourceKey(
+                paymentKey
+            )
+            return
+        }
+
+        var paymentEntry =
+            bakiDao.getBakiEntryBySourceKey(
+                paymentKey
+            )
+
+        if (paymentEntry == null) {
+            bakiDao.insertBakiEntryIgnore(
+                BakiEntryEntity(
+                    personId = person.id,
+                    action = "RECEIVED_BACK",
+                    amount =
+                        collectedAfterSale,
+                    balanceDelta =
+                        -collectedAfterSale,
+                    note =
+                        "Retail sale payment ${sale.invoiceNo}",
+                    sourceKey =
+                        paymentKey
+                )
+            )
+
+            paymentEntry =
+                bakiDao.getBakiEntryBySourceKey(
+                    paymentKey
+                )
+        }
+
+        paymentEntry?.let { entry ->
+            require(
+                entry.personId ==
+                    person.id
+            ) {
+                "Retail payment Baki person mismatch"
+            }
+
+            bakiDao.updateBakiEntry(
+                entryId = entry.id,
+                action = "RECEIVED_BACK",
+                amount =
+                    collectedAfterSale,
+                balanceDelta =
+                    -collectedAfterSale,
+                note =
+                    "Retail sale payment ${sale.invoiceNo}",
+                dueAt = null
+            )
+        }
+    }
+
     fun createRetailSale(
         invoiceNo: String = "",
         lines: List<RetailSaleLineInput>,
@@ -846,6 +1087,28 @@ class InventoryViewModel(application: Application) : AndroidViewModel(applicatio
         viewModelScope.launch {
             val saleId =
                 runCatching {
+                    val resolvedBakiPersonId =
+                        bakiPersonId
+                            ?.takeIf {
+                                it > 0L
+                            }
+
+                    if (
+                        resolvedBakiPersonId !=
+                        null
+                    ) {
+                        requireNotNull(
+                            bakiDao.getStatementPerson(
+                                personId =
+                                    resolvedBakiPersonId,
+                                workspace =
+                                    currentWorkspace
+                            )
+                        ) {
+                            "Baki person not found"
+                        }
+                    }
+
                     database.withTransaction {
                         data class BatchUse(
                             val batch: StockBatchEntity,
@@ -1102,6 +1365,25 @@ class InventoryViewModel(application: Application) : AndroidViewModel(applicatio
                         val finalPaid =
                             paid.coerceAtMost(total)
 
+                        val remainingDue =
+                            (
+                                total -
+                                    finalPaid
+                            ).coerceAtLeast(
+                                0.0
+                            )
+
+                        if (
+                            remainingDue >
+                            0.0001
+                        ) {
+                            requireNotNull(
+                                resolvedBakiPersonId
+                            ) {
+                                "Baki person required for due sale"
+                            }
+                        }
+
                         val status =
                             when {
                                 total <= 0.0001 ->
@@ -1167,10 +1449,7 @@ class InventoryViewModel(application: Application) : AndroidViewModel(applicatio
                                     invoiceNo =
                                         finalInvoiceNo,
                                     bakiPersonId =
-                                        bakiPersonId
-                                            ?.takeIf {
-                                                it > 0L
-                                            },
+                                        resolvedBakiPersonId,
                                     customerName =
                                         customerName.trim(),
                                     customerPhone =
@@ -1264,7 +1543,143 @@ class InventoryViewModel(application: Application) : AndroidViewModel(applicatio
                     }
                 }.getOrNull()
 
+            saleId?.let { id ->
+                dao.getRetailSaleOnce(
+                    id
+                )?.let { sale ->
+                    runCatching {
+                        reconcileRetailSaleBaki(
+                            sale
+                        )
+                    }
+                }
+            }
+
             onDone(saleId)
+        }
+    }
+
+    fun recordRetailSalePayment(
+        saleId: Long,
+        amount: Double,
+        onDone: (Boolean) -> Unit = {}
+    ) {
+        if (
+            saleId <= 0L ||
+            !amount.isFinite() ||
+            amount <= 0.0
+        ) {
+            onDone(false)
+            return
+        }
+
+        val currentWorkspace =
+            workspace.value
+
+        val currentBusinessKey =
+            businessKey.value
+
+        viewModelScope.launch {
+            val updatedSale =
+                runCatching {
+                    database.withTransaction {
+                        val sale =
+                            requireNotNull(
+                                dao.getRetailSaleOnce(
+                                    saleId
+                                )
+                            ) {
+                                "Sale not found"
+                            }
+
+                        require(
+                            sale.workspace ==
+                                currentWorkspace &&
+                                sale.businessKey ==
+                                    currentBusinessKey
+                        ) {
+                            "Sale context mismatch"
+                        }
+
+                        require(
+                            sale.status !=
+                                "CANCELLED"
+                        ) {
+                            "Cancelled sale"
+                        }
+
+                        val remainingDue =
+                            (
+                                sale.total -
+                                    sale.paid
+                            ).coerceAtLeast(
+                                0.0
+                            )
+
+                        require(
+                            remainingDue >
+                                0.0001
+                        ) {
+                            "Sale is already paid"
+                        }
+
+                        require(
+                            amount <=
+                                remainingDue +
+                                    0.0001
+                        ) {
+                            "Payment exceeds due"
+                        }
+
+                        val newPaid =
+                            (
+                                sale.paid +
+                                    amount
+                            ).coerceAtMost(
+                                sale.total
+                            )
+
+                        val newStatus =
+                            if (
+                                newPaid >=
+                                sale.total -
+                                    0.0001
+                            ) {
+                                "PAID"
+                            } else {
+                                "PARTIAL"
+                            }
+
+                        dao.updateRetailSalePayment(
+                            saleId = sale.id,
+                            paid = newPaid,
+                            status = newStatus
+                        )
+
+                        requireNotNull(
+                            dao.getRetailSaleOnce(
+                                sale.id
+                            )
+                        )
+                    }
+                }.getOrNull()
+
+            /*
+             * Inventory payment is authoritative here.
+             * Baki sync is idempotent and will retry when
+             * this business context is opened again.
+             */
+            updatedSale?.let { sale ->
+                runCatching {
+                    reconcileRetailSaleBaki(
+                        sale
+                    )
+                }
+            }
+
+            onDone(
+                updatedSale != null
+            )
         }
     }
 
@@ -1413,6 +1828,18 @@ class InventoryViewModel(application: Application) : AndroidViewModel(applicatio
                         true
                     }
                 }.getOrDefault(false)
+
+            if (result) {
+                dao.getRetailSaleOnce(
+                    saleId
+                )?.let { sale ->
+                    runCatching {
+                        reconcileRetailSaleBaki(
+                            sale
+                        )
+                    }
+                }
+            }
 
             onDone(result)
         }

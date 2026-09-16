@@ -224,6 +224,15 @@ class FamilyKhataViewModel(application: Application) : AndroidViewModel(applicat
         note: String,
         dueAt: Long?
     ) {
+        if (
+            item.sourceKey
+                ?.startsWith(
+                    "RETAIL_SALE_"
+                ) == true
+        ) {
+            return
+        }
+
         if (!canWriteNow() || amount <= 0) return
 
         val delta =
@@ -251,8 +260,19 @@ class FamilyKhataViewModel(application: Application) : AndroidViewModel(applicat
     }
 
     fun deleteBakiEntry(item: BakiEntryEntity) {
-        if (!canWriteNow()) return
-        viewModelScope.launch { dao.deleteBakiEntry(item) }
+        if (
+            !canWriteNow() ||
+            item.sourceKey
+                ?.startsWith(
+                    "RETAIL_SALE_"
+                ) == true
+        ) {
+            return
+        }
+
+        viewModelScope.launch {
+            dao.deleteBakiEntry(item)
+        }
     }
 
     fun observeBakiEntries(personId: Long): Flow<List<BakiEntryEntity>> =

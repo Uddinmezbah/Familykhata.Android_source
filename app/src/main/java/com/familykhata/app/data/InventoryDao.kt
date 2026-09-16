@@ -276,6 +276,20 @@ interface InventoryDao {
     @Query(
         """
         SELECT *
+        FROM retail_sales
+        WHERE workspace = :workspace
+          AND businessKey = :businessKey
+        ORDER BY soldAt ASC, id ASC
+        """
+    )
+    suspend fun getRetailSalesOnce(
+        workspace: String,
+        businessKey: String
+    ): List<RetailSaleEntity>
+
+    @Query(
+        """
+        SELECT *
         FROM retail_sale_lines
         WHERE saleId = :saleId
         ORDER BY id ASC
@@ -357,6 +371,20 @@ interface InventoryDao {
     )
     suspend fun updateRetailSaleStatus(
         saleId: Long,
+        status: String
+    )
+
+    @Query(
+        """
+        UPDATE retail_sales
+        SET paid = :paid,
+            status = :status
+        WHERE id = :saleId
+        """
+    )
+    suspend fun updateRetailSalePayment(
+        saleId: Long,
+        paid: Double,
         status: String
     )
 

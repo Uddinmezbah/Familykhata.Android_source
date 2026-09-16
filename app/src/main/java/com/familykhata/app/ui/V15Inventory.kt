@@ -3265,8 +3265,8 @@ private fun EditProductDialog(
                         label = {
                             Text(
                                 v15Text(
-                                    "পরিমাণ",
-                                    "Quantity"
+                                    "পরিমাণ (${product.unit.trim().ifBlank { "pcs" }} Base Unit)",
+                                    "Quantity (${product.unit.trim().ifBlank { "pcs" }} Base Unit)"
                                 )
                             )
                         },
@@ -3288,8 +3288,8 @@ private fun EditProductDialog(
                         label = {
                             Text(
                                 v15Text(
-                                    "ক্রয় মূল্য / ইউনিট",
-                                    "Purchase price / unit"
+                                    "ক্রয় মূল্য / ${product.unit.trim().ifBlank { "pcs" }} Base Unit",
+                                    "Purchase price / ${product.unit.trim().ifBlank { "pcs" }} Base Unit"
                                 )
                             )
                         },

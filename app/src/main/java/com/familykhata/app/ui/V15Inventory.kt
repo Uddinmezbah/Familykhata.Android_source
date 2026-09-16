@@ -152,81 +152,120 @@ private data class BatchUpdateInput(
 
 private data class ProductUnitDraft(
     val unitName: String = "",
-    val multiplier: String = ""
+    val multiplier: String = "",
+    val referenceUnit: String = ""
 )
 
 private fun buildProductUnitInputs(
     baseUnit: String,
     drafts: List<ProductUnitDraft>
 ): List<ProductUnitInput>? {
-    val baseKey =
+    val cleanBase =
         baseUnit.trim()
             .ifBlank { "pcs" }
-            .lowercase(Locale.ROOT)
 
-    val seen = mutableSetOf<String>()
-    val result = mutableListOf<ProductUnitInput>()
+    val baseKey =
+        cleanBase.lowercase(
+            Locale.ROOT
+        )
 
-    var cumulative = 1L
+    val factorByUnit =
+        linkedMapOf<String, Long>(
+            baseKey to 1L
+        )
+
+    val seen =
+        mutableSetOf(baseKey)
+
+    val result =
+        mutableListOf<ProductUnitInput>()
 
     drafts.forEachIndexed { index, draft ->
-        val unitName = draft.unitName.trim()
-        val unitKey = unitName.lowercase(Locale.ROOT)
+        val unitName =
+            draft.unitName.trim()
+
+        val unitKey =
+            unitName.lowercase(
+                Locale.ROOT
+            )
 
         val multiplier =
             draft.multiplier
                 .v15InventoryIntOrNull()
                 ?: return null
 
+        val referenceKey =
+            draft.referenceUnit
+                .trim()
+                .ifBlank { cleanBase }
+                .lowercase(
+                    Locale.ROOT
+                )
+
         if (
             unitName.isBlank() ||
-            unitKey == baseKey ||
-            multiplier <= 1 ||
-            !seen.add(unitKey)
+            unitKey in seen ||
+            multiplier <= 0
         ) {
             return null
         }
 
-        cumulative *= multiplier.toLong()
+        val referenceFactor =
+            factorByUnit[referenceKey]
+                ?: return null
 
-        if (cumulative > Int.MAX_VALUE) {
+        val baseQuantity =
+            referenceFactor *
+                multiplier.toLong()
+
+        if (
+            baseQuantity <= 1L ||
+            baseQuantity >
+                Int.MAX_VALUE
+        ) {
             return null
         }
 
         result +=
             ProductUnitInput(
-                unitName = unitName,
-                baseQuantity = cumulative.toInt(),
-                sortOrder = index + 1
+                unitName =
+                    unitName,
+                baseQuantity =
+                    baseQuantity.toInt(),
+                sortOrder =
+                    index + 1
             )
+
+        seen += unitKey
+        factorByUnit[unitKey] =
+            baseQuantity
     }
 
     return result
 }
 
 private fun storedUnitDrafts(
-    units: List<ProductUnitConversionEntity>
+    baseUnit: String,
+    units:
+        List<ProductUnitConversionEntity>
 ): List<ProductUnitDraft> {
-    var previousBaseQuantity = 1
+    val cleanBase =
+        baseUnit.trim()
+            .ifBlank { "pcs" }
 
     return units
-        .sortedBy { it.sortOrder }
+        .sortedBy {
+            it.sortOrder
+        }
         .map { item ->
-            val multiplier =
-                if (
-                    item.baseQuantity > previousBaseQuantity &&
-                    item.baseQuantity % previousBaseQuantity == 0
-                ) {
-                    item.baseQuantity / previousBaseQuantity
-                } else {
-                    item.baseQuantity
-                }
-
-            previousBaseQuantity = item.baseQuantity
-
             ProductUnitDraft(
-                unitName = item.unitName,
-                multiplier = multiplier.toString()
+                unitName =
+                    item.unitName,
+                multiplier =
+                    item.baseQuantity
+                        .toString(),
+                referenceUnit =
+                    cleanBase
             )
         }
 }
@@ -235,60 +274,134 @@ private fun storedUnitDrafts(
 private fun ProductUnitConversionEditor(
     baseUnit: String,
     drafts: List<ProductUnitDraft>,
-    onChange: (List<ProductUnitDraft>) -> Unit
+    onChange:
+        (List<ProductUnitDraft>) -> Unit
 ) {
+    val cleanBase =
+        baseUnit.trim()
+            .ifBlank { "pcs" }
+
     Column(
-        verticalArrangement = Arrangement.spacedBy(7.dp)
+        verticalArrangement =
+            Arrangement.spacedBy(7.dp)
     ) {
         Text(
             v15Text(
-                "বেস ইউনিট: $baseUnit — স্টক এই সবচেয়ে ছোট ইউনিটে হিসাব হবে",
-                "Base unit: $baseUnit — stock is counted in this smallest unit"
+                "বেস ইউনিট: $cleanBase — সব স্টক ভেতরে এই ইউনিটে হিসাব হবে",
+                "Base unit: $cleanBase — stock is stored internally in this unit"
             ),
-            style = MaterialTheme.typography.bodySmall,
-            fontWeight = FontWeight.SemiBold
+            style =
+                MaterialTheme
+                    .typography
+                    .bodySmall,
+            fontWeight =
+                FontWeight.SemiBold
         )
 
         drafts.forEachIndexed { index, draft ->
-            val previousUnit =
-                if (index == 0) {
-                    baseUnit
-                } else {
-                    drafts[index - 1]
-                        .unitName
-                        .ifBlank {
-                            v15Text(
-                                "আগের ইউনিট",
-                                "previous unit"
-                            )
+            val availableReferences =
+                buildList {
+                    add(cleanBase)
+
+                    drafts
+                        .take(index)
+                        .map {
+                            it.unitName.trim()
+                        }
+                        .filter {
+                            it.isNotBlank()
+                        }
+                        .forEach { name ->
+                            if (
+                                none {
+                                    it.equals(
+                                        name,
+                                        ignoreCase = true
+                                    )
+                                }
+                            ) {
+                                add(name)
+                            }
                         }
                 }
 
+            val currentReference =
+                availableReferences
+                    .firstOrNull {
+                        it.equals(
+                            draft.referenceUnit,
+                            ignoreCase = true
+                        )
+                    }
+                    ?: cleanBase
+
             Card(
-                modifier = Modifier.fillMaxWidth()
+                modifier =
+                    Modifier.fillMaxWidth()
             ) {
                 Column(
-                    modifier = Modifier.padding(10.dp),
+                    modifier =
+                        Modifier.padding(10.dp),
                     verticalArrangement =
-                        Arrangement.spacedBy(6.dp)
+                        Arrangement.spacedBy(
+                            6.dp
+                        )
                 ) {
                     Text(
                         v15Text(
                             "প্যাক ইউনিট ${index + 1}",
                             "Pack unit ${index + 1}"
                         ),
-                        fontWeight = FontWeight.Bold
+                        fontWeight =
+                            FontWeight.Bold
                     )
 
                     OutlinedTextField(
-                        value = draft.unitName,
+                        value =
+                            draft.unitName,
                         onValueChange = { value ->
-                            val copy = drafts.toMutableList()
-                            copy[index] =
+                            val updated =
+                                drafts
+                                    .toMutableList()
+
+                            val oldName =
+                                draft.unitName
+                                    .trim()
+
+                            updated[index] =
                                 draft.copy(
-                                    unitName = value
+                                    unitName =
+                                        value
                                 )
-                            onChange(copy)
+
+                            if (
+                                oldName.isNotBlank()
+                            ) {
+                                for (
+                                    row in
+                                    index + 1 until
+                                        updated.size
+                                ) {
+                                    val later =
+                                        updated[row]
+
+                                    if (
+                                        later.referenceUnit
+                                            .equals(
+                                                oldName,
+                                                ignoreCase = true
+                                            )
+                                    ) {
+                                        updated[row] =
+                                            later.copy(
+                                                referenceUnit =
+                                                    value.trim()
+                                            )
+                                    }
+                                }
+                            }
+
+                            onChange(updated)
                         },
                         label = {
                             Text(
@@ -299,52 +412,142 @@ private fun ProductUnitConversionEditor(
                             )
                         },
                         singleLine = true,
-                        modifier = Modifier.fillMaxWidth()
+                        modifier =
+                            Modifier.fillMaxWidth()
                     )
 
+                    Text(
+                        v15Text(
+                            "রেফারেন্স ইউনিট নির্বাচন করুন",
+                            "Select reference unit"
+                        ),
+                        style =
+                            MaterialTheme
+                                .typography
+                                .bodySmall,
+                        fontWeight =
+                            FontWeight.SemiBold
+                    )
+
+                    Column {
+                        availableReferences
+                            .forEach { reference ->
+                                TextButton(
+                                    onClick = {
+                                        val updated =
+                                            drafts
+                                                .toMutableList()
+
+                                        updated[index] =
+                                            draft.copy(
+                                                referenceUnit =
+                                                    reference
+                                            )
+
+                                        onChange(
+                                            updated
+                                        )
+                                    }
+                                ) {
+                                    Text(
+                                        if (
+                                            reference.equals(
+                                                currentReference,
+                                                ignoreCase = true
+                                            )
+                                        ) {
+                                            "✓ $reference"
+                                        } else {
+                                            reference
+                                        }
+                                    )
+                                }
+                            }
+                    }
+
                     OutlinedTextField(
-                        value = draft.multiplier,
+                        value =
+                            draft.multiplier,
                         onValueChange = { value ->
-                            val copy = drafts.toMutableList()
-                            copy[index] =
+                            val updated =
+                                drafts
+                                    .toMutableList()
+
+                            updated[index] =
                                 draft.copy(
-                                    multiplier = value
+                                    multiplier =
+                                        value,
+                                    referenceUnit =
+                                        currentReference
                                 )
-                            onChange(copy)
+
+                            onChange(updated)
                         },
                         label = {
                             Text(
                                 v15Text(
-                                    "১ ${draft.unitName.ifBlank { "ইউনিট" }} = কত $previousUnit",
-                                    "1 ${draft.unitName.ifBlank { "unit" }} = how many $previousUnit"
+                                    "১ ${draft.unitName.ifBlank { "ইউনিট" }} = কত $currentReference",
+                                    "1 ${draft.unitName.ifBlank { "unit" }} = how many $currentReference"
                                 )
                             )
                         },
                         singleLine = true,
-                        modifier = Modifier.fillMaxWidth()
+                        modifier =
+                            Modifier.fillMaxWidth()
                     )
 
                     if (
-                        draft.unitName.isNotBlank() &&
-                        draft.multiplier.isNotBlank()
+                        draft.unitName
+                            .isNotBlank() &&
+                        draft.multiplier
+                            .isNotBlank()
                     ) {
                         Text(
                             v15Text(
-                                "১ ${draft.unitName} = ${draft.multiplier} $previousUnit",
-                                "1 ${draft.unitName} = ${draft.multiplier} $previousUnit"
+                                "১ ${draft.unitName} = ${draft.multiplier} $currentReference",
+                                "1 ${draft.unitName} = ${draft.multiplier} $currentReference"
                             ),
-                            style = MaterialTheme.typography.bodySmall
+                            style =
+                                MaterialTheme
+                                    .typography
+                                    .bodySmall
                         )
                     }
 
                     TextButton(
                         onClick = {
+                            val removedName =
+                                draft.unitName
+                                    .trim()
+
+                            val remaining =
+                                drafts
+                                    .filterIndexed {
+                                            row,
+                                            _ ->
+                                        row != index
+                                    }
+                                    .map { item ->
+                                        if (
+                                            removedName
+                                                .isNotBlank() &&
+                                            item.referenceUnit
+                                                .equals(
+                                                    removedName,
+                                                    ignoreCase = true
+                                                )
+                                        ) {
+                                            item.copy(
+                                                referenceUnit =
+                                                    cleanBase
+                                            )
+                                        } else {
+                                            item
+                                        }
+                                    }
+
                             onChange(
-                                drafts.filterIndexed {
-                                        row,
-                                        _ ->
-                                    row != index
-                                }
+                                remaining
                             )
                         }
                     ) {
@@ -361,15 +564,22 @@ private fun ProductUnitConversionEditor(
 
         OutlinedButton(
             onClick = {
-                if (drafts.size < 6) {
+                if (
+                    drafts.size < 6
+                ) {
                     onChange(
                         drafts +
-                            ProductUnitDraft()
+                            ProductUnitDraft(
+                                referenceUnit =
+                                    cleanBase
+                            )
                     )
                 }
             },
-            enabled = drafts.size < 6,
-            modifier = Modifier.fillMaxWidth()
+            enabled =
+                drafts.size < 6,
+            modifier =
+                Modifier.fillMaxWidth()
         ) {
             Text(
                 v15Text(
@@ -379,13 +589,18 @@ private fun ProductUnitConversionEditor(
             )
         }
 
-        if (drafts.isNotEmpty()) {
+        if (
+            drafts.isNotEmpty()
+        ) {
             Text(
                 v15Text(
-                    "উদাহরণ: Base=pcs → ১ পাতা=১২ pcs → ১ Box=২০ পাতা → ১ Carton=১০ Box।",
-                    "Example: Base=pcs → 1 Strip=12 pcs → 1 Box=20 Strips → 1 Carton=10 Boxes."
+                    "উদাহরণ: Base=Piece, ১ Pata=১২ Piece। Box চাইলে ২০ Piece সরাসরি দিতে পারবে, অথবা ২০ Pata নির্বাচন করতে পারবে।",
+                    "Example: Base=Piece, 1 Strip=12 Pieces. A Box may be 20 Pieces directly, or 20 Strips by selecting Strip as reference."
                 ),
-                style = MaterialTheme.typography.bodySmall
+                style =
+                    MaterialTheme
+                        .typography
+                        .bodySmall
             )
         }
     }
@@ -1949,8 +2164,8 @@ private fun AddProductDialog(
                     if (unitInputs == null) {
                         error =
                             v15Text(
-                                "ইউনিট কনভার্সন ঠিক করুন। প্রতিটি অনুপাত ১-এর বেশি হতে হবে।",
-                                "Check unit conversion. Every multiplier must be greater than 1."
+                                "ইউনিট কনভার্সন ঠিক করুন। সঠিক রেফারেন্স ইউনিট এবং ধনাত্মক অনুপাত দিন।",
+                                "Check unit conversion. Select a valid reference unit and use a positive multiplier."
                             )
                         return@TextButton
                     }
@@ -2213,7 +2428,9 @@ private fun EditProductDialog(
     ) {
         mutableStateOf(
             storedUnitDrafts(
-                storedUnitConversions
+                baseUnit = unit,
+                units =
+                    storedUnitConversions
             )
         )
     }
@@ -2588,8 +2805,8 @@ private fun EditProductDialog(
                     if (unitInputs == null) {
                         error =
                             v15Text(
-                                "ইউনিট কনভার্সন ঠিক করুন। প্রতিটি অনুপাত ১-এর বেশি হতে হবে।",
-                                "Check unit conversion. Every multiplier must be greater than 1."
+                                "ইউনিট কনভার্সন ঠিক করুন। সঠিক রেফারেন্স ইউনিট এবং ধনাত্মক অনুপাত দিন।",
+                                "Check unit conversion. Select a valid reference unit and use a positive multiplier."
                             )
                         return@TextButton
                     }

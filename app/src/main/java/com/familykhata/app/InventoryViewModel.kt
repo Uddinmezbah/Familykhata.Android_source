@@ -171,23 +171,6 @@ class InventoryViewModel(application: Application) : AndroidViewModel(applicatio
             }
         )
 
-        var previousFactor = 1
-
-        cleaned.forEach { unit ->
-            require(
-                unit.baseQuantity >
-                    previousFactor
-            )
-
-            require(
-                unit.baseQuantity %
-                    previousFactor == 0
-            )
-
-            previousFactor =
-                unit.baseQuantity
-        }
-
         return cleaned
     }
 

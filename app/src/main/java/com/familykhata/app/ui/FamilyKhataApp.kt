@@ -896,6 +896,27 @@ private fun BusinessDashboard(
     onIncomeHistory: () -> Unit,
     onExpenseHistory: () -> Unit
 ) {
+    val financialAccounts by
+        viewModel.financialAccounts.collectAsState()
+
+    val trialStatus by
+        viewModel.trialStatus.collectAsState()
+
+    var showFinancialAccounts by
+        remember {
+            mutableStateOf(false)
+        }
+
+    val activeFinancialAccounts =
+        financialAccounts.filter {
+            it.isActive
+        }
+
+    val totalFinancialBalance =
+        activeFinancialAccounts.sumOf {
+            it.balance
+        }
+
     Column(
         modifier = Modifier
             .fillMaxSize()
@@ -916,7 +937,10 @@ private fun BusinessDashboard(
                 verticalArrangement = Arrangement.spacedBy(5.dp)
             ) {
                 Text(
-                    v15Text("ব্যবসার ক্যাশ ব্যালেন্স", "Business cash balance"),
+                    v15Text(
+                        "আয়-খরচ ব্যালেন্স",
+                        "Income-expense balance"
+                    ),
                     style = MaterialTheme.typography.labelLarge,
                     color = Color.White
                 )
@@ -927,7 +951,10 @@ private fun BusinessDashboard(
                     color = Color.White
                 )
                 Text(
-                    v15Text("দোকান/প্রতিষ্ঠানের আয়-খরচের বর্তমান হিসাব", "Current business cash-flow summary"),
+                    v15Text(
+                        "এটি আয় থেকে খরচ বাদ দেওয়ার হিসাব; Cash/Bank/Wallet ব্যালেন্স নিচে আলাদা।",
+                        "Income minus expense. Cash, bank and wallet balances are tracked separately below."
+                    ),
                     style = MaterialTheme.typography.bodySmall,
                     color = Color.White
                 )
@@ -972,6 +999,114 @@ private fun BusinessDashboard(
                 accentColor = PayableAccent,
                 onClick = onPayable
             )
+        }
+
+        Surface(
+            modifier =
+                Modifier
+                    .fillMaxWidth()
+                    .clickable {
+                        showFinancialAccounts = true
+                    },
+            shape =
+                RoundedCornerShape(20.dp),
+            color =
+                ShopAccent.copy(
+                    alpha = 0.09f
+                ),
+            border =
+                BorderStroke(
+                    1.dp,
+                    ShopAccent.copy(
+                        alpha = 0.22f
+                    )
+                )
+        ) {
+            Column(
+                modifier =
+                    Modifier.padding(16.dp),
+                verticalArrangement =
+                    Arrangement.spacedBy(5.dp)
+            ) {
+                Row(
+                    modifier =
+                        Modifier.fillMaxWidth(),
+                    verticalAlignment =
+                        Alignment.CenterVertically
+                ) {
+                    Column(
+                        modifier =
+                            Modifier.weight(1f)
+                    ) {
+                        Text(
+                            v15Text(
+                                "ক্যাশ • ব্যাংক • ওয়ালেট",
+                                "Cash • Bank • Wallet"
+                            ),
+                            fontWeight =
+                                FontWeight.Bold
+                        )
+
+                        Text(
+                            v15Text(
+                                "${activeFinancialAccounts.size}টি সক্রিয় অ্যাকাউন্ট",
+                                "${activeFinancialAccounts.size} active accounts"
+                            ),
+                            style =
+                                MaterialTheme
+                                    .typography
+                                    .bodySmall,
+                            color =
+                                MaterialTheme
+                                    .colorScheme
+                                    .onSurfaceVariant
+                        )
+                    }
+
+                    Text(
+                        if (
+                            V14DisplayState
+                                .summaryVisible
+                        ) {
+                            "${V14DisplayState.currencySymbol} ${money(totalFinancialBalance)}"
+                        } else {
+                            "••••"
+                        },
+                        style =
+                            MaterialTheme
+                                .typography
+                                .titleLarge,
+                        fontWeight =
+                            FontWeight.ExtraBold,
+                        color =
+                            ShopAccent
+                    )
+                }
+
+                Text(
+                    v15Text(
+                        "Cash, bKash, Nagad, Rocket, Bank ইত্যাদির আসল ব্যালেন্স ও নিজের অ্যাকাউন্টের মধ্যে টাকা ট্রান্সফার।",
+                        "Track actual Cash, bKash, Nagad, Rocket, Bank and other account balances, with internal transfers."
+                    ),
+                    style =
+                        MaterialTheme
+                            .typography
+                            .bodySmall
+                )
+
+                Text(
+                    v15Text(
+                        "নিজের এক অ্যাকাউন্ট থেকে অন্য অ্যাকাউন্টে Transfer আয় বা খরচ নয়।",
+                        "Transfers between your own accounts are not income or expense."
+                    ),
+                    style =
+                        MaterialTheme
+                            .typography
+                            .labelSmall,
+                    color =
+                        NeutralAccent
+                )
+            }
         }
 
         DueDashboardSection(
@@ -1052,6 +1187,18 @@ private fun BusinessDashboard(
                 )
             }
         }
+    }
+
+    if (showFinancialAccounts) {
+        V16FinancialAccountsDialog(
+            viewModel = viewModel,
+            canWrite =
+                !trialStatus.expired,
+            onDismiss = {
+                showFinancialAccounts =
+                    false
+            }
+        )
     }
 }
 
@@ -3046,7 +3193,7 @@ private fun parseAmount(input: String): Double? {
     return normalized.toDoubleOrNull()?.takeIf { it > 0.0 }
 }
 
-private fun money(value: Double): String =
+internal fun money(value: Double): String =
     if (value % 1.0 == 0.0) value.toLong().toString()
     else String.format(Locale.US, "%.2f", value)
 

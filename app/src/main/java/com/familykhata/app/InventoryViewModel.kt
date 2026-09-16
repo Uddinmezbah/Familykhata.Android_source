@@ -234,6 +234,49 @@ class InventoryViewModel(application: Application) : AndroidViewModel(applicatio
         productId: Long,
         units: List<ProductUnitInput>,
         onDone: (Boolean) -> Unit = {}
+    ) {
+        if (productId <= 0L) {
+            onDone(false)
+            return
+        }
+
+        val currentWorkspace =
+            workspace.value
+        val currentBusinessKey =
+            businessKey.value
+
+        viewModelScope.launch {
+            val success =
+                runCatching {
+                    database.withTransaction {
+                        val product =
+                            requireNotNull(
+                                dao.getProductOnce(
+                                    productId
+                                )
+                            )
+
+                        require(
+                            product.workspace ==
+                                currentWorkspace &&
+                                product.businessKey ==
+                                    currentBusinessKey
+                        )
+
+                        replaceProductUnitConversions(
+                            productId =
+                                product.id,
+                            baseUnit =
+                                product.unit,
+                            units =
+                                units
+                        )
+                    }
+                }.isSuccess
+
+            onDone(success)
+        }
+    }
 
     fun observeRetailSaleLines(
         saleId: Long

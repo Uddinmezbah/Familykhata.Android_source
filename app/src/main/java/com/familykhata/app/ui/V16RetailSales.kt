@@ -1,5 +1,7 @@
 package com.familykhata.app.ui
 
+import android.content.ClipData
+import android.content.Intent
 import android.widget.Toast
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.layout.Arrangement
@@ -14,6 +16,7 @@ import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
@@ -27,20 +30,27 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.core.content.FileProvider
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.familykhata.app.InventoryViewModel
 import com.familykhata.app.RetailSaleLineInput
 import com.familykhata.app.data.ProductStockSummary
 import com.familykhata.app.data.RetailSaleEntity
+import com.familykhata.app.report.writeRetailInvoicePdf
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 private data class RetailCartLine(
     val productId: Long,
@@ -90,6 +100,17 @@ internal fun V16RetailSalesScreen(
         mutableStateOf(false)
     }
 
+    var selectedSaleId by remember {
+        mutableStateOf<Long?>(null)
+    }
+
+    val selectedSale =
+        selectedSaleId?.let { id ->
+            sales.firstOrNull {
+                it.id == id
+            }
+        }
+
     LaunchedEffect(
         workspace,
         shopType
@@ -101,16 +122,29 @@ internal fun V16RetailSalesScreen(
     }
 
     BackHandler {
-        onExit()
+        if (selectedSale != null) {
+            selectedSaleId = null
+        } else {
+            onExit()
+        }
     }
 
-    V15DeepScreenContainer(
-        title = v15Text(
-            "বিক্রি ও ইনভয়েস",
-            "Sales & Invoices"
-        ),
-        onBack = onExit
-    ) {
+    if (selectedSale != null) {
+        RetailSaleDetailScreen(
+            sale = selectedSale,
+            viewModel = vm,
+            onBack = {
+                selectedSaleId = null
+            }
+        )
+    } else {
+        V15DeepScreenContainer(
+            title = v15Text(
+                "বিক্রি ও ইনভয়েস",
+                "Sales & Invoices"
+            ),
+            onBack = onExit
+        ) {
         val activeSales =
             sales.filter {
                 it.status != "CANCELLED"
@@ -266,6 +300,10 @@ internal fun V16RetailSalesScreen(
                     RetailSaleCard(
                         sale = sale,
                         canWrite = canWrite,
+                        onOpen = {
+                            selectedSaleId =
+                                sale.id
+                        },
                         onCancel = {
                             cancellingSale =
                                 sale
@@ -274,6 +312,8 @@ internal fun V16RetailSalesScreen(
                 }
             }
         }
+    }
+
     }
 
     cancellingSale?.let { sale ->
@@ -440,6 +480,468 @@ internal fun V16RetailSalesScreen(
 }
 
 @Composable
+private fun RetailSaleDetailScreen(
+    sale: RetailSaleEntity,
+    viewModel: InventoryViewModel,
+    onBack: () -> Unit
+) {
+    val context =
+        LocalContext.current
+
+    val scope =
+        rememberCoroutineScope()
+
+    val linesFlow =
+        remember(
+            sale.id
+        ) {
+            viewModel.observeRetailSaleLines(
+                sale.id
+            )
+        }
+
+    val lines by
+        linesFlow.collectAsState(
+            initial = emptyList()
+        )
+
+    var sharing by remember(
+        sale.id
+    ) {
+        mutableStateOf(false)
+    }
+
+    var error by remember(
+        sale.id
+    ) {
+        mutableStateOf<String?>(null)
+    }
+
+    val due =
+        (
+            sale.total -
+                sale.paid
+        ).coerceAtLeast(
+            0.0
+        )
+
+    V15DeepScreenContainer(
+        title =
+            v15Text(
+                "বিক্রির বিস্তারিত",
+                "Sale details"
+            ),
+        onBack = onBack
+    ) {
+        Column(
+            modifier =
+                Modifier
+                    .fillMaxWidth()
+                    .verticalScroll(
+                        rememberScrollState()
+                    )
+                    .padding(
+                        bottom = 24.dp
+                    ),
+            verticalArrangement =
+                Arrangement.spacedBy(
+                    10.dp
+                )
+        ) {
+            Text(
+                sale.invoiceNo,
+                style =
+                    MaterialTheme
+                        .typography
+                        .headlineSmall,
+                fontWeight =
+                    FontWeight.ExtraBold
+            )
+
+            Text(
+                "${retailDate(sale.soldAt)} • ${retailStatusLabel(sale.status)}",
+                style =
+                    MaterialTheme
+                        .typography
+                        .bodySmall,
+                color =
+                    MaterialTheme
+                        .colorScheme
+                        .onSurfaceVariant
+            )
+
+            if (
+                sale.customerName
+                    .isNotBlank()
+            ) {
+                Text(
+                    v15Text(
+                        "ক্রেতা: ${sale.customerName}",
+                        "Customer: ${sale.customerName}"
+                    )
+                )
+            }
+
+            if (
+                sale.customerPhone
+                    .isNotBlank()
+            ) {
+                Text(
+                    v15Text(
+                        "মোবাইল: ${sale.customerPhone}",
+                        "Phone: ${sale.customerPhone}"
+                    )
+                )
+            }
+
+            Text(
+                v15Text(
+                    "পেমেন্ট: ${retailPaymentLabel(sale.paymentMethod)}",
+                    "Payment: ${retailPaymentLabel(sale.paymentMethod)}"
+                )
+            )
+
+            if (
+                sale.status ==
+                "CANCELLED"
+            ) {
+                Surface(
+                    modifier =
+                        Modifier.fillMaxWidth(),
+                    shape =
+                        MaterialTheme
+                            .shapes
+                            .large,
+                    color =
+                        MaterialTheme
+                            .colorScheme
+                            .errorContainer
+                ) {
+                    Text(
+                        v15Text(
+                            "এই বিক্রিটি বাতিল করা হয়েছে এবং সক্রিয় বিক্রির হিসাবে গণনা হয় না।",
+                            "This sale is cancelled and is not counted as an active sale."
+                        ),
+                        modifier =
+                            Modifier.padding(
+                                12.dp
+                            ),
+                        color =
+                            MaterialTheme
+                                .colorScheme
+                                .onErrorContainer
+                    )
+                }
+            }
+
+            Text(
+                v15Text(
+                    "পণ্যসমূহ",
+                    "Items"
+                ),
+                fontWeight =
+                    FontWeight.Bold
+            )
+
+            if (lines.isEmpty()) {
+                Text(
+                    v15Text(
+                        "পণ্যের তথ্য পাওয়া যাচ্ছে না।",
+                        "No sale-line information available."
+                    ),
+                    color =
+                        MaterialTheme
+                            .colorScheme
+                            .onSurfaceVariant
+                )
+            } else {
+                lines.forEach { line ->
+                    Card(
+                        modifier =
+                            Modifier.fillMaxWidth(),
+                        colors =
+                            CardDefaults
+                                .cardColors(
+                                    containerColor =
+                                        MaterialTheme
+                                            .colorScheme
+                                            .surfaceVariant
+                                            .copy(
+                                                alpha =
+                                                    0.45f
+                                            )
+                                )
+                    ) {
+                        Column(
+                            modifier =
+                                Modifier.padding(
+                                    12.dp
+                                ),
+                            verticalArrangement =
+                                Arrangement.spacedBy(
+                                    4.dp
+                                )
+                        ) {
+                            Text(
+                                line.productNameSnapshot,
+                                fontWeight =
+                                    FontWeight.SemiBold
+                            )
+
+                            if (
+                                line.skuSnapshot
+                                    .isNotBlank()
+                            ) {
+                                Text(
+                                    "SKU: ${line.skuSnapshot}",
+                                    style =
+                                        MaterialTheme
+                                            .typography
+                                            .bodySmall
+                                )
+                            }
+
+                            Text(
+                                "${line.quantity} ${line.unitSnapshot} × " +
+                                    "${V14DisplayState.currencySymbol}${retailMoney(line.unitPrice)}"
+                            )
+
+                            Text(
+                                "${V14DisplayState.currencySymbol}${retailMoney(line.lineTotal)}",
+                                fontWeight =
+                                    FontWeight.Bold
+                            )
+                        }
+                    }
+                }
+            }
+
+            Surface(
+                modifier =
+                    Modifier.fillMaxWidth(),
+                shape =
+                    MaterialTheme
+                        .shapes
+                        .large,
+                color =
+                    MaterialTheme
+                        .colorScheme
+                        .surfaceVariant
+            ) {
+                Column(
+                    modifier =
+                        Modifier.padding(
+                            12.dp
+                        ),
+                    verticalArrangement =
+                        Arrangement.spacedBy(
+                            5.dp
+                        )
+                ) {
+                    Text(
+                        v15Text(
+                            "সাবটোটাল: ${V14DisplayState.currencySymbol}${retailMoney(sale.subtotal)}",
+                            "Subtotal: ${V14DisplayState.currencySymbol}${retailMoney(sale.subtotal)}"
+                        )
+                    )
+
+                    if (
+                        sale.discount >
+                        0.0001
+                    ) {
+                        Text(
+                            v15Text(
+                                "ছাড়: ${V14DisplayState.currencySymbol}${retailMoney(sale.discount)}",
+                                "Discount: ${V14DisplayState.currencySymbol}${retailMoney(sale.discount)}"
+                            )
+                        )
+                    }
+
+                    Text(
+                        v15Text(
+                            "মোট: ${V14DisplayState.currencySymbol}${retailMoney(sale.total)}",
+                            "Total: ${V14DisplayState.currencySymbol}${retailMoney(sale.total)}"
+                        ),
+                        fontWeight =
+                            FontWeight.ExtraBold
+                    )
+
+                    Text(
+                        v15Text(
+                            "আদায়: ${V14DisplayState.currencySymbol}${retailMoney(sale.paid)}",
+                            "Paid: ${V14DisplayState.currencySymbol}${retailMoney(sale.paid)}"
+                        )
+                    )
+
+                    Text(
+                        v15Text(
+                            "বাকি: ${V14DisplayState.currencySymbol}${retailMoney(due)}",
+                            "Due: ${V14DisplayState.currencySymbol}${retailMoney(due)}"
+                        ),
+                        fontWeight =
+                            FontWeight.Bold
+                    )
+                }
+            }
+
+            if (
+                sale.note
+                    .isNotBlank()
+            ) {
+                Text(
+                    v15Text(
+                        "নোট: ${sale.note}",
+                        "Note: ${sale.note}"
+                    )
+                )
+            }
+
+            Button(
+                enabled =
+                    !sharing &&
+                        lines.isNotEmpty(),
+                modifier =
+                    Modifier.fillMaxWidth(),
+                onClick = {
+                    sharing = true
+                    error = null
+
+                    val bangla =
+                        V15LanguageState
+                            .isBangla()
+
+                    val currency =
+                        V14DisplayState
+                            .currencySymbol
+
+                    scope.launch {
+                        try {
+                            val pdf =
+                                withContext(
+                                    Dispatchers.IO
+                                ) {
+                                    writeRetailInvoicePdf(
+                                        context =
+                                            context.applicationContext,
+                                        sale = sale,
+                                        lines = lines,
+                                        bangla = bangla,
+                                        currency = currency
+                                    )
+                                }
+
+                            val uri =
+                                FileProvider
+                                    .getUriForFile(
+                                        context,
+                                        "${context.packageName}.statements",
+                                        pdf.file
+                                    )
+
+                            val intent =
+                                Intent(
+                                    Intent.ACTION_SEND
+                                ).apply {
+                                    type =
+                                        "application/pdf"
+
+                                    putExtra(
+                                        Intent.EXTRA_STREAM,
+                                        uri
+                                    )
+
+                                    putExtra(
+                                        Intent.EXTRA_SUBJECT,
+                                        "Hisabi Khata - ${sale.invoiceNo}"
+                                    )
+
+                                    clipData =
+                                        ClipData.newRawUri(
+                                            "Sales invoice",
+                                            uri
+                                        )
+
+                                    addFlags(
+                                        Intent.FLAG_GRANT_READ_URI_PERMISSION
+                                    )
+                                }
+
+                            context.startActivity(
+                                Intent.createChooser(
+                                    intent,
+                                    v15Text(
+                                        "ইনভয়েস PDF শেয়ার করুন",
+                                        "Share invoice PDF"
+                                    )
+                                )
+                            )
+                        } catch (
+                            cancelled:
+                                CancellationException
+                        ) {
+                            throw cancelled
+                        } catch (
+                            _: Exception
+                        ) {
+                            error =
+                                v15Text(
+                                    "ইনভয়েস PDF তৈরি বা শেয়ার করা যায়নি। আবার চেষ্টা করুন।",
+                                    "Unable to create or share the invoice PDF. Please try again."
+                                )
+                        } finally {
+                            sharing = false
+                        }
+                    }
+                }
+            ) {
+                Text(
+                    if (sharing) {
+                        v15Text(
+                            "PDF তৈরি হচ্ছে…",
+                            "Creating PDF…"
+                        )
+                    } else {
+                        v15Text(
+                            "PDF ইনভয়েস শেয়ার",
+                            "Share PDF invoice"
+                        )
+                    }
+                )
+            }
+
+            if (sharing) {
+                CircularProgressIndicator()
+            }
+
+            error?.let {
+                Text(
+                    it,
+                    color =
+                        MaterialTheme
+                            .colorScheme
+                            .error
+                )
+            }
+
+            Text(
+                v15Text(
+                    "WhatsApp, Messenger, ইমেইল বা অন্য অ্যাপ Share menu থেকে বেছে নিতে পারবেন।",
+                    "Choose WhatsApp, Messenger, email or another app from the Share menu."
+                ),
+                style =
+                    MaterialTheme
+                        .typography
+                        .bodySmall,
+                color =
+                    MaterialTheme
+                        .colorScheme
+                        .onSurfaceVariant
+            )
+        }
+    }
+}
+
+@Composable
 private fun RetailSaleMetric(
     title: String,
     value: String,
@@ -482,6 +984,7 @@ private fun RetailSaleMetric(
 private fun RetailSaleCard(
     sale: RetailSaleEntity,
     canWrite: Boolean,
+    onOpen: () -> Unit,
     onCancel: () -> Unit
 ) {
     val due =
@@ -599,6 +1102,19 @@ private fun RetailSaleCard(
                     MaterialTheme.colorScheme
                         .onSurfaceVariant
             )
+
+            OutlinedButton(
+                onClick = onOpen,
+                modifier =
+                    Modifier.fillMaxWidth()
+            ) {
+                Text(
+                    v15Text(
+                        "বিস্তারিত ও ইনভয়েস",
+                        "Details & Invoice"
+                    )
+                )
+            }
 
             if (
                 canWrite &&

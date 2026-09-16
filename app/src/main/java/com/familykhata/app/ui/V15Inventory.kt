@@ -120,7 +120,9 @@ private data class NewProductInput(
     val purchasePrice: Double,
     val purchaseDate: Long,
     val expiryDate: Long?,
-    val batchNo: String
+    val batchNo: String,
+    val stockUnitName: String,
+    val stockUnitFactor: Int
 )
 
 private data class BatchInput(
@@ -128,7 +130,20 @@ private data class BatchInput(
     val purchasePrice: Double,
     val purchaseDate: Long,
     val expiryDate: Long?,
-    val batchNo: String
+    val batchNo: String,
+    val unitName: String,
+    val unitFactor: Int
+)
+
+private data class StockQuantityInput(
+    val quantity: Int,
+    val unitName: String,
+    val unitFactor: Int
+)
+
+private data class InventoryStockUnitOption(
+    val name: String,
+    val factor: Int
 )
 
 private data class EditableBatchInput(
@@ -602,6 +617,55 @@ private fun ProductUnitConversionEditor(
                         .typography
                         .bodySmall
             )
+        }
+    }
+}
+
+@Composable
+private fun InventoryStockUnitSelector(
+    options: List<InventoryStockUnitOption>,
+    selectedName: String,
+    label: String,
+    enabled: Boolean = true,
+    onSelect: (InventoryStockUnitOption) -> Unit
+) {
+    if (options.isEmpty()) return
+
+    Text(
+        label,
+        style = MaterialTheme.typography.bodySmall,
+        fontWeight = FontWeight.SemiBold
+    )
+
+    Column {
+        options.forEach { option ->
+            val selected =
+                option.name.equals(
+                    selectedName,
+                    ignoreCase = true
+                )
+
+            TextButton(
+                onClick = {
+                    onSelect(option)
+                },
+                enabled = enabled
+            ) {
+                val relation =
+                    if (option.factor == 1) {
+                        option.name
+                    } else {
+                        "${option.name} • 1 = ${option.factor} ${options.first().name}"
+                    }
+
+                Text(
+                    if (selected) {
+                        "✓ $relation"
+                    } else {
+                        relation
+                    }
+                )
+            }
         }
     }
 }
@@ -1182,7 +1246,11 @@ private fun ProductListScreen(
                     purchasePrice = input.purchasePrice,
                     purchaseDate = input.purchaseDate,
                     expiryDate = input.expiryDate,
-                    batchNo = input.batchNo
+                    batchNo = input.batchNo,
+                    initialUnitName =
+                        input.stockUnitName,
+                    initialUnitFactor =
+                        input.stockUnitFactor
                 )
                 showAdd = false
             }
@@ -1531,6 +1599,46 @@ private fun ProductDetailScreen(
             )
         }
     val batches by batchesFlow.collectAsState(initial = emptyList())
+
+    val stockUnitsFlow =
+        remember(product.id) {
+            viewModel.observeProductUnitConversions(
+                product.id
+            )
+        }
+
+    val stockUnitConversions by
+        stockUnitsFlow.collectAsState(
+            initial = emptyList()
+        )
+
+    val stockUnitOptions =
+        buildList<InventoryStockUnitOption> {
+            add(
+                InventoryStockUnitOption(
+                    name =
+                        product.unit
+                            .trim()
+                            .ifBlank { "pcs" },
+                    factor = 1
+                )
+            )
+
+            stockUnitConversions.forEach { conversion ->
+                if (
+                    conversion.unitName.isNotBlank() &&
+                    conversion.baseQuantity > 1
+                ) {
+                    add(
+                        InventoryStockUnitOption(
+                            name = conversion.unitName,
+                            factor = conversion.baseQuantity
+                        )
+                    )
+                }
+            }
+        }
+
     var showAddBatch by remember { mutableStateOf(false) }
     var showReduce by remember { mutableStateOf(false) }
     var showEdit by remember { mutableStateOf(false) }
@@ -1684,22 +1792,55 @@ private fun ProductDetailScreen(
     }
 
     if (showAddBatch) {
-        AddBatchDialog(onDismiss = { showAddBatch = false }) { input ->
+        AddBatchDialog(
+            unitOptions = stockUnitOptions,
+            onDismiss = {
+                showAddBatch = false
+            }
+        ) { input ->
             viewModel.addBatch(
                 productId = product.id,
                 quantity = input.quantity,
                 purchasePrice = input.purchasePrice,
                 purchaseDate = input.purchaseDate,
                 expiryDate = input.expiryDate,
-                batchNo = input.batchNo
+                batchNo = input.batchNo,
+                unitName = input.unitName,
+                unitFactor = input.unitFactor
             )
             showAddBatch = false
         }
     }
+
     if (showReduce) {
-        ReduceStockDialog(max = product.totalStock, onDismiss = { showReduce = false }) { qty ->
-            viewModel.reduceStock(product.id, qty) { ok ->
-                Toast.makeText(context, if (ok) v15Text("স্টক আপডেট হয়েছে", "Stock updated") else v15Text("স্টক কমানো যায়নি", "Could not reduce stock"), Toast.LENGTH_SHORT).show()
+        ReduceStockDialog(
+            maxBaseQuantity = product.totalStock,
+            unitOptions = stockUnitOptions,
+            onDismiss = {
+                showReduce = false
+            }
+        ) { input ->
+            viewModel.reduceStock(
+                productId = product.id,
+                quantity = input.quantity,
+                unitName = input.unitName,
+                unitFactor = input.unitFactor
+            ) { ok ->
+                Toast.makeText(
+                    context,
+                    if (ok) {
+                        v15Text(
+                            "স্টক আপডেট হয়েছে",
+                            "Stock updated"
+                        )
+                    } else {
+                        v15Text(
+                            "স্টক কমানো যায়নি",
+                            "Could not reduce stock"
+                        )
+                    },
+                    Toast.LENGTH_SHORT
+                ).show()
             }
             showReduce = false
         }
@@ -1717,6 +1858,8 @@ private fun ProductDetailScreen(
                 category = input.category,
                 sku = input.sku,
                 unit = input.unit,
+                unitConversions =
+                    input.unitConversions,
                 brand = input.brand,
                 genericName = input.genericName,
                 modelName = input.modelName,
@@ -1842,6 +1985,11 @@ private fun AddProductDialog(
     var buy by remember { mutableStateOf("") }
     var batchNo by remember { mutableStateOf("") }
 
+    var stockUnitName by
+        remember {
+            mutableStateOf("pcs")
+        }
+
     var purchaseDate by remember {
         mutableStateOf(startOfDay(System.currentTimeMillis()))
     }
@@ -1857,6 +2005,47 @@ private fun AddProductDialog(
         mode == ProductFormMode.PHARMACY ||
         mode == ProductFormMode.EXPIRY_RETAIL ||
         mode == ProductFormMode.GENERAL
+
+    val baseStockUnit =
+        unit.trim()
+            .ifBlank { "pcs" }
+
+    val currentUnitInputs =
+        buildProductUnitInputs(
+            baseUnit = baseStockUnit,
+            drafts = unitDrafts
+        )
+
+    val initialStockUnitOptions =
+        buildList<InventoryStockUnitOption> {
+            add(
+                InventoryStockUnitOption(
+                    name = baseStockUnit,
+                    factor = 1
+                )
+            )
+
+            currentUnitInputs
+                .orEmpty()
+                .forEach { conversion ->
+                    add(
+                        InventoryStockUnitOption(
+                            name = conversion.unitName,
+                            factor = conversion.baseQuantity
+                        )
+                    )
+                }
+        }
+
+    val selectedInitialStockOption =
+        initialStockUnitOptions
+            .firstOrNull {
+                it.name.equals(
+                    stockUnitName,
+                    ignoreCase = true
+                )
+            }
+            ?: initialStockUnitOptions.first()
 
     AlertDialog(
         onDismissRequest = onDismiss,
@@ -2075,17 +2264,41 @@ private fun AddProductDialog(
                     sell,
                     { sell = it },
                     label = {
-                        Text(v15Text("বিক্রয় মূল্য / ইউনিট", "Selling price / unit"))
+                        Text(
+                            v15Text(
+                                "বিক্রয় মূল্য / $baseStockUnit",
+                                "Selling price / $baseStockUnit"
+                            )
+                        )
                     },
                     singleLine = true,
                     modifier = Modifier.fillMaxWidth()
+                )
+
+                InventoryStockUnitSelector(
+                    options = initialStockUnitOptions,
+                    selectedName =
+                        selectedInitialStockOption.name,
+                    label =
+                        v15Text(
+                            "প্রাথমিক স্টকের ইউনিট",
+                            "Initial stock unit"
+                        ),
+                    onSelect = { option ->
+                        stockUnitName = option.name
+                    }
                 )
 
                 OutlinedTextField(
                     buy,
                     { buy = it },
                     label = {
-                        Text(v15Text("ক্রয় মূল্য / ইউনিট", "Purchase price / unit"))
+                        Text(
+                            v15Text(
+                                "ক্রয় মূল্য / ${selectedInitialStockOption.name}",
+                                "Purchase price / ${selectedInitialStockOption.name}"
+                            )
+                        )
                     },
                     singleLine = true,
                     modifier = Modifier.fillMaxWidth()
@@ -2095,11 +2308,38 @@ private fun AddProductDialog(
                     qty,
                     { qty = it },
                     label = {
-                        Text(v15Text("প্রাথমিক স্টক", "Initial stock"))
+                        Text(
+                            v15Text(
+                                "প্রাথমিক স্টক (${selectedInitialStockOption.name})",
+                                "Initial stock (${selectedInitialStockOption.name})"
+                            )
+                        )
                     },
                     singleLine = true,
                     modifier = Modifier.fillMaxWidth()
                 )
+
+                val initialEnteredQuantity =
+                    qty.v15InventoryIntOrNull()
+
+                if (
+                    initialEnteredQuantity != null &&
+                    initialEnteredQuantity > 0 &&
+                    selectedInitialStockOption.factor > 1
+                ) {
+                    val convertedBaseQuantity =
+                        initialEnteredQuantity.toLong() *
+                            selectedInitialStockOption.factor.toLong()
+
+                    Text(
+                        "$initialEnteredQuantity ${selectedInitialStockOption.name} = " +
+                            "$convertedBaseQuantity $baseStockUnit",
+                        style =
+                            MaterialTheme.typography.bodySmall,
+                        color =
+                            MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
 
                 OutlinedTextField(
                     low,
@@ -2234,7 +2474,11 @@ private fun AddProductDialog(
                                     purchasePrice = purchase,
                                     purchaseDate = purchaseDate,
                                     expiryDate = if (showExpiry) expiryDate else null,
-                                    batchNo = batchNo.trim()
+                                    batchNo = batchNo.trim(),
+                                    stockUnitName =
+                                        selectedInitialStockOption.name,
+                                    stockUnitFactor =
+                                        selectedInitialStockOption.factor
                                 )
                             )
                         }
@@ -2257,6 +2501,7 @@ private fun AddProductDialog(
             onDismiss = { showUnitPicker = false }
         ) {
             unit = it
+            stockUnitName = it
             showUnitPicker = false
         }
     }
@@ -2264,6 +2509,7 @@ private fun AddProductDialog(
 
 @Composable
 private fun AddBatchDialog(
+    unitOptions: List<InventoryStockUnitOption>,
     onDismiss: () -> Unit,
     onSave: (BatchInput) -> Unit
 ) {
@@ -2271,78 +2517,205 @@ private fun AddBatchDialog(
     var buy by remember { mutableStateOf("") }
     var batchNo by remember { mutableStateOf("") }
 
+    var selectedUnitName by
+        remember {
+            mutableStateOf(
+                unitOptions.firstOrNull()
+                    ?.name
+                    .orEmpty()
+            )
+        }
+
     var purchaseDate by remember {
-        mutableStateOf(startOfDay(System.currentTimeMillis()))
+        mutableStateOf(
+            startOfDay(
+                System.currentTimeMillis()
+            )
+        )
     }
 
     var expiryDate by remember {
         mutableStateOf<Long?>(null)
     }
 
-    var error by remember { mutableStateOf<String?>(null) }
+    var error by remember {
+        mutableStateOf<String?>(null)
+    }
+
+    val selectedUnit =
+        unitOptions.firstOrNull {
+            it.name.equals(
+                selectedUnitName,
+                ignoreCase = true
+            )
+        } ?: unitOptions.firstOrNull()
 
     AlertDialog(
         onDismissRequest = onDismiss,
         title = {
-            Text(v15Text("স্টক ব্যাচ যোগ করুন", "Add stock batch"))
+            Text(
+                v15Text(
+                    "স্টক ব্যাচ যোগ করুন",
+                    "Add stock batch"
+                )
+            )
         },
         text = {
             Column(
-                verticalArrangement = Arrangement.spacedBy(8.dp)
+                verticalArrangement =
+                    Arrangement.spacedBy(8.dp)
             ) {
-                OutlinedTextField(
-                    qty,
-                    { qty = it },
-                    label = { Text(v15Text("পরিমাণ", "Quantity")) },
-                    singleLine = true
+                InventoryStockUnitSelector(
+                    options = unitOptions,
+                    selectedName =
+                        selectedUnit?.name.orEmpty(),
+                    label =
+                        v15Text(
+                            "স্টক যোগ করার ইউনিট",
+                            "Stock entry unit"
+                        ),
+                    onSelect = { option ->
+                        selectedUnitName =
+                            option.name
+                    }
                 )
 
                 OutlinedTextField(
-                    buy,
-                    { buy = it },
+                    value = qty,
+                    onValueChange = {
+                        qty = it
+                    },
                     label = {
-                        Text(v15Text("ক্রয় মূল্য / ইউনিট", "Purchase price / unit"))
+                        Text(
+                            v15Text(
+                                "পরিমাণ (${selectedUnit?.name.orEmpty()})",
+                                "Quantity (${selectedUnit?.name.orEmpty()})"
+                            )
+                        )
                     },
                     singleLine = true
                 )
 
                 OutlinedTextField(
-                    batchNo,
-                    { batchNo = it },
-                    label = { Text("Batch / Lot No.") },
+                    value = buy,
+                    onValueChange = {
+                        buy = it
+                    },
+                    label = {
+                        Text(
+                            v15Text(
+                                "ক্রয় মূল্য / ${selectedUnit?.name.orEmpty()}",
+                                "Purchase price / ${selectedUnit?.name.orEmpty()}"
+                            )
+                        )
+                    },
+                    singleLine = true
+                )
+
+                val enteredQuantity =
+                    qty.v15InventoryIntOrNull()
+
+                if (
+                    selectedUnit != null &&
+                    enteredQuantity != null &&
+                    enteredQuantity > 0 &&
+                    selectedUnit.factor > 1
+                ) {
+                    val converted =
+                        enteredQuantity.toLong() *
+                            selectedUnit.factor.toLong()
+
+                    Text(
+                        "$enteredQuantity ${selectedUnit.name} = " +
+                            "$converted ${unitOptions.first().name}",
+                        style =
+                            MaterialTheme.typography.bodySmall,
+                        color =
+                            MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+
+                OutlinedTextField(
+                    value = batchNo,
+                    onValueChange = {
+                        batchNo = it
+                    },
+                    label = {
+                        Text("Batch / Lot No.")
+                    },
                     singleLine = true
                 )
 
                 DateButton(
-                    v15Text("কেনার তারিখ", "Purchase date"),
+                    v15Text(
+                        "কেনার তারিখ",
+                        "Purchase date"
+                    ),
                     purchaseDate
                 ) {
                     purchaseDate = it
                 }
 
                 NullableDateButton(
-                    v15Text("মেয়াদ শেষ", "Expiry date"),
+                    v15Text(
+                        "মেয়াদ শেষ",
+                        "Expiry date"
+                    ),
                     expiryDate
                 ) {
                     expiryDate = it
                 }
 
                 error?.let {
-                    Text(it, color = MaterialTheme.colorScheme.error)
+                    Text(
+                        it,
+                        color =
+                            MaterialTheme.colorScheme.error
+                    )
                 }
             }
         },
         confirmButton = {
             TextButton(
                 onClick = {
-                    val q = qty.v15InventoryIntOrNull()
-                    val p = buy.v15InventoryDoubleOrNull() ?: 0.0
+                    val q =
+                        qty.v15InventoryIntOrNull()
 
-                    if (q == null || q <= 0 || p < 0) {
-                        error = v15Text(
-                            v15Text("সঠিক তথ্য দিন","Enter valid information"),
-                            "Enter valid values"
-                        )
+                    val p =
+                        buy.v15InventoryDoubleOrNull()
+                            ?: 0.0
+
+                    val option =
+                        selectedUnit
+
+                    val baseQuantity =
+                        if (
+                            q != null &&
+                            q > 0 &&
+                            option != null
+                        ) {
+                            q.toLong() *
+                                option.factor.toLong()
+                        } else {
+                            -1L
+                        }
+
+                    if (
+                        q == null ||
+                        q <= 0 ||
+                        option == null ||
+                        option.factor <= 0 ||
+                        baseQuantity <= 0L ||
+                        baseQuantity >
+                            Int.MAX_VALUE.toLong() ||
+                        !p.isFinite() ||
+                        p < 0.0
+                    ) {
+                        error =
+                            v15Text(
+                                "সঠিক পরিমাণ, ইউনিট ও ক্রয় মূল্য দিন",
+                                "Enter a valid quantity, unit and purchase price"
+                            )
                     } else {
                         onSave(
                             BatchInput(
@@ -2350,42 +2723,219 @@ private fun AddBatchDialog(
                                 purchasePrice = p,
                                 purchaseDate = purchaseDate,
                                 expiryDate = expiryDate,
-                                batchNo = batchNo.trim()
+                                batchNo = batchNo.trim(),
+                                unitName = option.name,
+                                unitFactor = option.factor
                             )
                         )
                     }
                 }
             ) {
-                Text(v15Text("যোগ করুন", "Add"))
+                Text(
+                    v15Text(
+                        "যোগ করুন",
+                        "Add"
+                    )
+                )
             }
         },
         dismissButton = {
-            TextButton(onClick = onDismiss) {
-                Text(v15Text("বাতিল", "Cancel"))
+            TextButton(
+                onClick = onDismiss
+            ) {
+                Text(
+                    v15Text(
+                        "বাতিল",
+                        "Cancel"
+                    )
+                )
             }
         }
     )
 }
 
 @Composable
-private fun ReduceStockDialog(max: Int, onDismiss: () -> Unit, onSave: (Int) -> Unit) {
+private fun ReduceStockDialog(
+    maxBaseQuantity: Int,
+    unitOptions: List<InventoryStockUnitOption>,
+    onDismiss: () -> Unit,
+    onSave: (StockQuantityInput) -> Unit
+) {
     var qty by remember { mutableStateOf("") }
-    var error by remember { mutableStateOf<String?>(null) }
+
+    var selectedUnitName by
+        remember {
+            mutableStateOf(
+                unitOptions.firstOrNull()
+                    ?.name
+                    .orEmpty()
+            )
+        }
+
+    var error by remember {
+        mutableStateOf<String?>(null)
+    }
+
+    val selectedUnit =
+        unitOptions.firstOrNull {
+            it.name.equals(
+                selectedUnitName,
+                ignoreCase = true
+            )
+        } ?: unitOptions.firstOrNull()
+
+    val selectedAvailable =
+        if (
+            selectedUnit != null &&
+            selectedUnit.factor > 0
+        ) {
+            maxBaseQuantity /
+                selectedUnit.factor
+        } else {
+            0
+        }
+
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text(v15Text("স্টক কমান", "Reduce stock")) },
+        title = {
+            Text(
+                v15Text(
+                    "স্টক কমান",
+                    "Reduce stock"
+                )
+            )
+        },
         text = {
-            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                Text(v15Text("বর্তমান স্টক: $max", "Current stock: $max"))
-                OutlinedTextField(qty, { qty = it }, label = { Text(v15Text("কতটি কমাবেন", "Quantity to remove")) }, singleLine = true)
-                error?.let { Text(it, color = MaterialTheme.colorScheme.error) }
+            Column(
+                verticalArrangement =
+                    Arrangement.spacedBy(8.dp)
+            ) {
+                Text(
+                    v15Text(
+                        "বর্তমান স্টক: $maxBaseQuantity ${unitOptions.firstOrNull()?.name.orEmpty()}",
+                        "Current stock: $maxBaseQuantity ${unitOptions.firstOrNull()?.name.orEmpty()}"
+                    )
+                )
+
+                InventoryStockUnitSelector(
+                    options = unitOptions,
+                    selectedName =
+                        selectedUnit?.name.orEmpty(),
+                    label =
+                        v15Text(
+                            "স্টক কমানোর ইউনিট",
+                            "Stock removal unit"
+                        ),
+                    onSelect = { option ->
+                        selectedUnitName =
+                            option.name
+                    }
+                )
+
+                if (selectedUnit != null) {
+                    Text(
+                        v15Text(
+                            "এই ইউনিটে সর্বোচ্চ: $selectedAvailable ${selectedUnit.name}",
+                            "Maximum in this unit: $selectedAvailable ${selectedUnit.name}"
+                        ),
+                        style =
+                            MaterialTheme.typography.bodySmall
+                    )
+                }
+
+                OutlinedTextField(
+                    value = qty,
+                    onValueChange = {
+                        qty = it
+                    },
+                    label = {
+                        Text(
+                            v15Text(
+                                "কত ${selectedUnit?.name.orEmpty()} কমাবেন",
+                                "Quantity to remove (${selectedUnit?.name.orEmpty()})"
+                            )
+                        )
+                    },
+                    singleLine = true
+                )
+
+                error?.let {
+                    Text(
+                        it,
+                        color =
+                            MaterialTheme.colorScheme.error
+                    )
+                }
             }
         },
-        confirmButton = { TextButton(onClick = {
-            val q = qty.v15InventoryIntOrNull()
-            if (q == null || q <= 0 || q > max) error = v15Text("সঠিক পরিমাণ দিন", "Enter a valid quantity") else onSave(q)
-        }) { Text(v15Text("আপডেট", "Update")) } },
-        dismissButton = { TextButton(onClick = onDismiss) { Text(v15Text("বাতিল", "Cancel")) } }
+        confirmButton = {
+            TextButton(
+                onClick = {
+                    val q =
+                        qty.v15InventoryIntOrNull()
+
+                    val option =
+                        selectedUnit
+
+                    val baseQuantity =
+                        if (
+                            q != null &&
+                            q > 0 &&
+                            option != null
+                        ) {
+                            q.toLong() *
+                                option.factor.toLong()
+                        } else {
+                            -1L
+                        }
+
+                    if (
+                        q == null ||
+                        q <= 0 ||
+                        option == null ||
+                        option.factor <= 0 ||
+                        baseQuantity <= 0L ||
+                        baseQuantity >
+                            maxBaseQuantity.toLong() ||
+                        baseQuantity >
+                            Int.MAX_VALUE.toLong()
+                    ) {
+                        error =
+                            v15Text(
+                                "সঠিক পরিমাণ দিন",
+                                "Enter a valid quantity"
+                            )
+                    } else {
+                        onSave(
+                            StockQuantityInput(
+                                quantity = q,
+                                unitName = option.name,
+                                unitFactor = option.factor
+                            )
+                        )
+                    }
+                }
+            ) {
+                Text(
+                    v15Text(
+                        "আপডেট",
+                        "Update"
+                    )
+                )
+            }
+        },
+        dismissButton = {
+            TextButton(
+                onClick = onDismiss
+            ) {
+                Text(
+                    v15Text(
+                        "বাতিল",
+                        "Cancel"
+                    )
+                )
+            }
+        }
     )
 }
 
@@ -2521,12 +3071,34 @@ private fun EditProductDialog(
                     label = { Text("Barcode / SKU") }
                 )
 
-                OutlinedButton(
-                    onClick = { showUnitPicker = true },
-                    modifier = Modifier.fillMaxWidth()
-                ) {
-                    Text(v15Text(v15Text("ইউনিট: $unit","Unit: $unit"), "Unit: $unit"))
-                }
+                OutlinedTextField(
+                    value =
+                        unit.trim()
+                            .ifBlank { "pcs" },
+                    onValueChange = {},
+                    readOnly = true,
+                    label = {
+                        Text(
+                            v15Text(
+                                "Base Unit (লক)",
+                                "Base Unit (locked)"
+                            )
+                        )
+                    },
+                    modifier =
+                        Modifier.fillMaxWidth()
+                )
+
+                Text(
+                    v15Text(
+                        "স্টক ও পুরনো রেকর্ড সঠিক রাখতে Base Unit পরিবর্তন করা যাবে না। Additional Unit ও conversion পরিবর্তন করতে পারবেন।",
+                        "Base Unit is locked to protect stock and historical records. Additional units and conversions can still be edited."
+                    ),
+                    style =
+                        MaterialTheme.typography.bodySmall,
+                    color =
+                        MaterialTheme.colorScheme.onSurfaceVariant
+                )
 
                 ProductUnitConversionEditor(
                     baseUnit =

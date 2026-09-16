@@ -176,6 +176,70 @@ class InventoryViewModel(application: Application) : AndroidViewModel(applicatio
         return cleaned
     }
 
+    private suspend fun resolveExistingProductUnit(
+        product: ProductEntity,
+        requestedUnitName: String,
+        requestedUnitFactor: Int
+    ): Pair<String, Int> {
+        require(requestedUnitFactor > 0)
+
+        val baseName =
+            product.unit
+                .trim()
+                .ifBlank { "pcs" }
+
+        val baseKey =
+            baseName.lowercase(
+                Locale.ROOT
+            )
+
+        val requestedKey =
+            requestedUnitName
+                .trim()
+                .lowercase(
+                    Locale.ROOT
+                )
+
+        if (
+            requestedKey.isBlank() ||
+            requestedKey == baseKey
+        ) {
+            require(
+                requestedUnitFactor == 1
+            ) {
+                "Invalid base unit factor"
+            }
+
+            return baseName to 1
+        }
+
+        val conversion =
+            requireNotNull(
+                dao.getProductUnitConversionsOnce(
+                    product.id
+                ).firstOrNull {
+                    it.unitKey ==
+                        requestedKey
+                }
+            ) {
+                "Product unit not found"
+            }
+
+        require(
+            conversion.baseQuantity ==
+                requestedUnitFactor
+        ) {
+            "Product unit factor changed"
+        }
+
+        require(
+            conversion.baseQuantity > 1
+        )
+
+        return conversion.unitName to
+            conversion.baseQuantity
+    }
+
     private suspend fun replaceProductUnitConversions(
         productId: Long,
         baseUnit: String,
@@ -293,7 +357,9 @@ class InventoryViewModel(application: Application) : AndroidViewModel(applicatio
         batchNo: String,
         unitConversions:
             List<ProductUnitInput> =
-                emptyList()
+                emptyList(),
+        initialUnitName: String = "",
+        initialUnitFactor: Int = 1
     ) {
         val cleanName = name.trim()
         if (cleanName.isBlank()) return
@@ -310,6 +376,89 @@ class InventoryViewModel(application: Application) : AndroidViewModel(applicatio
                 )
             }.getOrNull()
                 ?: return
+
+        if (
+            initialQuantity < 0 ||
+            initialUnitFactor <= 0 ||
+            !purchasePrice.isFinite() ||
+            purchasePrice < 0.0
+        ) {
+            return
+        }
+
+        val initialStockValues =
+            runCatching {
+                val baseKey =
+                    cleanUnit.lowercase(
+                        Locale.ROOT
+                    )
+
+                val requestedKey =
+                    initialUnitName
+                        .trim()
+                        .lowercase(
+                            Locale.ROOT
+                        )
+
+                val factor =
+                    if (
+                        requestedKey.isBlank() ||
+                        requestedKey == baseKey
+                    ) {
+                        require(
+                            initialUnitFactor == 1
+                        )
+                        1
+                    } else {
+                        val conversion =
+                            requireNotNull(
+                                cleanedUnits
+                                    .firstOrNull {
+                                        it.unitName
+                                            .lowercase(
+                                                Locale.ROOT
+                                            ) ==
+                                            requestedKey
+                                    }
+                            )
+
+                        require(
+                            conversion.baseQuantity ==
+                                initialUnitFactor
+                        )
+
+                        conversion.baseQuantity
+                    }
+
+                val baseQuantityLong =
+                    initialQuantity.toLong() *
+                        factor.toLong()
+
+                require(
+                    baseQuantityLong in
+                        0L..
+                        Int.MAX_VALUE.toLong()
+                )
+
+                val basePurchasePrice =
+                    purchasePrice /
+                        factor.toDouble()
+
+                require(
+                    basePurchasePrice.isFinite() &&
+                        basePurchasePrice >= 0.0
+                )
+
+                baseQuantityLong.toInt() to
+                    basePurchasePrice
+            }.getOrNull()
+                ?: return
+
+        val initialBaseQuantity =
+            initialStockValues.first
+
+        val initialBasePurchasePrice =
+            initialStockValues.second
 
         viewModelScope.launch {
             runCatching {
@@ -369,7 +518,7 @@ class InventoryViewModel(application: Application) : AndroidViewModel(applicatio
                             cleanedUnits
                     )
 
-                    if (initialQuantity > 0) {
+                    if (initialBaseQuantity > 0) {
                         dao.insertBatch(
                             StockBatchEntity(
                                 productId =
@@ -377,10 +526,9 @@ class InventoryViewModel(application: Application) : AndroidViewModel(applicatio
                                 batchNo =
                                     batchNo.trim(),
                                 quantity =
-                                    initialQuantity,
+                                    initialBaseQuantity,
                                 purchasePrice =
-                                    purchasePrice
-                                        .coerceAtLeast(0.0),
+                                    initialBasePurchasePrice,
                                 purchaseDate =
                                     purchaseDate,
                                 expiryDate =
@@ -420,6 +568,20 @@ class InventoryViewModel(application: Application) : AndroidViewModel(applicatio
         val cleanUnit =
             unit.trim()
                 .ifBlank { "pcs" }
+
+        val existingBaseUnit =
+            item.unit
+                .trim()
+                .ifBlank { "pcs" }
+
+        if (
+            !cleanUnit.equals(
+                existingBaseUnit,
+                ignoreCase = true
+            )
+        ) {
+            return
+        }
 
         val cleanedUnits =
             runCatching {
@@ -521,21 +683,91 @@ class InventoryViewModel(application: Application) : AndroidViewModel(applicatio
         purchasePrice: Double,
         purchaseDate: Long,
         expiryDate: Long?,
-        batchNo: String
+        batchNo: String,
+        unitName: String = "",
+        unitFactor: Int = 1
     ) {
-        if (quantity <= 0) return
+        if (
+            quantity <= 0 ||
+            unitFactor <= 0 ||
+            !purchasePrice.isFinite() ||
+            purchasePrice < 0.0
+        ) {
+            return
+        }
+
+        val currentWorkspace =
+            workspace.value
+
+        val currentBusinessKey =
+            businessKey.value
 
         viewModelScope.launch {
-            dao.insertBatch(
-                StockBatchEntity(
-                    productId = productId,
-                    batchNo = batchNo.trim(),
-                    quantity = quantity,
-                    purchasePrice = purchasePrice.coerceAtLeast(0.0),
-                    purchaseDate = purchaseDate,
-                    expiryDate = expiryDate
-                )
-            )
+            runCatching {
+                database.withTransaction {
+                    val product =
+                        requireNotNull(
+                            dao.getProductOnce(
+                                productId
+                            )
+                        )
+
+                    require(
+                        product.workspace ==
+                            currentWorkspace &&
+                            product.businessKey ==
+                                currentBusinessKey
+                    ) {
+                        "Product context mismatch"
+                    }
+
+                    val resolvedUnit =
+                        resolveExistingProductUnit(
+                            product = product,
+                            requestedUnitName =
+                                unitName,
+                            requestedUnitFactor =
+                                unitFactor
+                        )
+
+                    val factor =
+                        resolvedUnit.second
+
+                    val baseQuantityLong =
+                        quantity.toLong() *
+                            factor.toLong()
+
+                    require(
+                        baseQuantityLong in
+                            1L..
+                            Int.MAX_VALUE.toLong()
+                    )
+
+                    val basePurchasePrice =
+                        purchasePrice /
+                            factor.toDouble()
+
+                    require(
+                        basePurchasePrice.isFinite() &&
+                            basePurchasePrice >= 0.0
+                    )
+
+                    dao.insertBatch(
+                        StockBatchEntity(
+                            productId = productId,
+                            batchNo = batchNo.trim(),
+                            quantity =
+                                baseQuantityLong.toInt(),
+                            purchasePrice =
+                                basePurchasePrice,
+                            purchaseDate =
+                                purchaseDate,
+                            expiryDate =
+                                expiryDate
+                        )
+                    )
+                }
+            }
         }
     }
 
@@ -1186,26 +1418,114 @@ class InventoryViewModel(application: Application) : AndroidViewModel(applicatio
         }
     }
 
-    fun reduceStock(productId: Long, quantity: Int, onDone: (Boolean) -> Unit = {}) {
-        if (quantity <= 0) {
+    fun reduceStock(
+        productId: Long,
+        quantity: Int,
+        unitName: String = "",
+        unitFactor: Int = 1,
+        onDone: (Boolean) -> Unit = {}
+    ) {
+        if (
+            quantity <= 0 ||
+            unitFactor <= 0
+        ) {
             onDone(false)
             return
         }
+
+        val currentWorkspace =
+            workspace.value
+
+        val currentBusinessKey =
+            businessKey.value
+
         viewModelScope.launch {
-            val result = runCatching {
-                database.withTransaction {
-                    val batches = dao.getBatchesOnce(productId).filter { it.quantity > 0 }
-                    val available = batches.sumOf { it.quantity }
-                    require(available >= quantity) { "Not enough stock" }
-                    var remaining = quantity
-                    for (batch in batches) {
-                        if (remaining <= 0) break
-                        val used = minOf(batch.quantity, remaining)
-                        dao.updateBatchQuantity(batch.id, batch.quantity - used)
-                        remaining -= used
+            val result =
+                runCatching {
+                    database.withTransaction {
+                        val product =
+                            requireNotNull(
+                                dao.getProductOnce(
+                                    productId
+                                )
+                            )
+
+                        require(
+                            product.workspace ==
+                                currentWorkspace &&
+                                product.businessKey ==
+                                    currentBusinessKey
+                        ) {
+                            "Product context mismatch"
+                        }
+
+                        val resolvedUnit =
+                            resolveExistingProductUnit(
+                                product = product,
+                                requestedUnitName =
+                                    unitName,
+                                requestedUnitFactor =
+                                    unitFactor
+                            )
+
+                        val baseQuantityLong =
+                            quantity.toLong() *
+                                resolvedUnit.second.toLong()
+
+                        require(
+                            baseQuantityLong in
+                                1L..
+                                Int.MAX_VALUE.toLong()
+                        )
+
+                        val baseQuantity =
+                            baseQuantityLong.toInt()
+
+                        val batches =
+                            dao.getBatchesOnce(
+                                productId
+                            ).filter {
+                                it.quantity > 0
+                            }
+
+                        val available =
+                            batches.sumOf {
+                                it.quantity.toLong()
+                            }
+
+                        require(
+                            available >=
+                                baseQuantityLong
+                        ) {
+                            "Not enough stock"
+                        }
+
+                        var remaining =
+                            baseQuantity
+
+                        for (batch in batches) {
+                            if (remaining <= 0) break
+
+                            val used =
+                                minOf(
+                                    batch.quantity,
+                                    remaining
+                                )
+
+                            dao.updateBatchQuantity(
+                                batch.id,
+                                batch.quantity - used
+                            )
+
+                            remaining -= used
+                        }
+
+                        require(
+                            remaining == 0
+                        )
                     }
-                }
-            }.isSuccess
+                }.isSuccess
+
             onDone(result)
         }
     }

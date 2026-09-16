@@ -844,6 +844,7 @@ private fun ProductListScreen(
             )
 
         EditProductDialog(
+            viewModel = viewModel,
             product = product,
             batches = editBatches,
             onDismiss = {

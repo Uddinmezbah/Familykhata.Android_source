@@ -46,6 +46,35 @@ data class ProductEntity(
 )
 
 @Entity(
+    tableName = "inventory_product_units",
+    foreignKeys = [
+        ForeignKey(
+            entity = ProductEntity::class,
+            parentColumns = ["id"],
+            childColumns = ["productId"],
+            onDelete = ForeignKey.CASCADE
+        )
+    ],
+    indices = [
+        Index("productId"),
+        Index(
+            value = ["productId", "unitKey"],
+            unique = true
+        )
+    ]
+)
+data class ProductUnitConversionEntity(
+    @PrimaryKey(autoGenerate = true)
+    val id: Long = 0,
+    val productId: Long,
+    val unitName: String,
+    val unitKey: String,
+    val baseQuantity: Int,
+    val sortOrder: Int,
+    val createdAt: Long = System.currentTimeMillis()
+)
+
+@Entity(
     tableName = "inventory_batches",
     foreignKeys = [
         ForeignKey(

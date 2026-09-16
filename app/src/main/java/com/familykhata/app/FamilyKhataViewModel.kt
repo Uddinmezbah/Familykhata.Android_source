@@ -13,6 +13,7 @@ import com.familykhata.app.data.DashboardTotals
 import com.familykhata.app.data.DueReceivableItem
 import com.familykhata.app.data.InventoryBackupBridge
 import com.familykhata.app.data.ProductEntity
+import com.familykhata.app.data.ProductUnitConversionEntity
 import com.familykhata.app.data.StockBatchEntity
 import com.familykhata.app.data.TransactionEntity
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -511,7 +512,7 @@ class FamilyKhataViewModel(application: Application) : AndroidViewModel(applicat
 
                 JSONObject().apply {
                     put("format", "hisabi-khata-backup")
-                    put("version", 6)
+                    put("version", 7)
                     put("createdAt", System.currentTimeMillis())
                     put("transactions", JSONArray().apply {
                         transactions.forEach { item ->
@@ -596,6 +597,43 @@ class FamilyKhataViewModel(application: Application) : AndroidViewModel(applicat
                             })
                         }
                     })
+                    put(
+                        "inventoryUnits",
+                        JSONArray().apply {
+                            inventory.unitConversions
+                                .forEach { unit ->
+                                    put(
+                                        JSONObject().apply {
+                                            put(
+                                                "id",
+                                                unit.id
+                                            )
+                                            put(
+                                                "productId",
+                                                unit.productId
+                                            )
+                                            put(
+                                                "unitName",
+                                                unit.unitName
+                                            )
+                                            put(
+                                                "baseQuantity",
+                                                unit.baseQuantity
+                                            )
+                                            put(
+                                                "sortOrder",
+                                                unit.sortOrder
+                                            )
+                                            put(
+                                                "createdAt",
+                                                unit.createdAt
+                                            )
+                                        }
+                                    )
+                                }
+                        }
+                    )
+
                     put("inventoryBatches", JSONArray().apply {
                         inventory.batches.forEach { batch ->
                             put(JSONObject().apply {
@@ -629,7 +667,7 @@ class FamilyKhataViewModel(application: Application) : AndroidViewModel(applicat
                     "এটি হিসাবী খাতার সঠিক ব্যাকআপ ফাইল নয়"
                 }
                 val backupVersion = root.optInt("version")
-                require(backupVersion in 1..6) {
+                require(backupVersion in 1..7) {
                     "এই ব্যাকআপ ভার্সনটি এখনো সমর্থিত নয়"
                 }
 
@@ -638,6 +676,8 @@ class FamilyKhataViewModel(application: Application) : AndroidViewModel(applicat
                 val entries = mutableListOf<BakiEntryEntity>()
                 val inventoryProducts = mutableListOf<ProductEntity>()
                 val inventoryBatches = mutableListOf<StockBatchEntity>()
+                val inventoryUnits =
+                    mutableListOf<ProductUnitConversionEntity>()
                 val actions = setOf("GAVE", "RECEIVED_BACK", "TOOK", "PAID_BACK")
 
                 val transactionArray = root.getJSONArray("transactions")
@@ -780,7 +820,107 @@ class FamilyKhataViewModel(application: Application) : AndroidViewModel(applicat
                             createdAt = item.optLong("createdAt", System.currentTimeMillis())
                         )
                     }
-                    val productIds = inventoryProducts.map { it.id }.toSet()
+                    val productIds =
+                        inventoryProducts
+                            .map {
+                                it.id
+                            }
+                            .toSet()
+
+                    if (backupVersion >= 7) {
+                        val unitArray =
+                            root.optJSONArray(
+                                "inventoryUnits"
+                            ) ?: JSONArray()
+
+                        val seenUnits =
+                            mutableSetOf<Pair<Long, String>>()
+
+                        for (
+                            index in
+                            0 until unitArray.length()
+                        ) {
+                            val item =
+                                unitArray
+                                    .getJSONObject(
+                                        index
+                                    )
+
+                            val productId =
+                                item.getLong(
+                                    "productId"
+                                )
+
+                            require(
+                                productId in
+                                    productIds
+                            ) {
+                                "ইউনিটের পণ্য পাওয়া যায়নি"
+                            }
+
+                            val unitName =
+                                item.getString(
+                                    "unitName"
+                                ).trim()
+
+                            val unitKey =
+                                unitName.lowercase(
+                                    Locale.ROOT
+                                )
+
+                            val baseQuantity =
+                                item.getInt(
+                                    "baseQuantity"
+                                )
+
+                            val sortOrder =
+                                item.getInt(
+                                    "sortOrder"
+                                )
+
+                            require(
+                                unitName.isNotBlank() &&
+                                    baseQuantity > 1 &&
+                                    sortOrder > 0
+                            ) {
+                                "পণ্যের ইউনিট তথ্য সঠিক নয়"
+                            }
+
+                            require(
+                                seenUnits.add(
+                                    productId to
+                                        unitKey
+                                )
+                            ) {
+                                "একই পণ্যের একই ইউনিট একাধিকবার আছে"
+                            }
+
+                            inventoryUnits +=
+                                ProductUnitConversionEntity(
+                                    id =
+                                        item.optLong(
+                                            "id",
+                                            0L
+                                        ),
+                                    productId =
+                                        productId,
+                                    unitName =
+                                        unitName,
+                                    unitKey =
+                                        unitKey,
+                                    baseQuantity =
+                                        baseQuantity,
+                                    sortOrder =
+                                        sortOrder,
+                                    createdAt =
+                                        item.optLong(
+                                            "createdAt",
+                                            System.currentTimeMillis()
+                                        )
+                                )
+                        }
+                    }
+
                     val batchArray = root.optJSONArray("inventoryBatches") ?: JSONArray()
                     for (index in 0 until batchArray.length()) {
                         val item = batchArray.getJSONObject(index)
@@ -813,7 +953,8 @@ class FamilyKhataViewModel(application: Application) : AndroidViewModel(applicat
                     InventoryBackupBridge.restore(
                         getApplication(),
                         inventoryProducts,
-                        inventoryBatches
+                        inventoryBatches,
+                        inventoryUnits
                     )
                 }
 
@@ -843,6 +984,7 @@ class FamilyKhataViewModel(application: Application) : AndroidViewModel(applicat
                     entries.size +
                     inventoryProducts.size +
                     inventoryBatches.size +
+                    inventoryUnits.size +
                     businessRowsRestored
             }.onSuccess(onDone).onFailure {
                 onError(it.message ?: "ব্যাকআপ রিস্টোর করা যায়নি")

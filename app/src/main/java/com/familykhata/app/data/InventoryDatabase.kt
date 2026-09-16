@@ -119,9 +119,10 @@ import com.familykhata.app.production.ProductionItemRoleEntity
         FoodPaymentEntity::class,
         RetailSaleEntity::class,
         RetailSaleLineEntity::class,
-        RetailSaleStockAllocationEntity::class
+        RetailSaleStockAllocationEntity::class,
+        ProductUnitConversionEntity::class
     ],
-    version = 13,
+    version = 14,
     exportSchema = false
 )
 abstract class InventoryDatabase : RoomDatabase() {
@@ -2418,6 +2419,52 @@ abstract class InventoryDatabase : RoomDatabase() {
                 }
             }
 
+        private val MIGRATION_13_14 =
+            object : Migration(
+                13,
+                14
+            ) {
+                override fun migrate(
+                    db: SupportSQLiteDatabase
+                ) {
+                    db.execSQL(
+                        """
+                        CREATE TABLE IF NOT EXISTS
+                        `inventory_product_units` (
+                            `id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+                            `productId` INTEGER NOT NULL,
+                            `unitName` TEXT NOT NULL,
+                            `unitKey` TEXT NOT NULL,
+                            `baseQuantity` INTEGER NOT NULL,
+                            `sortOrder` INTEGER NOT NULL,
+                            `createdAt` INTEGER NOT NULL,
+                            FOREIGN KEY(`productId`)
+                                REFERENCES `inventory_products`(`id`)
+                                ON UPDATE NO ACTION
+                                ON DELETE CASCADE
+                        )
+                        """.trimIndent()
+                    )
+
+                    db.execSQL(
+                        """
+                        CREATE INDEX IF NOT EXISTS
+                        `index_inventory_product_units_productId`
+                        ON `inventory_product_units` (`productId`)
+                        """.trimIndent()
+                    )
+
+                    db.execSQL(
+                        """
+                        CREATE UNIQUE INDEX IF NOT EXISTS
+                        `index_inventory_product_units_productId_unitKey`
+                        ON `inventory_product_units`
+                        (`productId`, `unitKey`)
+                        """.trimIndent()
+                    )
+                }
+            }
+
         fun get(context: Context): InventoryDatabase = INSTANCE ?: synchronized(this) {
             INSTANCE ?: Room.databaseBuilder(
                 context.applicationContext,
@@ -2436,7 +2483,8 @@ abstract class InventoryDatabase : RoomDatabase() {
                     MIGRATION_9_10,
                     MIGRATION_10_11,
                     MIGRATION_11_12,
-                    MIGRATION_12_13
+                    MIGRATION_12_13,
+                    MIGRATION_13_14
                 )
                 .build()
                 .also { INSTANCE = it }
@@ -2446,7 +2494,8 @@ abstract class InventoryDatabase : RoomDatabase() {
 
 data class InventoryBackupData(
     val products: List<ProductEntity>,
-    val batches: List<StockBatchEntity>
+    val batches: List<StockBatchEntity>,
+    val unitConversions: List<ProductUnitConversionEntity>
 )
 
 object InventoryBackupBridge {
@@ -2454,22 +2503,38 @@ object InventoryBackupBridge {
         val dao = InventoryDatabase.get(context).dao()
         return InventoryBackupData(
             products = dao.getAllProducts(),
-            batches = dao.getAllBatches()
+            batches = dao.getAllBatches(),
+            unitConversions =
+                dao.getAllProductUnitConversions()
         )
     }
 
     suspend fun restore(
         context: Context,
         products: List<ProductEntity>,
-        batches: List<StockBatchEntity>
+        batches: List<StockBatchEntity>,
+        unitConversions:
+            List<ProductUnitConversionEntity> =
+                emptyList()
     ) {
         val db = InventoryDatabase.get(context)
         val dao = db.dao()
         db.withTransaction {
+            dao.clearProductUnitConversions()
             dao.clearBatches()
             dao.clearProducts()
-            products.forEach { dao.insertProduct(it) }
-            batches.forEach { dao.insertBatch(it) }
+
+            products.forEach {
+                dao.insertProduct(it)
+            }
+
+            unitConversions.forEach {
+                dao.insertProductUnitConversion(it)
+            }
+
+            batches.forEach {
+                dao.insertBatch(it)
+            }
         }
     }
 }

@@ -6,6 +6,7 @@ import androidx.lifecycle.viewModelScope
 import androidx.room.withTransaction
 import com.familykhata.app.data.InventoryDatabase
 import com.familykhata.app.data.ProductEntity
+import com.familykhata.app.data.ProductUnitConversionEntity
 import com.familykhata.app.data.ProductStockSummary
 import com.familykhata.app.data.RetailSaleEntity
 import com.familykhata.app.data.RetailSaleLineEntity
@@ -20,6 +21,13 @@ import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
+import java.util.Locale
+
+data class ProductUnitInput(
+    val unitName: String,
+    val baseQuantity: Int,
+    val sortOrder: Int
+)
 
 data class RetailSaleLineInput(
     val productId: Long,
@@ -107,6 +115,126 @@ class InventoryViewModel(application: Application) : AndroidViewModel(applicatio
     fun observeBatches(productId: Long): Flow<List<StockBatchEntity>> =
         dao.observeBatches(productId)
 
+    fun observeProductUnitConversions(
+        productId: Long
+    ): Flow<List<ProductUnitConversionEntity>> =
+        dao.observeProductUnitConversions(
+            productId
+        )
+
+    private fun normalizedProductUnitInputs(
+        baseUnit: String,
+        units: List<ProductUnitInput>
+    ): List<ProductUnitInput> {
+        val baseKey =
+            baseUnit
+                .trim()
+                .ifBlank { "pcs" }
+                .lowercase(Locale.ROOT)
+
+        val cleaned =
+            units
+                .sortedBy { it.sortOrder }
+                .mapIndexed { index, item ->
+                    ProductUnitInput(
+                        unitName =
+                            item.unitName.trim(),
+                        baseQuantity =
+                            item.baseQuantity,
+                        sortOrder =
+                            index + 1
+                    )
+                }
+
+        require(
+            cleaned.none {
+                it.unitName.isBlank() ||
+                    it.baseQuantity <= 1
+            }
+        )
+
+        val keys =
+            cleaned.map {
+                it.unitName.lowercase(
+                    Locale.ROOT
+                )
+            }
+
+        require(
+            keys.distinct().size ==
+                keys.size
+        )
+
+        require(
+            keys.none {
+                it == baseKey
+            }
+        )
+
+        var previousFactor = 1
+
+        cleaned.forEach { unit ->
+            require(
+                unit.baseQuantity >
+                    previousFactor
+            )
+
+            require(
+                unit.baseQuantity %
+                    previousFactor == 0
+            )
+
+            previousFactor =
+                unit.baseQuantity
+        }
+
+        return cleaned
+    }
+
+    private suspend fun replaceProductUnitConversions(
+        productId: Long,
+        baseUnit: String,
+        units: List<ProductUnitInput>
+    ) {
+        val cleaned =
+            normalizedProductUnitInputs(
+                baseUnit = baseUnit,
+                units = units
+            )
+
+        dao.deleteProductUnitConversions(
+            productId
+        )
+
+        cleaned.forEach { unit ->
+            val inserted =
+                dao.insertProductUnitConversion(
+                    ProductUnitConversionEntity(
+                        productId =
+                            productId,
+                        unitName =
+                            unit.unitName,
+                        unitKey =
+                            unit.unitName
+                                .lowercase(
+                                    Locale.ROOT
+                                ),
+                        baseQuantity =
+                            unit.baseQuantity,
+                        sortOrder =
+                            unit.sortOrder
+                    )
+                )
+
+            require(inserted > 0L)
+        }
+    }
+
+    fun saveProductUnitConversions(
+        productId: Long,
+        units: List<ProductUnitInput>,
+        onDone: (Boolean) -> Unit = {}
+
     fun observeRetailSaleLines(
         saleId: Long
     ): Flow<List<RetailSaleLineEntity>> =
@@ -134,48 +262,104 @@ class InventoryViewModel(application: Application) : AndroidViewModel(applicatio
         purchasePrice: Double,
         purchaseDate: Long,
         expiryDate: Long?,
-        batchNo: String
+        batchNo: String,
+        unitConversions:
+            List<ProductUnitInput> =
+                emptyList()
     ) {
         val cleanName = name.trim()
         if (cleanName.isBlank()) return
 
-        viewModelScope.launch {
-            database.withTransaction {
-                val productId = dao.insertProduct(
-                    ProductEntity(
-                        name = cleanName,
-                        category = category.trim(),
-                        sku = sku.trim(),
-                        unit = unit.trim().ifBlank { "pcs" },
-                        brand = brand.trim(),
-                        genericName = genericName.trim(),
-                        modelName = modelName.trim(),
-                        serialOrImei = serialOrImei.trim(),
-                        size = size.trim(),
-                        color = color.trim(),
-                        warrantyMonths = warrantyMonths.coerceAtLeast(0),
-                        sellingPrice = sellingPrice.coerceAtLeast(0.0),
-                        mrp = mrp.coerceAtLeast(0.0),
-                        rackLocation = rackLocation.trim(),
-                        lowStockLevel = lowStockLevel.coerceAtLeast(0),
-                        note = note.trim(),
-                        workspace = workspace,
-                        businessKey =
-                            businessKey.value
-                    )
-                )
+        val cleanUnit =
+            unit.trim()
+                .ifBlank { "pcs" }
 
-                if (initialQuantity > 0) {
-                    dao.insertBatch(
-                        StockBatchEntity(
-                            productId = productId,
-                            batchNo = batchNo.trim(),
-                            quantity = initialQuantity,
-                            purchasePrice = purchasePrice.coerceAtLeast(0.0),
-                            purchaseDate = purchaseDate,
-                            expiryDate = expiryDate
+        val cleanedUnits =
+            runCatching {
+                normalizedProductUnitInputs(
+                    baseUnit = cleanUnit,
+                    units = unitConversions
+                )
+            }.getOrNull()
+                ?: return
+
+        viewModelScope.launch {
+            runCatching {
+                database.withTransaction {
+                    val productId =
+                        dao.insertProduct(
+                            ProductEntity(
+                                name = cleanName,
+                                category =
+                                    category.trim(),
+                                sku =
+                                    sku.trim(),
+                                unit =
+                                    cleanUnit,
+                                brand =
+                                    brand.trim(),
+                                genericName =
+                                    genericName.trim(),
+                                modelName =
+                                    modelName.trim(),
+                                serialOrImei =
+                                    serialOrImei.trim(),
+                                size =
+                                    size.trim(),
+                                color =
+                                    color.trim(),
+                                warrantyMonths =
+                                    warrantyMonths
+                                        .coerceAtLeast(0),
+                                sellingPrice =
+                                    sellingPrice
+                                        .coerceAtLeast(0.0),
+                                mrp =
+                                    mrp.coerceAtLeast(0.0),
+                                rackLocation =
+                                    rackLocation.trim(),
+                                lowStockLevel =
+                                    lowStockLevel
+                                        .coerceAtLeast(0),
+                                note =
+                                    note.trim(),
+                                workspace =
+                                    workspace,
+                                businessKey =
+                                    businessKey.value
+                            )
                         )
+
+                    require(productId > 0L)
+
+                    replaceProductUnitConversions(
+                        productId =
+                            productId,
+                        baseUnit =
+                            cleanUnit,
+                        units =
+                            cleanedUnits
                     )
+
+                    if (initialQuantity > 0) {
+                        dao.insertBatch(
+                            StockBatchEntity(
+                                productId =
+                                    productId,
+                                batchNo =
+                                    batchNo.trim(),
+                                quantity =
+                                    initialQuantity,
+                                purchasePrice =
+                                    purchasePrice
+                                        .coerceAtLeast(0.0),
+                                purchaseDate =
+                                    purchaseDate,
+                                expiryDate =
+                                    expiryDate
+                            )
+                        )
+                    }
                 }
             }
         }
@@ -198,30 +382,77 @@ class InventoryViewModel(application: Application) : AndroidViewModel(applicatio
         mrp: Double,
         rackLocation: String,
         lowStockLevel: Int,
-        note: String
+        note: String,
+        unitConversions:
+            List<ProductUnitInput> =
+                emptyList()
     ) {
         if (name.isBlank()) return
 
+        val cleanUnit =
+            unit.trim()
+                .ifBlank { "pcs" }
+
+        val cleanedUnits =
+            runCatching {
+                normalizedProductUnitInputs(
+                    baseUnit = cleanUnit,
+                    units = unitConversions
+                )
+            }.getOrNull()
+                ?: return
+
         viewModelScope.launch {
-            dao.updateProduct(
-                productId = item.id,
-                name = name.trim(),
-                category = category.trim(),
-                sku = sku.trim(),
-                unit = unit.trim().ifBlank { "pcs" },
-                brand = brand.trim(),
-                genericName = genericName.trim(),
-                modelName = modelName.trim(),
-                serialOrImei = serialOrImei.trim(),
-                size = size.trim(),
-                color = color.trim(),
-                warrantyMonths = warrantyMonths.coerceAtLeast(0),
-                sellingPrice = sellingPrice.coerceAtLeast(0.0),
-                mrp = mrp.coerceAtLeast(0.0),
-                rackLocation = rackLocation.trim(),
-                lowStockLevel = lowStockLevel.coerceAtLeast(0),
-                note = note.trim()
-            )
+            runCatching {
+                database.withTransaction {
+                    dao.updateProduct(
+                        productId = item.id,
+                        name = name.trim(),
+                        category =
+                            category.trim(),
+                        sku =
+                            sku.trim(),
+                        unit =
+                            cleanUnit,
+                        brand =
+                            brand.trim(),
+                        genericName =
+                            genericName.trim(),
+                        modelName =
+                            modelName.trim(),
+                        serialOrImei =
+                            serialOrImei.trim(),
+                        size =
+                            size.trim(),
+                        color =
+                            color.trim(),
+                        warrantyMonths =
+                            warrantyMonths
+                                .coerceAtLeast(0),
+                        sellingPrice =
+                            sellingPrice
+                                .coerceAtLeast(0.0),
+                        mrp =
+                            mrp.coerceAtLeast(0.0),
+                        rackLocation =
+                            rackLocation.trim(),
+                        lowStockLevel =
+                            lowStockLevel
+                                .coerceAtLeast(0),
+                        note =
+                            note.trim()
+                    )
+
+                    replaceProductUnitConversions(
+                        productId =
+                            item.id,
+                        baseUnit =
+                            cleanUnit,
+                        units =
+                            cleanedUnits
+                    )
+                }
+            }
         }
     }
 

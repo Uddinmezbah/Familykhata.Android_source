@@ -42,6 +42,8 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.familykhata.app.FamilyKhataViewModel
 import com.familykhata.app.InventoryViewModel
+import com.familykhata.app.ProductUnitInput
+import com.familykhata.app.data.ProductUnitConversionEntity
 import com.familykhata.app.data.ProductStockSummary
 import com.familykhata.app.data.StockBatchEntity
 import com.google.mlkit.vision.codescanner.GmsBarcodeScanning
@@ -96,6 +98,8 @@ private data class ProductDetailsInput(
     val category: String,
     val sku: String,
     val unit: String,
+    val unitConversions:
+        List<ProductUnitInput>,
     val brand: String,
     val genericName: String,
     val modelName: String,
@@ -144,6 +148,248 @@ private data class BatchUpdateInput(
     val expiryDate: Long?,
     val batchNo: String
 )
+
+
+private data class ProductUnitDraft(
+    val unitName: String = "",
+    val multiplier: String = ""
+)
+
+private fun buildProductUnitInputs(
+    baseUnit: String,
+    drafts: List<ProductUnitDraft>
+): List<ProductUnitInput>? {
+    val baseKey =
+        baseUnit.trim()
+            .ifBlank { "pcs" }
+            .lowercase(Locale.ROOT)
+
+    val seen = mutableSetOf<String>()
+    val result = mutableListOf<ProductUnitInput>()
+
+    var cumulative = 1L
+
+    drafts.forEachIndexed { index, draft ->
+        val unitName = draft.unitName.trim()
+        val unitKey = unitName.lowercase(Locale.ROOT)
+
+        val multiplier =
+            draft.multiplier
+                .v15InventoryIntOrNull()
+                ?: return null
+
+        if (
+            unitName.isBlank() ||
+            unitKey == baseKey ||
+            multiplier <= 1 ||
+            !seen.add(unitKey)
+        ) {
+            return null
+        }
+
+        cumulative *= multiplier.toLong()
+
+        if (cumulative > Int.MAX_VALUE) {
+            return null
+        }
+
+        result +=
+            ProductUnitInput(
+                unitName = unitName,
+                baseQuantity = cumulative.toInt(),
+                sortOrder = index + 1
+            )
+    }
+
+    return result
+}
+
+private fun storedUnitDrafts(
+    units: List<ProductUnitConversionEntity>
+): List<ProductUnitDraft> {
+    var previousBaseQuantity = 1
+
+    return units
+        .sortedBy { it.sortOrder }
+        .map { item ->
+            val multiplier =
+                if (
+                    item.baseQuantity > previousBaseQuantity &&
+                    item.baseQuantity % previousBaseQuantity == 0
+                ) {
+                    item.baseQuantity / previousBaseQuantity
+                } else {
+                    item.baseQuantity
+                }
+
+            previousBaseQuantity = item.baseQuantity
+
+            ProductUnitDraft(
+                unitName = item.unitName,
+                multiplier = multiplier.toString()
+            )
+        }
+}
+
+@Composable
+private fun ProductUnitConversionEditor(
+    baseUnit: String,
+    drafts: List<ProductUnitDraft>,
+    onChange: (List<ProductUnitDraft>) -> Unit
+) {
+    Column(
+        verticalArrangement = Arrangement.spacedBy(7.dp)
+    ) {
+        Text(
+            v15Text(
+                "বেস ইউনিট: $baseUnit — স্টক এই সবচেয়ে ছোট ইউনিটে হিসাব হবে",
+                "Base unit: $baseUnit — stock is counted in this smallest unit"
+            ),
+            style = MaterialTheme.typography.bodySmall,
+            fontWeight = FontWeight.SemiBold
+        )
+
+        drafts.forEachIndexed { index, draft ->
+            val previousUnit =
+                if (index == 0) {
+                    baseUnit
+                } else {
+                    drafts[index - 1]
+                        .unitName
+                        .ifBlank {
+                            v15Text(
+                                "আগের ইউনিট",
+                                "previous unit"
+                            )
+                        }
+                }
+
+            Card(
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Column(
+                    modifier = Modifier.padding(10.dp),
+                    verticalArrangement =
+                        Arrangement.spacedBy(6.dp)
+                ) {
+                    Text(
+                        v15Text(
+                            "প্যাক ইউনিট ${index + 1}",
+                            "Pack unit ${index + 1}"
+                        ),
+                        fontWeight = FontWeight.Bold
+                    )
+
+                    OutlinedTextField(
+                        value = draft.unitName,
+                        onValueChange = { value ->
+                            val copy = drafts.toMutableList()
+                            copy[index] =
+                                draft.copy(
+                                    unitName = value
+                                )
+                            onChange(copy)
+                        },
+                        label = {
+                            Text(
+                                v15Text(
+                                    "ইউনিটের নাম — যেমন পাতা, Box, Carton",
+                                    "Unit name — e.g. Strip, Box, Carton"
+                                )
+                            )
+                        },
+                        singleLine = true,
+                        modifier = Modifier.fillMaxWidth()
+                    )
+
+                    OutlinedTextField(
+                        value = draft.multiplier,
+                        onValueChange = { value ->
+                            val copy = drafts.toMutableList()
+                            copy[index] =
+                                draft.copy(
+                                    multiplier = value
+                                )
+                            onChange(copy)
+                        },
+                        label = {
+                            Text(
+                                v15Text(
+                                    "১ ${draft.unitName.ifBlank { "ইউনিট" }} = কত $previousUnit",
+                                    "1 ${draft.unitName.ifBlank { "unit" }} = how many $previousUnit"
+                                )
+                            )
+                        },
+                        singleLine = true,
+                        modifier = Modifier.fillMaxWidth()
+                    )
+
+                    if (
+                        draft.unitName.isNotBlank() &&
+                        draft.multiplier.isNotBlank()
+                    ) {
+                        Text(
+                            v15Text(
+                                "১ ${draft.unitName} = ${draft.multiplier} $previousUnit",
+                                "1 ${draft.unitName} = ${draft.multiplier} $previousUnit"
+                            ),
+                            style = MaterialTheme.typography.bodySmall
+                        )
+                    }
+
+                    TextButton(
+                        onClick = {
+                            onChange(
+                                drafts.filterIndexed {
+                                        row,
+                                        _ ->
+                                    row != index
+                                }
+                            )
+                        }
+                    ) {
+                        Text(
+                            v15Text(
+                                "এই ইউনিট সরান",
+                                "Remove this unit"
+                            )
+                        )
+                    }
+                }
+            }
+        }
+
+        OutlinedButton(
+            onClick = {
+                if (drafts.size < 6) {
+                    onChange(
+                        drafts +
+                            ProductUnitDraft()
+                    )
+                }
+            },
+            enabled = drafts.size < 6,
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            Text(
+                v15Text(
+                    "＋ আরেকটি প্যাক ইউনিট যোগ করুন",
+                    "+ Add another pack unit"
+                )
+            )
+        }
+
+        if (drafts.isNotEmpty()) {
+            Text(
+                v15Text(
+                    "উদাহরণ: Base=pcs → ১ পাতা=১২ pcs → ১ Box=২০ পাতা → ১ Carton=১০ Box।",
+                    "Example: Base=pcs → 1 Strip=12 pcs → 1 Box=20 Strips → 1 Carton=10 Boxes."
+                ),
+                style = MaterialTheme.typography.bodySmall
+            )
+        }
+    }
+}
 
 private fun productFormMode(shopType: String): ProductFormMode {
     val value = shopType.lowercase(Locale.getDefault())
@@ -610,6 +856,8 @@ private fun ProductListScreen(
                 category = input.category,
                 sku = input.sku,
                 unit = input.unit,
+                unitConversions =
+                    input.unitConversions,
                 brand = input.brand,
                 genericName = input.genericName,
                 modelName = input.modelName,
@@ -699,6 +947,8 @@ private fun ProductListScreen(
                     category = p.category,
                     sku = p.sku,
                     unit = p.unit,
+                    unitConversions =
+                        p.unitConversions,
                     brand = p.brand,
                     genericName = p.genericName,
                     modelName = p.modelName,
@@ -1240,6 +1490,7 @@ private fun ProductDetailScreen(
     }
     if (showEdit) {
         EditProductDialog(
+            viewModel = viewModel,
             product = product,
             batches = batches,
             onDismiss = { showEdit = false }
@@ -1352,6 +1603,11 @@ private fun AddProductDialog(
     var category by remember { mutableStateOf("") }
     var sku by remember { mutableStateOf("") }
     var unit by remember { mutableStateOf("pcs") }
+    var unitDrafts by remember {
+        mutableStateOf(
+            emptyList<ProductUnitDraft>()
+        )
+    }
     var brand by remember { mutableStateOf("") }
     var genericName by remember { mutableStateOf("") }
     var modelName by remember { mutableStateOf("") }
@@ -1464,6 +1720,17 @@ private fun AddProductDialog(
                         )
                     )
                 }
+
+                ProductUnitConversionEditor(
+                    baseUnit =
+                        unit.trim()
+                            .ifBlank { "pcs" },
+                    drafts = unitDrafts,
+                    onChange = {
+                        unitDrafts = it
+                    }
+                )
+
 
                 OutlinedTextField(
                     brand,
@@ -1672,6 +1939,21 @@ private fun AddProductDialog(
         confirmButton = {
             TextButton(
                 onClick = {
+                    val unitInputs =
+                        buildProductUnitInputs(
+                            baseUnit = unit,
+                            drafts = unitDrafts
+                        )
+
+                    if (unitInputs == null) {
+                        error =
+                            v15Text(
+                                "ইউনিট কনভার্সন ঠিক করুন। প্রতিটি অনুপাত ১-এর বেশি হতে হবে।",
+                                "Check unit conversion. Every multiplier must be greater than 1."
+                            )
+                        return@TextButton
+                    }
+
                     val selling =
                         sell.v15InventoryDoubleOrNull()
                             ?: 0.0
@@ -1716,6 +1998,8 @@ private fun AddProductDialog(
                                         category = category.trim(),
                                         sku = sku.trim(),
                                         unit = unit.trim().ifBlank { "pcs" },
+                                          unitConversions =
+                                              unitInputs,
                                         brand = brand.trim(),
                                         genericName = genericName.trim(),
                                         modelName = modelName.trim(),
@@ -1891,6 +2175,7 @@ private fun ReduceStockDialog(max: Int, onDismiss: () -> Unit, onSave: (Int) -> 
 
 @Composable
 private fun EditProductDialog(
+    viewModel: InventoryViewModel,
     product: ProductStockSummary,
     batches: List<StockBatchEntity>,
     onDismiss: () -> Unit,
@@ -1910,6 +2195,26 @@ private fun EditProductDialog(
 
     val mode = remember(shopType) {
         productFormMode(shopType)
+    }
+
+    val storedUnitConversions by
+        viewModel
+            .observeProductUnitConversions(
+                product.id
+            )
+            .collectAsState(
+                initial = emptyList()
+            )
+
+    var unitDrafts by remember(
+        product.id,
+        storedUnitConversions
+    ) {
+        mutableStateOf(
+            storedUnitDrafts(
+                storedUnitConversions
+            )
+        )
     }
 
     var name by remember { mutableStateOf(product.name) }
@@ -2004,6 +2309,17 @@ private fun EditProductDialog(
                 ) {
                     Text(v15Text(v15Text("ইউনিট: $unit","Unit: $unit"), "Unit: $unit"))
                 }
+
+                ProductUnitConversionEditor(
+                    baseUnit =
+                        unit.trim()
+                            .ifBlank { "pcs" },
+                    drafts = unitDrafts,
+                    onChange = {
+                        unitDrafts = it
+                    }
+                )
+
 
                 OutlinedTextField(
                     brand,
@@ -2262,6 +2578,44 @@ private fun EditProductDialog(
         confirmButton = {
             TextButton(
                 onClick = {
+                    val unitInputs =
+                        buildProductUnitInputs(
+                            baseUnit = unit,
+                            drafts = unitDrafts
+                        )
+
+                    if (unitInputs == null) {
+                        error =
+                            v15Text(
+                                "ইউনিট কনভার্সন ঠিক করুন। প্রতিটি অনুপাত ১-এর বেশি হতে হবে।",
+                                "Check unit conversion. Every multiplier must be greater than 1."
+                            )
+                        return@TextButton
+                    }
+
+                    val originalBaseUnit =
+                        product.unit.trim()
+                            .ifBlank { "pcs" }
+
+                    val finalBaseUnit =
+                        unit.trim()
+                            .ifBlank { "pcs" }
+
+                    if (
+                        batches.isNotEmpty() &&
+                        !originalBaseUnit.equals(
+                            finalBaseUnit,
+                            ignoreCase = true
+                        )
+                    ) {
+                        error =
+                            v15Text(
+                                "স্টক ব্যাচ থাকা অবস্থায় বেস ইউনিট পরিবর্তন করা যাবে না।",
+                                "Base unit cannot be changed while stock batches exist."
+                            )
+                        return@TextButton
+                    }
+
                     val warrantyMonths =
                         warranty.v15InventoryIntOrNull()
                     val sellingPrice =
@@ -2339,7 +2693,9 @@ private fun EditProductDialog(
                             sku = sku.trim(),
                             unit =
                                 unit.trim()
-                                    .ifBlank { "pcs" },
+                                    .ifBlank { "pcs" },                              unitConversions =
+                                  unitInputs,
+
                             brand = brand.trim(),
                             genericName =
                                 genericName.trim(),

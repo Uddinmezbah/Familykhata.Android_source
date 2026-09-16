@@ -138,6 +138,58 @@ interface InventoryDao {
     @Query("SELECT * FROM inventory_products WHERE id = :productId LIMIT 1")
     suspend fun getProductOnce(productId: Long): ProductEntity?
 
+    @Query(
+        """
+        SELECT *
+        FROM inventory_product_units
+        WHERE productId = :productId
+        ORDER BY sortOrder ASC, id ASC
+        """
+    )
+    fun observeProductUnitConversions(
+        productId: Long
+    ): Flow<List<ProductUnitConversionEntity>>
+
+    @Query(
+        """
+        SELECT *
+        FROM inventory_product_units
+        WHERE productId = :productId
+        ORDER BY sortOrder ASC, id ASC
+        """
+    )
+    suspend fun getProductUnitConversionsOnce(
+        productId: Long
+    ): List<ProductUnitConversionEntity>
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insertProductUnitConversion(
+        item: ProductUnitConversionEntity
+    ): Long
+
+    @Query(
+        """
+        DELETE FROM inventory_product_units
+        WHERE productId = :productId
+        """
+    )
+    suspend fun deleteProductUnitConversions(
+        productId: Long
+    ): Int
+
+    @Query(
+        """
+        SELECT *
+        FROM inventory_product_units
+        ORDER BY productId ASC, sortOrder ASC, id ASC
+        """
+    )
+    suspend fun getAllProductUnitConversions():
+        List<ProductUnitConversionEntity>
+
+    @Query("DELETE FROM inventory_product_units")
+    suspend fun clearProductUnitConversions()
+
     @Query("SELECT * FROM inventory_batches WHERE productId = :productId ORDER BY purchaseDate ASC, id ASC")
     fun observeBatches(productId: Long): Flow<List<StockBatchEntity>>
 

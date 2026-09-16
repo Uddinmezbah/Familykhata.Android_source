@@ -300,7 +300,7 @@ private fun ProductUnitConversionEditor(
 
         drafts.forEachIndexed { index, draft ->
             val availableReferences =
-                buildList {
+                buildList<String> {
                     add(cleanBase)
 
                     drafts
@@ -2428,7 +2428,7 @@ private fun EditProductDialog(
     ) {
         mutableStateOf(
             storedUnitDrafts(
-                baseUnit = unit,
+                baseUnit = product.unit,
                 units =
                     storedUnitConversions
             )

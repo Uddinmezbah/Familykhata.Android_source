@@ -2601,12 +2601,11 @@ internal fun V16DealerBusinessScreen(
 
     if (showDeliveryChallan) {
         DealerDeliveryChallanDialog(
+            viewModel = vm,
             deliveryPeople =
                 deliveryPeople,
             products =
                 products,
-            packs =
-                productPacks,
             onDismiss = {
                 showDeliveryChallan =
                     false
@@ -7057,12 +7056,12 @@ private fun DealerDeliverySettlementDialog(
 
 @Composable
 private fun DealerDeliveryChallanDialog(
+    viewModel:
+        DealerBusinessViewModel,
     deliveryPeople:
         List<DealerDeliveryPersonEntity>,
     products:
         List<com.familykhata.app.data.ProductEntity>,
-    packs:
-        List<DealerProductPackEntity>,
     onDismiss: () -> Unit,
     onSave: (
         Long,
@@ -7087,15 +7086,15 @@ private fun DealerDeliveryChallanDialog(
         mutableStateOf<Long?>(null)
     }
 
-    var boxes by remember {
+    var selectedUnitName by remember {
         mutableStateOf("")
     }
 
-    var sheets by remember {
-        mutableStateOf("")
+    var selectedUnitFactor by remember {
+        mutableStateOf(1)
     }
 
-    var loose by remember {
+    var quantity by remember {
         mutableStateOf("")
     }
 
@@ -7130,7 +7129,9 @@ private fun DealerDeliveryChallanDialog(
                             rememberScrollState()
                         ),
                 verticalArrangement =
-                    Arrangement.spacedBy(7.dp)
+                    Arrangement.spacedBy(
+                        7.dp
+                    )
             ) {
                 Text(
                     v15Text(
@@ -7198,9 +7199,18 @@ private fun DealerDeliveryChallanDialog(
                             selectedProductId =
                                 product.id
 
-                            boxes = ""
-                            sheets = ""
-                            loose = ""
+                            selectedUnitName =
+                                product.unit
+                                    .trim()
+                                    .ifBlank {
+                                        "pcs"
+                                    }
+
+                            selectedUnitFactor =
+                                1
+
+                            quantity =
+                                ""
                         },
                         modifier =
                             Modifier.fillMaxWidth()
@@ -7227,13 +7237,87 @@ private fun DealerDeliveryChallanDialog(
                                 productId
                         }
 
-                    val pack =
-                        packs.firstOrNull {
-                            it.productId ==
+                    if (product != null) {
+                        val baseUnit =
+                            product.unit
+                                .trim()
+                                .ifBlank {
+                                    "pcs"
+                                }
+
+                        val unitFlow =
+                            remember(
                                 productId
+                            ) {
+                                viewModel
+                                    .observeProductUnitConversions(
+                                        productId
+                                    )
+                            }
+
+                        val unitConversions by
+                            unitFlow.collectAsState(
+                                initial =
+                                    emptyList()
+                            )
+
+                        val unitOptions =
+                            remember(
+                                baseUnit,
+                                unitConversions
+                            ) {
+                                buildList<
+                                    Pair<String, Int>
+                                > {
+                                    add(
+                                        baseUnit to 1
+                                    )
+
+                                    unitConversions
+                                        .filter {
+                                            it.unitName
+                                                .isNotBlank() &&
+                                                it.baseQuantity >
+                                                    1 &&
+                                                !it.unitName
+                                                    .equals(
+                                                        baseUnit,
+                                                        ignoreCase =
+                                                            true
+                                                    )
+                                        }
+                                        .forEach {
+                                            conversion ->
+
+                                            add(
+                                                conversion.unitName to
+                                                    conversion.baseQuantity
+                                            )
+                                        }
+                                }
+                            }
+
+                        /*
+                         * Product may have been selected before its
+                         * unit-conversion Flow finished loading.
+                         * Base unit remains the safe default.
+                         */
+                        LaunchedEffect(
+                            productId,
+                            baseUnit
+                        ) {
+                            if (
+                                selectedUnitName
+                                    .isBlank()
+                            ) {
+                                selectedUnitName =
+                                    baseUnit
+
+                                selectedUnitFactor =
+                                    1
+                            }
                         }
 
-                    if (product != null) {
                         Text(
                             product.name,
                             fontWeight =
@@ -7242,8 +7326,8 @@ private fun DealerDeliveryChallanDialog(
 
                         Text(
                             v15Text(
-                                "১ বক্স = ${pack?.piecesPerBox ?: 0} পিস • ১ পাতা = ${pack?.piecesPerSheet ?: 0} পিস",
-                                "1 box = ${pack?.piecesPerBox ?: 0} pcs • 1 sheet = ${pack?.piecesPerSheet ?: 0} pcs"
+                                "বেস ইউনিট: $baseUnit",
+                                "Base unit: $baseUnit"
                             ),
                             style =
                                 MaterialTheme
@@ -7251,86 +7335,147 @@ private fun DealerDeliveryChallanDialog(
                                     .bodySmall
                         )
 
+                        Text(
+                            v15Text(
+                                "চালানের ইউনিট",
+                                "Challan unit"
+                            ),
+                            fontWeight =
+                                FontWeight.SemiBold
+                        )
+
+                        unitOptions.forEach {
+                                option ->
+
+                            val unitName =
+                                option.first
+
+                            val unitFactor =
+                                option.second
+
+                            OutlinedButton(
+                                onClick = {
+                                    selectedUnitName =
+                                        unitName
+
+                                    selectedUnitFactor =
+                                        unitFactor
+
+                                    quantity =
+                                        ""
+                                },
+                                modifier =
+                                    Modifier.fillMaxWidth()
+                            ) {
+                                val relation =
+                                    if (
+                                        unitFactor ==
+                                        1
+                                    ) {
+                                        unitName
+                                    } else {
+                                        "$unitName • 1 = " +
+                                            "$unitFactor $baseUnit"
+                                    }
+
+                                Text(
+                                    if (
+                                        selectedUnitName
+                                            .equals(
+                                                unitName,
+                                                ignoreCase =
+                                                    true
+                                            ) &&
+                                        selectedUnitFactor ==
+                                            unitFactor
+                                    ) {
+                                        "✓ $relation"
+                                    } else {
+                                        relation
+                                    }
+                                )
+                            }
+                        }
+
                         OutlinedTextField(
                             value =
-                                boxes,
+                                quantity,
                             onValueChange = {
-                                boxes = it
+                                quantity = it
                             },
                             label = {
                                 Text(
                                     v15Text(
-                                        "বক্স",
-                                        "Boxes"
+                                        "পরিমাণ ($selectedUnitName)",
+                                        "Quantity ($selectedUnitName)"
                                     )
                                 )
                             },
+                            singleLine = true,
                             modifier =
                                 Modifier.fillMaxWidth()
                         )
 
-                        OutlinedTextField(
-                            value =
-                                sheets,
-                            onValueChange = {
-                                sheets = it
-                            },
-                            label = {
-                                Text(
-                                    v15Text(
-                                        "পাতা",
-                                        "Sheets"
-                                    )
-                                )
-                            },
-                            modifier =
-                                Modifier.fillMaxWidth()
-                        )
+                        val enteredQuantity =
+                            quantity
+                                .dealerBusinessInt()
 
-                        OutlinedTextField(
-                            value =
-                                loose,
-                            onValueChange = {
-                                loose = it
-                            },
-                            label = {
+                        if (
+                            enteredQuantity !=
+                                null &&
+                            enteredQuantity >
+                                0
+                        ) {
+                            val baseQuantity =
+                                enteredQuantity
+                                    .toLong() *
+                                    selectedUnitFactor
+                                        .toLong()
+
+                            if (
+                                selectedUnitFactor >
+                                1
+                            ) {
                                 Text(
-                                    v15Text(
-                                        "খোলা পিস",
-                                        "Loose pieces"
-                                    )
+                                    "$enteredQuantity " +
+                                        "$selectedUnitName = " +
+                                        "$baseQuantity " +
+                                        baseUnit,
+                                    style =
+                                        MaterialTheme
+                                            .typography
+                                            .bodySmall,
+                                    color =
+                                        MaterialTheme
+                                            .colorScheme
+                                            .onSurfaceVariant
                                 )
-                            },
-                            modifier =
-                                Modifier.fillMaxWidth()
-                        )
+                            }
+                        }
 
                         OutlinedButton(
                             onClick = {
-                                val boxCount =
-                                    boxes
+                                val entered =
+                                    quantity
                                         .dealerBusinessInt()
                                         ?: 0
 
-                                val sheetCount =
-                                    sheets
-                                        .dealerBusinessInt()
-                                        ?: 0
-
-                                val looseCount =
-                                    loose
-                                        .dealerBusinessInt()
-                                        ?: 0
+                                val baseQuantity =
+                                    entered.toLong() *
+                                        selectedUnitFactor
+                                            .toLong()
 
                                 if (
-                                    boxCount >= 0 &&
-                                    sheetCount >= 0 &&
-                                    looseCount >= 0 &&
-                                    (
-                                        boxCount > 0 ||
-                                            sheetCount > 0 ||
-                                            looseCount > 0
-                                    )
+                                    entered > 0 &&
+                                    selectedUnitFactor >
+                                        0 &&
+                                    selectedUnitName
+                                        .isNotBlank() &&
+                                    baseQuantity >
+                                        0L &&
+                                    baseQuantity <=
+                                        Int.MAX_VALUE
+                                            .toLong()
                                 ) {
                                     lines =
                                         lines +
@@ -7339,20 +7484,25 @@ private fun DealerDeliveryChallanDialog(
                                                 .DealerDeliveryChallanLineInput(
                                                     productId =
                                                         productId,
-                                                    boxCount =
-                                                        boxCount,
-                                                    sheetCount =
-                                                        sheetCount,
-                                                    loosePieces =
-                                                        looseCount
+                                                    unitName =
+                                                        selectedUnitName,
+                                                    unitFactor =
+                                                        selectedUnitFactor,
+                                                    quantity =
+                                                        entered
                                                 )
 
                                     selectedProductId =
                                         null
 
-                                    boxes = ""
-                                    sheets = ""
-                                    loose = ""
+                                    selectedUnitName =
+                                        ""
+
+                                    selectedUnitFactor =
+                                        1
+
+                                    quantity =
+                                        ""
                                 }
                             },
                             modifier =
@@ -7383,12 +7533,24 @@ private fun DealerDeliveryChallanDialog(
                         index,
                         line ->
 
-                    val productName =
+                    val product =
                         products.firstOrNull {
                             it.id ==
                                 line.productId
-                        }?.name
+                        }
+
+                    val productName =
+                        product?.name
                             ?: "#${line.productId}"
+
+                    val baseUnit =
+                        product
+                            ?.unit
+                            ?.trim()
+                            ?.ifBlank {
+                                "pcs"
+                            }
+                            ?: "pcs"
 
                     Card(
                         modifier =
@@ -7398,6 +7560,10 @@ private fun DealerDeliveryChallanDialog(
                             modifier =
                                 Modifier.padding(
                                     8.dp
+                                ),
+                            verticalArrangement =
+                                Arrangement.spacedBy(
+                                    3.dp
                                 )
                         ) {
                             Text(
@@ -7406,12 +7572,49 @@ private fun DealerDeliveryChallanDialog(
                                     FontWeight.Bold
                             )
 
-                            Text(
-                                v15Text(
-                                    "বক্স ${line.boxCount} • পাতা ${line.sheetCount} • খোলা ${line.loosePieces}",
-                                    "Box ${line.boxCount} • Sheet ${line.sheetCount} • Loose ${line.loosePieces}"
+                            if (
+                                line.quantity >
+                                0
+                            ) {
+                                Text(
+                                    "${line.quantity} " +
+                                        line.unitName
                                 )
-                            )
+
+                                if (
+                                    line.unitFactor >
+                                    1
+                                ) {
+                                    val baseQuantity =
+                                        line.quantity
+                                            .toLong() *
+                                            line.unitFactor
+                                                .toLong()
+
+                                    Text(
+                                        "$baseQuantity $baseUnit",
+                                        style =
+                                            MaterialTheme
+                                                .typography
+                                                .bodySmall,
+                                        color =
+                                            MaterialTheme
+                                                .colorScheme
+                                                .onSurfaceVariant
+                                    )
+                                }
+                            } else {
+                                /*
+                                 * Defensive fallback for any legacy
+                                 * in-memory caller.
+                                 */
+                                Text(
+                                    v15Text(
+                                        "বক্স ${line.boxCount} • পাতা ${line.sheetCount} • খোলা ${line.loosePieces}",
+                                        "Box ${line.boxCount} • Sheet ${line.sheetCount} • Loose ${line.loosePieces}"
+                                    )
+                                )
+                            }
 
                             TextButton(
                                 onClick = {
@@ -7419,6 +7622,7 @@ private fun DealerDeliveryChallanDialog(
                                         lines.filterIndexed {
                                                 currentIndex,
                                                 _ ->
+
                                             currentIndex !=
                                                 index
                                         }
@@ -7461,7 +7665,9 @@ private fun DealerDeliveryChallanDialog(
                         deliveryPersonId
                             ?: return@TextButton
 
-                    if (lines.isNotEmpty()) {
+                    if (
+                        lines.isNotEmpty()
+                    ) {
                         onSave(
                             personId,
                             challanNo,

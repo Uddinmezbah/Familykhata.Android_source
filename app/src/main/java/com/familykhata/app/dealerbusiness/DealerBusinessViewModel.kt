@@ -7,6 +7,7 @@ import androidx.room.withTransaction
 import com.familykhata.app.businessDataKey
 import com.familykhata.app.data.InventoryDatabase
 import com.familykhata.app.data.ProductEntity
+import com.familykhata.app.data.ProductUnitConversionEntity
 import com.familykhata.app.data.StockBatchEntity
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.Flow
@@ -16,6 +17,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
+import java.util.Locale
 
 data class DealerPurchaseLineInput(
     val productId: Long,
@@ -34,7 +36,10 @@ data class DealerDeliveryChallanLineInput(
     val productId: Long,
     val boxCount: Int = 0,
     val sheetCount: Int = 0,
-    val loosePieces: Int = 0
+    val loosePieces: Int = 0,
+    val unitName: String = "",
+    val unitFactor: Int = 1,
+    val quantity: Int = 0
 )
 
 data class DealerDeliverySaleLineInput(
@@ -268,6 +273,13 @@ class DealerBusinessViewModel(
         productId: Long
     ): Flow<List<StockBatchEntity>> =
         inventoryDao.observeBatches(
+            productId
+        )
+
+    fun observeProductUnitConversions(
+        productId: Long
+    ): Flow<List<ProductUnitConversionEntity>> =
+        inventoryDao.observeProductUnitConversions(
             productId
         )
 
@@ -515,14 +527,23 @@ class DealerBusinessViewModel(
     ) {
         val cleanLines =
             lines.filter {
+                val legacyQuantityEntered =
+                    it.boxCount > 0 ||
+                        it.sheetCount > 0 ||
+                        it.loosePieces > 0
+
+                val genericQuantityEntered =
+                    it.quantity > 0
+
                 it.productId > 0 &&
                     it.boxCount >= 0 &&
                     it.sheetCount >= 0 &&
                     it.loosePieces >= 0 &&
+                    it.quantity >= 0 &&
+                    it.unitFactor > 0 &&
                     (
-                        it.boxCount > 0 ||
-                            it.sheetCount > 0 ||
-                            it.loosePieces > 0
+                        legacyQuantityEntered xor
+                            genericQuantityEntered
                     )
             }
 
@@ -608,17 +629,139 @@ class DealerBusinessViewModel(
                                             currentWorkspace
                                     )
 
-                            val pieces =
-                                packedQuantityPieces(
-                                    boxCount =
-                                        input.boxCount,
-                                    sheetCount =
-                                        input.sheetCount,
-                                    loosePieces =
-                                        input.loosePieces,
-                                    pack =
-                                        pack
+                            val legacyRequested =
+                                input.boxCount > 0 ||
+                                    input.sheetCount > 0 ||
+                                    input.loosePieces > 0
+
+                            val genericRequested =
+                                input.quantity > 0
+
+                            require(
+                                legacyRequested xor
+                                    genericRequested
+                            )
+
+                            val baseUnitName =
+                                product.unit
+                                    .trim()
+                                    .ifBlank {
+                                        "pcs"
+                                    }
+
+                            val baseUnitKey =
+                                baseUnitName.lowercase(
+                                    Locale.ROOT
                                 )
+
+                            var resolvedUnitName =
+                                baseUnitName
+
+                            var resolvedUnitFactor =
+                                1
+
+                            val enteredQuantity: Int
+                            val pieces: Int
+
+                            if (genericRequested) {
+                                val requestedUnitKey =
+                                    input.unitName
+                                        .trim()
+                                        .lowercase(
+                                            Locale.ROOT
+                                        )
+
+                                if (
+                                    requestedUnitKey.isBlank() ||
+                                    requestedUnitKey ==
+                                        baseUnitKey
+                                ) {
+                                    require(
+                                        input.unitFactor ==
+                                            1
+                                    ) {
+                                        "Invalid base unit factor"
+                                    }
+
+                                    resolvedUnitName =
+                                        baseUnitName
+
+                                    resolvedUnitFactor =
+                                        1
+                                } else {
+                                    val conversion =
+                                        requireNotNull(
+                                            inventoryDao
+                                                .getProductUnitConversionsOnce(
+                                                    product.id
+                                                )
+                                                .firstOrNull {
+                                                    it.unitKey ==
+                                                        requestedUnitKey
+                                                }
+                                        ) {
+                                            "Product unit not found"
+                                        }
+
+                                    require(
+                                        conversion.baseQuantity ==
+                                            input.unitFactor
+                                    ) {
+                                        "Product unit factor changed"
+                                    }
+
+                                    require(
+                                        conversion.baseQuantity >
+                                            1
+                                    )
+
+                                    resolvedUnitName =
+                                        conversion.unitName
+
+                                    resolvedUnitFactor =
+                                        conversion.baseQuantity
+                                }
+
+                                val baseQuantityLong =
+                                    input.quantity.toLong() *
+                                        resolvedUnitFactor
+                                            .toLong()
+
+                                require(
+                                    baseQuantityLong in
+                                        1L..
+                                        Int.MAX_VALUE.toLong()
+                                ) {
+                                    "Delivery quantity overflow"
+                                }
+
+                                enteredQuantity =
+                                    input.quantity
+
+                                pieces =
+                                    baseQuantityLong.toInt()
+                            } else {
+                                pieces =
+                                    packedQuantityPieces(
+                                        boxCount =
+                                            input.boxCount,
+                                        sheetCount =
+                                            input.sheetCount,
+                                        loosePieces =
+                                            input.loosePieces,
+                                        pack =
+                                            pack
+                                    )
+
+                                enteredQuantity =
+                                    pieces
+
+                                resolvedUnitName =
+                                    baseUnitName
+
+                                resolvedUnitFactor =
+                                    1
+                            }
 
                             require(pieces > 0)
 
@@ -647,17 +790,53 @@ class DealerBusinessViewModel(
                                         productNameSnapshot =
                                             product.name,
                                         boxCount =
-                                            input.boxCount,
+                                            if (
+                                                genericRequested
+                                            ) {
+                                                0
+                                            } else {
+                                                input.boxCount
+                                            },
                                         sheetCount =
-                                            input.sheetCount,
+                                            if (
+                                                genericRequested
+                                            ) {
+                                                0
+                                            } else {
+                                                input.sheetCount
+                                            },
                                         loosePieces =
-                                            input.loosePieces,
+                                            if (
+                                                genericRequested
+                                            ) {
+                                                0
+                                            } else {
+                                                input.loosePieces
+                                            },
                                         piecesPerBoxSnapshot =
-                                            pack.piecesPerBox,
+                                            if (
+                                                genericRequested
+                                            ) {
+                                                0
+                                            } else {
+                                                pack.piecesPerBox
+                                            },
                                         piecesPerSheetSnapshot =
-                                            pack.piecesPerSheet,
+                                            if (
+                                                genericRequested
+                                            ) {
+                                                0
+                                            } else {
+                                                pack.piecesPerSheet
+                                            },
                                         quantityPieces =
-                                            pieces
+                                            pieces,
+                                        unitSnapshot =
+                                            resolvedUnitName,
+                                        unitFactor =
+                                            resolvedUnitFactor,
+                                        enteredQuantity =
+                                            enteredQuantity
                                     )
                                 )
 

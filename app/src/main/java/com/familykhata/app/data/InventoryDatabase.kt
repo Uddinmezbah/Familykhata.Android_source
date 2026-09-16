@@ -122,7 +122,7 @@ import com.familykhata.app.production.ProductionItemRoleEntity
         RetailSaleStockAllocationEntity::class,
         ProductUnitConversionEntity::class
     ],
-    version = 15,
+    version = 16,
     exportSchema = false
 )
 abstract class InventoryDatabase : RoomDatabase() {
@@ -2502,6 +2502,69 @@ abstract class InventoryDatabase : RoomDatabase() {
                 }
             }
 
+        private val MIGRATION_15_16 =
+            object : Migration(
+                15,
+                16
+            ) {
+                override fun migrate(
+                    db: SupportSQLiteDatabase
+                ) {
+                    db.execSQL(
+                        """
+                        ALTER TABLE
+                        `dealer_business_delivery_challan_lines`
+                        ADD COLUMN `unitSnapshot`
+                        TEXT NOT NULL DEFAULT 'pcs'
+                        """.trimIndent()
+                    )
+
+                    db.execSQL(
+                        """
+                        ALTER TABLE
+                        `dealer_business_delivery_challan_lines`
+                        ADD COLUMN `unitFactor`
+                        INTEGER NOT NULL DEFAULT 1
+                        """.trimIndent()
+                    )
+
+                    db.execSQL(
+                        """
+                        ALTER TABLE
+                        `dealer_business_delivery_challan_lines`
+                        ADD COLUMN `enteredQuantity`
+                        INTEGER NOT NULL DEFAULT 0
+                        """.trimIndent()
+                    )
+
+                    /*
+                     * Old delivery data was stored as base-piece
+                     * quantity. Preserve that meaning exactly.
+                     */
+                    db.execSQL(
+                        """
+                        UPDATE
+                        `dealer_business_delivery_challan_lines`
+                        SET
+                            `enteredQuantity` =
+                                `quantityPieces`,
+                            `unitSnapshot` =
+                                COALESCE(
+                                    (
+                                        SELECT `unit`
+                                        FROM `inventory_products`
+                                        WHERE
+                                            `inventory_products`.`id` =
+                                            `dealer_business_delivery_challan_lines`.`productId`
+                                    ),
+                                    'pcs'
+                                ),
+                            `unitFactor` = 1
+                        """.trimIndent()
+                    )
+                }
+            }
+
         fun get(context: Context): InventoryDatabase = INSTANCE ?: synchronized(this) {
             INSTANCE ?: Room.databaseBuilder(
                 context.applicationContext,
@@ -2522,7 +2585,8 @@ abstract class InventoryDatabase : RoomDatabase() {
                     MIGRATION_11_12,
                     MIGRATION_12_13,
                     MIGRATION_13_14,
-                    MIGRATION_14_15
+                    MIGRATION_14_15,
+                    MIGRATION_15_16
                 )
                 .build()
                 .also { INSTANCE = it }

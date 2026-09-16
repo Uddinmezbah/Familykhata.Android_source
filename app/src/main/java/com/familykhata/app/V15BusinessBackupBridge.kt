@@ -338,6 +338,47 @@ object V15BusinessBackupBridge {
                             }
                         }
 
+                        if (
+                            table ==
+                            "dealer_business_delivery_challan_lines"
+                        ) {
+                            if (
+                                !row.has(
+                                    "unitSnapshot"
+                                )
+                            ) {
+                                row.put(
+                                    "unitSnapshot",
+                                    "pcs"
+                                )
+                            }
+
+                            if (
+                                !row.has(
+                                    "unitFactor"
+                                )
+                            ) {
+                                row.put(
+                                    "unitFactor",
+                                    1
+                                )
+                            }
+
+                            if (
+                                !row.has(
+                                    "enteredQuantity"
+                                )
+                            ) {
+                                row.put(
+                                    "enteredQuantity",
+                                    row.optInt(
+                                        "quantityPieces",
+                                        0
+                                    )
+                                )
+                            }
+                        }
+
                         val values =
                             jsonToContentValues(
                                 row

@@ -1,5 +1,6 @@
 package com.familykhata.app.dealerbusiness
 
+import androidx.room.ColumnInfo
 import androidx.room.Entity
 import androidx.room.ForeignKey
 import androidx.room.Index
@@ -603,7 +604,13 @@ data class DealerDeliveryChallanLineEntity(
     val loosePieces: Int = 0,
     val piecesPerBoxSnapshot: Int = 0,
     val piecesPerSheetSnapshot: Int = 0,
-    val quantityPieces: Int
+    val quantityPieces: Int,
+    @ColumnInfo(defaultValue = "'pcs'")
+    val unitSnapshot: String = "pcs",
+    @ColumnInfo(defaultValue = "1")
+    val unitFactor: Int = 1,
+    @ColumnInfo(defaultValue = "0")
+    val enteredQuantity: Int = 0
 )
 
 @Entity(

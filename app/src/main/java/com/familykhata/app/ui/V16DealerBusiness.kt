@@ -45,6 +45,7 @@ import com.familykhata.app.dealerbusiness.DealerCustomerEntity
 import com.familykhata.app.dealerbusiness.DealerExpenseEntity
 import com.familykhata.app.dealerbusiness.DealerDamageEntity
 import com.familykhata.app.dealerbusiness.DealerDeliveryChallanEntity
+import com.familykhata.app.dealerbusiness.DealerDeliveryChallanLineEntity
 import com.familykhata.app.dealerbusiness.DealerDeliveryPersonEntity
 import com.familykhata.app.dealerbusiness.DealerProductPackEntity
 import com.familykhata.app.dealerbusiness.DealerPurchaseEntity
@@ -112,6 +113,94 @@ private fun dealerBusinessDate(
         "yyyy-MM-dd",
         Locale.US
     ).format(Date(value))
+
+private fun dealerDeliveryQuantityText(
+    baseQuantity: Int,
+    line: DealerDeliveryChallanLineEntity
+): String {
+    val quantity =
+        baseQuantity.coerceAtLeast(0)
+
+    val factor =
+        line.unitFactor
+            .coerceAtLeast(1)
+
+    val unit =
+        line.unitSnapshot
+            .trim()
+            .ifBlank {
+                "unit"
+            }
+
+    if (factor == 1) {
+        return "$quantity $unit"
+    }
+
+    val unitQuantity =
+        quantity.toDouble() /
+            factor.toDouble()
+
+    val formattedUnitQuantity =
+        if (
+            quantity %
+            factor ==
+            0
+        ) {
+            (
+                quantity /
+                    factor
+                ).toString()
+        } else {
+            String.format(
+                Locale.US,
+                "%.3f",
+                unitQuantity
+            )
+                .trimEnd('0')
+                .trimEnd('.')
+        }
+
+    return if (
+        quantity %
+        factor ==
+        0
+    ) {
+        "$formattedUnitQuantity $unit " +
+            "($quantity base)"
+    } else {
+        "$quantity base " +
+            "($formattedUnitQuantity $unit)"
+    }
+}
+
+private fun dealerDeliveryBaseQuantityLabel(
+    line: DealerDeliveryChallanLineEntity,
+    banglaAction: String,
+    englishAction: String
+): String {
+    val unit =
+        line.unitSnapshot
+            .trim()
+            .ifBlank {
+                "unit"
+            }
+
+    val factor =
+        line.unitFactor
+            .coerceAtLeast(1)
+
+    return if (factor == 1) {
+        v15Text(
+            "$banglaAction ($unit)",
+            "$englishAction ($unit)"
+        )
+    } else {
+        v15Text(
+            "$banglaAction — বেস পরিমাণ • 1 $unit = $factor base",
+            "$englishAction — base quantity • 1 $unit = $factor base"
+        )
+    }
+}
 
 private fun String.dealerBusinessDateMillis(): Long? {
     val formatter =
@@ -6407,6 +6496,17 @@ private fun DealerDeliverySaleDialog(
                         FontWeight.Bold
                 )
 
+                Text(
+                    v15Text(
+                        "চালানে যে Unit-এ মাল দেওয়া হয়েছিল সেটি পাশে দেখানো হবে। বিক্রি ও দর-এর ঘর Base quantity অনুযায়ী থাকবে, যাতে stock হিসাব নির্ভুল থাকে।",
+                        "The challan unit is shown beside each quantity. Sale quantity and rate are entered in base quantity so stock accounting remains exact."
+                    ),
+                    style =
+                        MaterialTheme
+                            .typography
+                            .bodySmall
+                )
+
                 if (loading) {
                     Text(
                         v15Text(
@@ -6446,8 +6546,8 @@ private fun DealerDeliverySaleDialog(
 
                             Text(
                                 v15Text(
-                                    "দেওয়া ${line.quantityPieces} • আগে বিক্রি ${status.soldPieces} • বাকি ${status.remainingPieces}",
-                                    "Issued ${line.quantityPieces} • already sold ${status.soldPieces} • remaining ${status.remainingPieces}"
+                                    "দেওয়া ${dealerDeliveryQuantityText(line.quantityPieces, line)} • আগে বিক্রি ${dealerDeliveryQuantityText(status.soldPieces, line)} • বাকি ${dealerDeliveryQuantityText(status.remainingPieces, line)}",
+                                    "Issued ${dealerDeliveryQuantityText(line.quantityPieces, line)} • already sold ${dealerDeliveryQuantityText(status.soldPieces, line)} • remaining ${dealerDeliveryQuantityText(status.remainingPieces, line)}"
                                 )
                             )
 
@@ -6472,9 +6572,12 @@ private fun DealerDeliverySaleDialog(
                                     },
                                     label = {
                                         Text(
-                                            v15Text(
-                                                "এই রিটেইলারে বিক্রি পিস",
-                                                "Pieces sold to this retailer"
+                                            dealerDeliveryBaseQuantityLabel(
+                                                line = line,
+                                                banglaAction =
+                                                    "এই রিটেইলারে বিক্রি",
+                                                englishAction =
+                                                    "Sold to this retailer"
                                             )
                                         )
                                     },
@@ -6501,8 +6604,8 @@ private fun DealerDeliverySaleDialog(
                                     label = {
                                         Text(
                                             v15Text(
-                                                "বিক্রয় দর / পিস",
-                                                "Selling rate / piece"
+                                                "বিক্রয় দর / বেস পরিমাণ",
+                                                "Selling rate / base quantity"
                                             )
                                         )
                                     },
@@ -6513,8 +6616,8 @@ private fun DealerDeliverySaleDialog(
                             } else {
                                 Text(
                                     v15Text(
-                                        "এই পণ্যের সব মাল ইতিমধ্যে বিক্রি হয়েছে।",
-                                        "All issued pieces are already sold."
+                                        "এই পণ্যের দেওয়া সব মাল ইতিমধ্যে বিক্রি হয়েছে।",
+                                        "All issued quantity has already been sold."
                                     )
                                 )
                             }
@@ -6864,6 +6967,17 @@ private fun DealerDeliverySettlementDialog(
                         FontWeight.Bold
                 )
 
+                Text(
+                    v15Text(
+                        "Unit conversion পাশে দেখা যাবে। ফেরত ও ড্যামেজ Base quantity-তে লিখুন; ভিতরের stock reconciliation Base quantity-তেই হবে।",
+                        "Unit conversions are shown beside the quantities. Enter returned and damaged amounts in base quantity; stock reconciliation remains in base quantity."
+                    ),
+                    style =
+                        MaterialTheme
+                            .typography
+                            .bodySmall
+                )
+
                 if (loading) {
                     Text(
                         v15Text(
@@ -6922,8 +7036,8 @@ private fun DealerDeliverySettlementDialog(
 
                             Text(
                                 v15Text(
-                                    "দেওয়া: ${line.quantityPieces} • বিক্রি: ${status.soldPieces} • বুঝে নিতে বাকি: ${status.remainingPieces}",
-                                    "Issued: ${line.quantityPieces} • sold: ${status.soldPieces} • remaining to settle: ${status.remainingPieces}"
+                                    "দেওয়া: ${dealerDeliveryQuantityText(line.quantityPieces, line)} • বিক্রি: ${dealerDeliveryQuantityText(status.soldPieces, line)} • বুঝে নিতে বাকি: ${dealerDeliveryQuantityText(status.remainingPieces, line)}",
+                                    "Issued: ${dealerDeliveryQuantityText(line.quantityPieces, line)} • sold: ${dealerDeliveryQuantityText(status.soldPieces, line)} • remaining to settle: ${dealerDeliveryQuantityText(status.remainingPieces, line)}"
                                 )
                             )
 
@@ -6944,9 +7058,12 @@ private fun DealerDeliverySettlementDialog(
                                 },
                                 label = {
                                     Text(
-                                        v15Text(
-                                            "ফেরত পিস",
-                                            "Returned pieces"
+                                        dealerDeliveryBaseQuantityLabel(
+                                            line = line,
+                                            banglaAction =
+                                                "ফেরত",
+                                            englishAction =
+                                                "Returned"
                                         )
                                     )
                                 },
@@ -6972,9 +7089,12 @@ private fun DealerDeliverySettlementDialog(
                                 },
                                 label = {
                                     Text(
-                                        v15Text(
-                                            "ড্যামেজ পিস",
-                                            "Damaged pieces"
+                                        dealerDeliveryBaseQuantityLabel(
+                                            line = line,
+                                            banglaAction =
+                                                "ড্যামেজ",
+                                            englishAction =
+                                                "Damaged"
                                         )
                                     )
                                 },
@@ -7019,8 +7139,8 @@ private fun DealerDeliverySettlementDialog(
                                     )
                                 } else {
                                     v15Text(
-                                        "আরও মিলাতে হবে: $difference পিস",
-                                        "Difference: $difference pcs"
+                                        "আরও মিলাতে হবে: ${dealerDeliveryQuantityText(difference.coerceAtLeast(0), line)}",
+                                        "Difference: ${dealerDeliveryQuantityText(difference.coerceAtLeast(0), line)}"
                                     )
                                 },
                                 fontWeight =

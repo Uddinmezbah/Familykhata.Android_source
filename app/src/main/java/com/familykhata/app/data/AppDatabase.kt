@@ -13,9 +13,10 @@ import androidx.sqlite.db.SupportSQLiteDatabase
         BakiPersonEntity::class,
         BakiEntryEntity::class,
         FinancialAccountEntity::class,
-        FinancialAccountEntryEntity::class
+        FinancialAccountEntryEntity::class,
+        DigitalServiceTransactionEntity::class
     ],
-    version = 5,
+    version = 6,
     exportSchema = false
 )
 abstract class AppDatabase : RoomDatabase() {
@@ -149,6 +150,101 @@ abstract class AppDatabase : RoomDatabase() {
                 }
             }
 
+        private val MIGRATION_5_6 =
+            object : Migration(5, 6) {
+                override fun migrate(
+                    db: SupportSQLiteDatabase
+                ) {
+                    db.execSQL(
+                        """
+                        ALTER TABLE transactions
+                        ADD COLUMN sourceKey TEXT
+                        """.trimIndent()
+                    )
+
+                    db.execSQL(
+                        """
+                        CREATE UNIQUE INDEX IF NOT EXISTS
+                        `index_transactions_sourceKey`
+                        ON `transactions` (`sourceKey`)
+                        """.trimIndent()
+                    )
+
+                    db.execSQL(
+                        """
+                        CREATE TABLE IF NOT EXISTS
+                        `digital_service_transactions` (
+                            `id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+                            `eventKey` TEXT NOT NULL,
+                            `serviceType` TEXT NOT NULL,
+                            `sourceAccountId` INTEGER NOT NULL,
+                            `destinationAccountId` INTEGER NOT NULL,
+                            `serviceAmount` REAL NOT NULL,
+                            `customerFee` REAL NOT NULL,
+                            `providerCharge` REAL NOT NULL,
+                            `customerPaid` REAL NOT NULL,
+                            `providerCost` REAL NOT NULL,
+                            `sourceAmount` REAL NOT NULL,
+                            `destinationAmount` REAL NOT NULL,
+                            `profit` REAL NOT NULL,
+                            `note` TEXT NOT NULL,
+                            `workspace` TEXT NOT NULL,
+                            `createdAt` INTEGER NOT NULL,
+                            FOREIGN KEY(`sourceAccountId`)
+                                REFERENCES `financial_accounts`(`id`)
+                                ON UPDATE NO ACTION
+                                ON DELETE NO ACTION,
+                            FOREIGN KEY(`destinationAccountId`)
+                                REFERENCES `financial_accounts`(`id`)
+                                ON UPDATE NO ACTION
+                                ON DELETE NO ACTION
+                        )
+                        """.trimIndent()
+                    )
+
+                    db.execSQL(
+                        """
+                        CREATE UNIQUE INDEX IF NOT EXISTS
+                        `index_digital_service_transactions_eventKey`
+                        ON `digital_service_transactions` (`eventKey`)
+                        """.trimIndent()
+                    )
+
+                    db.execSQL(
+                        """
+                        CREATE INDEX IF NOT EXISTS
+                        `index_digital_service_transactions_sourceAccountId`
+                        ON `digital_service_transactions` (`sourceAccountId`)
+                        """.trimIndent()
+                    )
+
+                    db.execSQL(
+                        """
+                        CREATE INDEX IF NOT EXISTS
+                        `index_digital_service_transactions_destinationAccountId`
+                        ON `digital_service_transactions` (`destinationAccountId`)
+                        """.trimIndent()
+                    )
+
+                    db.execSQL(
+                        """
+                        CREATE INDEX IF NOT EXISTS
+                        `index_digital_service_transactions_serviceType`
+                        ON `digital_service_transactions` (`serviceType`)
+                        """.trimIndent()
+                    )
+
+                    db.execSQL(
+                        """
+                        CREATE INDEX IF NOT EXISTS
+                        `index_digital_service_transactions_workspace_createdAt`
+                        ON `digital_service_transactions`
+                        (`workspace`, `createdAt`)
+                        """.trimIndent()
+                    )
+                }
+            }
+
         fun get(context: Context): AppDatabase = INSTANCE ?: synchronized(this) {
             INSTANCE ?: Room.databaseBuilder(
                 context.applicationContext,
@@ -159,7 +255,8 @@ abstract class AppDatabase : RoomDatabase() {
                     MIGRATION_1_2,
                     MIGRATION_2_3,
                     MIGRATION_3_4,
-                    MIGRATION_4_5
+                    MIGRATION_4_5,
+                    MIGRATION_5_6
                 )
                 .build()
                 .also { INSTANCE = it }

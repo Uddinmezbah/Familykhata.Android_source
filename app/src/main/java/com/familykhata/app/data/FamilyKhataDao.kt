@@ -244,6 +244,40 @@ interface FamilyKhataDao {
     @Query("DELETE FROM financial_accounts")
     suspend fun clearFinancialAccounts()
 
+    @Insert(
+        onConflict = OnConflictStrategy.ABORT
+    )
+    suspend fun insertDigitalServiceTransaction(
+        item: DigitalServiceTransactionEntity
+    ): Long
+
+    @Query(
+        """
+        SELECT *
+        FROM digital_service_transactions
+        WHERE workspace = :workspace
+        ORDER BY createdAt DESC, id DESC
+        """
+    )
+    fun observeDigitalServiceTransactions(
+        workspace: String
+    ): Flow<List<DigitalServiceTransactionEntity>>
+
+    @Query(
+        """
+        SELECT *
+        FROM digital_service_transactions
+        ORDER BY id ASC
+        """
+    )
+    suspend fun getAllDigitalServiceTransactions():
+        List<DigitalServiceTransactionEntity>
+
+    @Query(
+        "DELETE FROM digital_service_transactions"
+    )
+    suspend fun clearDigitalServiceTransactions()
+
     @Query("SELECT * FROM transactions ORDER BY id ASC")
     suspend fun getAllTransactions(): List<TransactionEntity>
 

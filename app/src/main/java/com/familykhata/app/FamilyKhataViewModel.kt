@@ -11,6 +11,7 @@ import com.familykhata.app.data.BakiPersonEntity
 import com.familykhata.app.data.BakiPersonSummary
 import com.familykhata.app.data.DashboardTotals
 import com.familykhata.app.data.DueReceivableItem
+import com.familykhata.app.data.DigitalServiceTransactionEntity
 import com.familykhata.app.data.FinancialAccountEntity
 import com.familykhata.app.data.FinancialAccountEntryEntity
 import com.familykhata.app.data.FinancialAccountSummary
@@ -94,6 +95,22 @@ class FamilyKhataViewModel(application: Application) : AndroidViewModel(applicat
             SharingStarted.WhileSubscribed(5_000),
             DashboardTotals(0.0, 0.0)
         )
+
+    val digitalServiceTransactions:
+        StateFlow<List<DigitalServiceTransactionEntity>> =
+        _selectedWorkspace
+            .flatMapLatest { workspace ->
+                dao.observeDigitalServiceTransactions(
+                    workspace
+                )
+            }
+            .stateIn(
+                viewModelScope,
+                SharingStarted.WhileSubscribed(
+                    5_000
+                ),
+                emptyList()
+            )
 
     val financialAccounts:
         StateFlow<List<FinancialAccountSummary>> =
@@ -317,8 +334,383 @@ class FamilyKhataViewModel(application: Application) : AndroidViewModel(applicat
             accountId
         )
 
+    fun recordAgentCashOut(
+        cashAccountId: Long,
+        walletAccountId: Long,
+        principalAmount: Double,
+        customerFee: Double,
+        providerCharge: Double,
+        note: String = "",
+        onDone: (Boolean) -> Unit = {}
+    ) {
+        if (
+            !principalAmount.isFinite() ||
+            !customerFee.isFinite() ||
+            !providerCharge.isFinite() ||
+            principalAmount <= 0.0 ||
+            customerFee < 0.0 ||
+            providerCharge < 0.0
+        ) {
+            onDone(false)
+            return
+        }
+
+        val netProfit =
+            customerFee -
+                providerCharge
+
+        val walletIncrease =
+            principalAmount +
+                netProfit
+
+        if (
+            !walletIncrease.isFinite() ||
+            walletIncrease <= 0.0
+        ) {
+            onDone(false)
+            return
+        }
+
+        recordDigitalService(
+            serviceType =
+                "AGENT_CASH_OUT",
+            sourceAccountId =
+                cashAccountId,
+            destinationAccountId =
+                walletAccountId,
+            serviceAmount =
+                principalAmount,
+            customerFee =
+                customerFee,
+            providerCharge =
+                providerCharge,
+            customerPaid =
+                0.0,
+            providerCost =
+                0.0,
+            sourceAmount =
+                principalAmount,
+            destinationAmount =
+                walletIncrease,
+            profit =
+                netProfit,
+            note =
+                note,
+            onDone =
+                onDone
+        )
+    }
+
+    fun recordMobileRecharge(
+        rechargeAccountId: Long,
+        receiveAccountId: Long,
+        faceValue: Double,
+        customerPaid: Double,
+        providerCost: Double,
+        note: String = "",
+        onDone: (Boolean) -> Unit = {}
+    ) {
+        if (
+            !faceValue.isFinite() ||
+            !customerPaid.isFinite() ||
+            !providerCost.isFinite() ||
+            faceValue <= 0.0 ||
+            customerPaid <= 0.0 ||
+            providerCost <= 0.0
+        ) {
+            onDone(false)
+            return
+        }
+
+        val profit =
+            customerPaid -
+                providerCost
+
+        if (!profit.isFinite()) {
+            onDone(false)
+            return
+        }
+
+        recordDigitalService(
+            serviceType =
+                "MOBILE_RECHARGE",
+            sourceAccountId =
+                rechargeAccountId,
+            destinationAccountId =
+                receiveAccountId,
+            serviceAmount =
+                faceValue,
+            customerFee =
+                0.0,
+            providerCharge =
+                0.0,
+            customerPaid =
+                customerPaid,
+            providerCost =
+                providerCost,
+            sourceAmount =
+                providerCost,
+            destinationAmount =
+                customerPaid,
+            profit =
+                profit,
+            note =
+                note,
+            onDone =
+                onDone
+        )
+    }
+
+    private fun recordDigitalService(
+        serviceType: String,
+        sourceAccountId: Long,
+        destinationAccountId: Long,
+        serviceAmount: Double,
+        customerFee: Double,
+        providerCharge: Double,
+        customerPaid: Double,
+        providerCost: Double,
+        sourceAmount: Double,
+        destinationAmount: Double,
+        profit: Double,
+        note: String,
+        onDone: (Boolean) -> Unit
+    ) {
+        if (
+            !canWriteNow() ||
+            _selectedWorkspace.value !=
+                "SHOP" ||
+            sourceAccountId <= 0L ||
+            destinationAccountId <= 0L ||
+            sourceAccountId ==
+                destinationAccountId ||
+            serviceType !in
+                setOf(
+                    "AGENT_CASH_OUT",
+                    "MOBILE_RECHARGE"
+                ) ||
+            !serviceAmount.isFinite() ||
+            !sourceAmount.isFinite() ||
+            !destinationAmount.isFinite() ||
+            !profit.isFinite() ||
+            serviceAmount <= 0.0 ||
+            sourceAmount <= 0.0 ||
+            destinationAmount <= 0.0
+        ) {
+            onDone(false)
+            return
+        }
+
+        val workspace =
+            _selectedWorkspace.value
+
+        viewModelScope.launch {
+            val success =
+                runCatching {
+                    database.withTransaction {
+                        val source =
+                            requireNotNull(
+                                dao.getFinancialAccountOnce(
+                                    sourceAccountId
+                                )
+                            )
+
+                        val destination =
+                            requireNotNull(
+                                dao.getFinancialAccountOnce(
+                                    destinationAccountId
+                                )
+                            )
+
+                        require(
+                            source.workspace ==
+                                workspace &&
+                                destination.workspace ==
+                                    workspace
+                        )
+
+                        require(
+                            source.isActive &&
+                                destination.isActive
+                        )
+
+                        val available =
+                            requireNotNull(
+                                dao.getFinancialAccountBalanceOnce(
+                                    source.id
+                                )
+                            )
+
+                        require(
+                            available +
+                                0.0001 >=
+                                sourceAmount
+                        )
+
+                        val eventKey =
+                            UUID.randomUUID()
+                                .toString()
+
+                        val now =
+                            System.currentTimeMillis()
+
+                        val serviceId =
+                            dao.insertDigitalServiceTransaction(
+                                DigitalServiceTransactionEntity(
+                                    eventKey =
+                                        eventKey,
+                                    serviceType =
+                                        serviceType,
+                                    sourceAccountId =
+                                        source.id,
+                                    destinationAccountId =
+                                        destination.id,
+                                    serviceAmount =
+                                        serviceAmount,
+                                    customerFee =
+                                        customerFee,
+                                    providerCharge =
+                                        providerCharge,
+                                    customerPaid =
+                                        customerPaid,
+                                    providerCost =
+                                        providerCost,
+                                    sourceAmount =
+                                        sourceAmount,
+                                    destinationAmount =
+                                        destinationAmount,
+                                    profit =
+                                        profit,
+                                    note =
+                                        note.trim(),
+                                    workspace =
+                                        workspace,
+                                    createdAt =
+                                        now
+                                )
+                            )
+
+                        require(
+                            serviceId > 0L
+                        )
+
+                        dao.insertFinancialAccountEntry(
+                            FinancialAccountEntryEntity(
+                                accountId =
+                                    source.id,
+                                entryType =
+                                    "SERVICE_OUT",
+                                amount =
+                                    sourceAmount,
+                                balanceDelta =
+                                    -sourceAmount,
+                                relatedAccountId =
+                                    destination.id,
+                                transferGroupId =
+                                    null,
+                                sourceKey =
+                                    "DIGITAL_SERVICE:" +
+                                        "$eventKey:SOURCE",
+                                note =
+                                    note.trim(),
+                                workspace =
+                                    workspace,
+                                createdAt =
+                                    now
+                            )
+                        )
+
+                        dao.insertFinancialAccountEntry(
+                            FinancialAccountEntryEntity(
+                                accountId =
+                                    destination.id,
+                                entryType =
+                                    "SERVICE_IN",
+                                amount =
+                                    destinationAmount,
+                                balanceDelta =
+                                    destinationAmount,
+                                relatedAccountId =
+                                    source.id,
+                                transferGroupId =
+                                    null,
+                                sourceKey =
+                                    "DIGITAL_SERVICE:" +
+                                        "$eventKey:DESTINATION",
+                                note =
+                                    note.trim(),
+                                workspace =
+                                    workspace,
+                                createdAt =
+                                    now
+                            )
+                        )
+
+                        if (
+                            kotlin.math.abs(
+                                profit
+                            ) >= 0.0001
+                        ) {
+                            val profitType =
+                                if (
+                                    profit > 0.0
+                                ) {
+                                    "INCOME"
+                                } else {
+                                    "EXPENSE"
+                                }
+
+                            val profitCategory =
+                                if (
+                                    serviceType ==
+                                        "AGENT_CASH_OUT"
+                                ) {
+                                    "Agent Cash Out Profit"
+                                } else {
+                                    "Mobile Recharge Profit"
+                                }
+
+                            dao.insertTransaction(
+                                TransactionEntity(
+                                    type =
+                                        profitType,
+                                    amount =
+                                        kotlin.math.abs(
+                                            profit
+                                        ),
+                                    category =
+                                        profitCategory,
+                                    note =
+                                        note.trim(),
+                                    workspace =
+                                        workspace,
+                                    sourceKey =
+                                        "DIGITAL_SERVICE:" +
+                                            "$eventKey:PROFIT",
+                                    createdAt =
+                                        now
+                                )
+                            )
+                        }
+                    }
+
+                    true
+                }.getOrDefault(false)
+
+            onDone(success)
+        }
+    }
+
     fun deleteTransaction(item: TransactionEntity) {
-        if (!canWriteNow()) return
+        if (
+            !canWriteNow() ||
+            item.sourceKey
+                ?.startsWith(
+                    "DIGITAL_SERVICE:"
+                ) == true
+        ) {
+            return
+        }
         viewModelScope.launch { dao.deleteTransaction(item) }
     }
 
@@ -333,6 +725,10 @@ class FamilyKhataViewModel(application: Application) : AndroidViewModel(applicat
 
         if (
             !canWriteNow() ||
+            item.sourceKey
+                ?.startsWith(
+                    "DIGITAL_SERVICE:"
+                ) == true ||
             cleanType !in setOf("INCOME", "EXPENSE") ||
             amount <= 0
         ) {
@@ -715,6 +1111,8 @@ class FamilyKhataViewModel(application: Application) : AndroidViewModel(applicat
                     dao.getAllFinancialAccounts()
                 val financialAccountEntries =
                     dao.getAllFinancialAccountEntries()
+                val digitalServiceTransactions =
+                    dao.getAllDigitalServiceTransactions()
                 val inventory =
                     InventoryBackupBridge.export(
                         getApplication()
@@ -726,7 +1124,7 @@ class FamilyKhataViewModel(application: Application) : AndroidViewModel(applicat
 
                 JSONObject().apply {
                     put("format", "hisabi-khata-backup")
-                    put("version", 9)
+                    put("version", 10)
                     put("createdAt", System.currentTimeMillis())
                     put("transactions", JSONArray().apply {
                         transactions.forEach { item ->
@@ -737,6 +1135,12 @@ class FamilyKhataViewModel(application: Application) : AndroidViewModel(applicat
                                 put("category", item.category)
                                 put("note", item.note)
                                 put("workspace", item.workspace)
+                                item.sourceKey?.let {
+                                    put(
+                                        "sourceKey",
+                                        it
+                                    )
+                                }
                                 put("createdAt", item.createdAt)
                             })
                         }
@@ -871,6 +1275,83 @@ class FamilyKhataViewModel(application: Application) : AndroidViewModel(applicat
                     )
 
                     put(
+                        "digitalServiceTransactions",
+                        JSONArray().apply {
+                            digitalServiceTransactions
+                                .forEach { service ->
+                                    put(
+                                        JSONObject().apply {
+                                            put(
+                                                "id",
+                                                service.id
+                                            )
+                                            put(
+                                                "eventKey",
+                                                service.eventKey
+                                            )
+                                            put(
+                                                "serviceType",
+                                                service.serviceType
+                                            )
+                                            put(
+                                                "sourceAccountId",
+                                                service.sourceAccountId
+                                            )
+                                            put(
+                                                "destinationAccountId",
+                                                service.destinationAccountId
+                                            )
+                                            put(
+                                                "serviceAmount",
+                                                service.serviceAmount
+                                            )
+                                            put(
+                                                "customerFee",
+                                                service.customerFee
+                                            )
+                                            put(
+                                                "providerCharge",
+                                                service.providerCharge
+                                            )
+                                            put(
+                                                "customerPaid",
+                                                service.customerPaid
+                                            )
+                                            put(
+                                                "providerCost",
+                                                service.providerCost
+                                            )
+                                            put(
+                                                "sourceAmount",
+                                                service.sourceAmount
+                                            )
+                                            put(
+                                                "destinationAmount",
+                                                service.destinationAmount
+                                            )
+                                            put(
+                                                "profit",
+                                                service.profit
+                                            )
+                                            put(
+                                                "note",
+                                                service.note
+                                            )
+                                            put(
+                                                "workspace",
+                                                service.workspace
+                                            )
+                                            put(
+                                                "createdAt",
+                                                service.createdAt
+                                            )
+                                        }
+                                    )
+                                }
+                        }
+                    )
+
+                    put(
                         "settings",
                         V15SettingsBackupBridge.export(
                             getApplication(),
@@ -979,7 +1460,7 @@ class FamilyKhataViewModel(application: Application) : AndroidViewModel(applicat
                     "এটি হিসাবী খাতার সঠিক ব্যাকআপ ফাইল নয়"
                 }
                 val backupVersion = root.optInt("version")
-                require(backupVersion in 1..9) {
+                require(backupVersion in 1..10) {
                     "এই ব্যাকআপ ভার্সনটি এখনো সমর্থিত নয়"
                 }
 
@@ -996,6 +1477,11 @@ class FamilyKhataViewModel(application: Application) : AndroidViewModel(applicat
                 val financialAccountEntries =
                     mutableListOf<
                         FinancialAccountEntryEntity
+                    >()
+
+                val digitalServiceTransactions =
+                    mutableListOf<
+                        DigitalServiceTransactionEntity
                     >()
 
                 val inventoryProducts =
@@ -1022,8 +1508,35 @@ class FamilyKhataViewModel(application: Application) : AndroidViewModel(applicat
                         category = item.optString("category", "অন্যান্য"),
                         note = item.optString("note", ""),
                         workspace = workspace,
+                        sourceKey =
+                            if (
+                                backupVersion >= 10
+                            ) {
+                                item.optString(
+                                    "sourceKey",
+                                    ""
+                                ).trim().takeIf {
+                                    it.isNotEmpty()
+                                }
+                            } else {
+                                null
+                            },
                         createdAt = item.optLong("createdAt", System.currentTimeMillis())
                     )
+                }
+
+                val transactionSourceKeys =
+                    transactions.mapNotNull {
+                        it.sourceKey
+                    }
+
+                require(
+                    transactionSourceKeys.size ==
+                        transactionSourceKeys
+                            .toSet()
+                            .size
+                ) {
+                    "ব্যাকআপে একই transaction sourceKey একাধিকবার আছে"
                 }
 
                 val peopleArray = root.getJSONArray("people")
@@ -1288,11 +1801,26 @@ class FamilyKhataViewModel(application: Application) : AndroidViewModel(applicat
                             "Account entry ID সঠিক নয়"
                         }
 
+                        val allowedEntryTypes =
+                            if (
+                                backupVersion >= 10
+                            ) {
+                                setOf(
+                                    "TRANSFER_IN",
+                                    "TRANSFER_OUT",
+                                    "SERVICE_IN",
+                                    "SERVICE_OUT"
+                                )
+                            } else {
+                                setOf(
+                                    "TRANSFER_IN",
+                                    "TRANSFER_OUT"
+                                )
+                            }
+
                         require(
-                            entryType ==
-                                "TRANSFER_IN" ||
-                                entryType ==
-                                "TRANSFER_OUT"
+                            entryType in
+                                allowedEntryTypes
                         ) {
                             "Account entry type সঠিক নয়"
                         }
@@ -1342,12 +1870,29 @@ class FamilyKhataViewModel(application: Application) : AndroidViewModel(applicat
                             item.optString(
                                 "transferGroupId",
                                 ""
-                            ).trim()
+                            )
+                                .trim()
+                                .takeIf {
+                                    it.isNotEmpty()
+                                }
 
-                        require(
-                            groupId.isNotBlank()
+                        if (
+                            entryType ==
+                                "TRANSFER_IN" ||
+                            entryType ==
+                                "TRANSFER_OUT"
                         ) {
-                            "Transfer group পাওয়া যায়নি"
+                            require(
+                                groupId != null
+                            ) {
+                                "Transfer group পাওয়া যায়নি"
+                            }
+                        } else {
+                            require(
+                                groupId == null
+                            ) {
+                                "Service entry-তে transfer group থাকা যাবে না"
+                            }
                         }
 
                         val sourceKey =
@@ -1385,8 +1930,9 @@ class FamilyKhataViewModel(application: Application) : AndroidViewModel(applicat
                                     amount,
                                 balanceDelta =
                                     if (
-                                        entryType ==
-                                            "TRANSFER_IN"
+                                        entryType.endsWith(
+                                            "_IN"
+                                        )
                                     ) {
                                         amount
                                     } else {
@@ -1414,6 +1960,12 @@ class FamilyKhataViewModel(application: Application) : AndroidViewModel(applicat
                     }
 
                     financialAccountEntries
+                        .filter {
+                            it.entryType ==
+                                "TRANSFER_IN" ||
+                                it.entryType ==
+                                    "TRANSFER_OUT"
+                        }
                         .groupBy {
                             it.transferGroupId
                         }
@@ -1455,6 +2007,419 @@ class FamilyKhataViewModel(application: Application) : AndroidViewModel(applicat
                                 "Transfer pair সঠিক নয়"
                             }
                         }
+                }
+
+                if (backupVersion >= 10) {
+                    val accountById =
+                        financialAccounts
+                            .associateBy {
+                                it.id
+                            }
+
+                    val serviceArray =
+                        root.optJSONArray(
+                            "digitalServiceTransactions"
+                        ) ?: JSONArray()
+
+                    val seenServiceIds =
+                        mutableSetOf<Long>()
+
+                    val seenEventKeys =
+                        mutableSetOf<String>()
+
+                    for (
+                        index in
+                        0 until serviceArray.length()
+                    ) {
+                        val item =
+                            serviceArray
+                                .getJSONObject(index)
+
+                        val id =
+                            item.getLong("id")
+
+                        val eventKey =
+                            item.getString(
+                                "eventKey"
+                            ).trim()
+
+                        val serviceType =
+                            item.getString(
+                                "serviceType"
+                            )
+                                .trim()
+                                .uppercase(
+                                    Locale.ROOT
+                                )
+
+                        val sourceAccountId =
+                            item.getLong(
+                                "sourceAccountId"
+                            )
+
+                        val destinationAccountId =
+                            item.getLong(
+                                "destinationAccountId"
+                            )
+
+                        val sourceAccount =
+                            requireNotNull(
+                                accountById[
+                                    sourceAccountId
+                                ]
+                            ) {
+                                "Service source account পাওয়া যায়নি"
+                            }
+
+                        val destinationAccount =
+                            requireNotNull(
+                                accountById[
+                                    destinationAccountId
+                                ]
+                            ) {
+                                "Service destination account পাওয়া যায়নি"
+                            }
+
+                        val workspace =
+                            item.getString(
+                                "workspace"
+                            )
+
+                        val serviceAmount =
+                            item.getDouble(
+                                "serviceAmount"
+                            )
+
+                        val customerFee =
+                            item.optDouble(
+                                "customerFee",
+                                0.0
+                            )
+
+                        val providerCharge =
+                            item.optDouble(
+                                "providerCharge",
+                                0.0
+                            )
+
+                        val customerPaid =
+                            item.optDouble(
+                                "customerPaid",
+                                0.0
+                            )
+
+                        val providerCost =
+                            item.optDouble(
+                                "providerCost",
+                                0.0
+                            )
+
+                        require(
+                            id > 0L &&
+                                id !in seenServiceIds
+                        ) {
+                            "Service ID সঠিক নয়"
+                        }
+
+                        require(
+                            eventKey.isNotBlank() &&
+                                eventKey !in
+                                    seenEventKeys
+                        ) {
+                            "Service event key সঠিক নয়"
+                        }
+
+                        require(
+                            serviceType in
+                                setOf(
+                                    "AGENT_CASH_OUT",
+                                    "MOBILE_RECHARGE"
+                                )
+                        ) {
+                            "Service type সঠিক নয়"
+                        }
+
+                        require(
+                            sourceAccountId !=
+                                destinationAccountId &&
+                                sourceAccount.workspace ==
+                                    workspace &&
+                                destinationAccount.workspace ==
+                                    workspace &&
+                                workspace == "SHOP"
+                        ) {
+                            "Service account/workspace সঠিক নয়"
+                        }
+
+                        require(
+                            serviceAmount.isFinite() &&
+                                customerFee.isFinite() &&
+                                providerCharge.isFinite() &&
+                                customerPaid.isFinite() &&
+                                providerCost.isFinite() &&
+                                serviceAmount > 0.0 &&
+                                customerFee >= 0.0 &&
+                                providerCharge >= 0.0 &&
+                                customerPaid >= 0.0 &&
+                                providerCost >= 0.0
+                        ) {
+                            "Service amount সঠিক নয়"
+                        }
+
+                        val calculatedSourceAmount: Double
+                        val calculatedDestinationAmount: Double
+                        val calculatedProfit: Double
+
+                        if (
+                            serviceType ==
+                                "AGENT_CASH_OUT"
+                        ) {
+                            require(
+                                kotlin.math.abs(
+                                    customerPaid
+                                ) < 0.0001 &&
+                                    kotlin.math.abs(
+                                        providerCost
+                                    ) < 0.0001
+                            ) {
+                                "Cash Out field সঠিক নয়"
+                            }
+
+                            calculatedProfit =
+                                customerFee -
+                                    providerCharge
+
+                            calculatedSourceAmount =
+                                serviceAmount
+
+                            calculatedDestinationAmount =
+                                serviceAmount +
+                                    calculatedProfit
+                        } else {
+                            require(
+                                kotlin.math.abs(
+                                    customerFee
+                                ) < 0.0001 &&
+                                    kotlin.math.abs(
+                                        providerCharge
+                                    ) < 0.0001 &&
+                                    customerPaid >
+                                        0.0 &&
+                                    providerCost >
+                                        0.0
+                            ) {
+                                "Recharge field সঠিক নয়"
+                            }
+
+                            calculatedProfit =
+                                customerPaid -
+                                    providerCost
+
+                            calculatedSourceAmount =
+                                providerCost
+
+                            calculatedDestinationAmount =
+                                customerPaid
+                        }
+
+                        require(
+                            calculatedSourceAmount >
+                                0.0 &&
+                                calculatedDestinationAmount >
+                                    0.0 &&
+                                calculatedProfit.isFinite()
+                        ) {
+                            "Service accounting সঠিক নয়"
+                        }
+
+                        seenServiceIds += id
+                        seenEventKeys += eventKey
+
+                        digitalServiceTransactions +=
+                            DigitalServiceTransactionEntity(
+                                id = id,
+                                eventKey =
+                                    eventKey,
+                                serviceType =
+                                    serviceType,
+                                sourceAccountId =
+                                    sourceAccountId,
+                                destinationAccountId =
+                                    destinationAccountId,
+                                serviceAmount =
+                                    serviceAmount,
+                                customerFee =
+                                    customerFee,
+                                providerCharge =
+                                    providerCharge,
+                                customerPaid =
+                                    customerPaid,
+                                providerCost =
+                                    providerCost,
+                                sourceAmount =
+                                    calculatedSourceAmount,
+                                destinationAmount =
+                                    calculatedDestinationAmount,
+                                profit =
+                                    calculatedProfit,
+                                note =
+                                    item.optString(
+                                        "note",
+                                        ""
+                                    ),
+                                workspace =
+                                    workspace,
+                                createdAt =
+                                    item.optLong(
+                                        "createdAt",
+                                        System.currentTimeMillis()
+                                    )
+                            )
+                    }
+
+                    val serviceEntries =
+                        financialAccountEntries
+                            .filter {
+                                it.entryType ==
+                                    "SERVICE_IN" ||
+                                    it.entryType ==
+                                        "SERVICE_OUT"
+                            }
+
+                    require(
+                        serviceEntries.size ==
+                            digitalServiceTransactions
+                                .size * 2
+                    ) {
+                        "Service account entry সংখ্যা সঠিক নয়"
+                    }
+
+                    digitalServiceTransactions
+                        .forEach { service ->
+                            val sourceKey =
+                                "DIGITAL_SERVICE:" +
+                                    "${service.eventKey}:SOURCE"
+
+                            val destinationKey =
+                                "DIGITAL_SERVICE:" +
+                                    "${service.eventKey}:DESTINATION"
+
+                            val sourceEntry =
+                                serviceEntries
+                                    .singleOrNull {
+                                        it.sourceKey ==
+                                            sourceKey
+                                    }
+
+                            val destinationEntry =
+                                serviceEntries
+                                    .singleOrNull {
+                                        it.sourceKey ==
+                                            destinationKey
+                                    }
+
+                            require(
+                                sourceEntry != null &&
+                                    destinationEntry != null &&
+                                    sourceEntry.entryType ==
+                                        "SERVICE_OUT" &&
+                                    destinationEntry.entryType ==
+                                        "SERVICE_IN" &&
+                                    sourceEntry.accountId ==
+                                        service.sourceAccountId &&
+                                    destinationEntry.accountId ==
+                                        service.destinationAccountId &&
+                                    sourceEntry.relatedAccountId ==
+                                        service.destinationAccountId &&
+                                    destinationEntry.relatedAccountId ==
+                                        service.sourceAccountId &&
+                                    kotlin.math.abs(
+                                        sourceEntry.amount -
+                                            service.sourceAmount
+                                    ) < 0.0001 &&
+                                    kotlin.math.abs(
+                                        destinationEntry.amount -
+                                            service.destinationAmount
+                                    ) < 0.0001 &&
+                                    sourceEntry.workspace ==
+                                        service.workspace &&
+                                    destinationEntry.workspace ==
+                                        service.workspace
+                            ) {
+                                "Service account movement সঠিক নয়"
+                            }
+
+                            val profitKey =
+                                "DIGITAL_SERVICE:" +
+                                    "${service.eventKey}:PROFIT"
+
+                            val profitTransaction =
+                                transactions
+                                    .singleOrNull {
+                                        it.sourceKey ==
+                                            profitKey
+                                    }
+
+                            if (
+                                kotlin.math.abs(
+                                    service.profit
+                                ) >= 0.0001
+                            ) {
+                                require(
+                                    profitTransaction !=
+                                        null &&
+                                        profitTransaction.type ==
+                                            if (
+                                                service.profit >
+                                                    0.0
+                                            ) {
+                                                "INCOME"
+                                            } else {
+                                                "EXPENSE"
+                                            } &&
+                                        kotlin.math.abs(
+                                            profitTransaction.amount -
+                                                kotlin.math.abs(
+                                                    service.profit
+                                                )
+                                        ) < 0.0001 &&
+                                        profitTransaction.workspace ==
+                                            service.workspace
+                                ) {
+                                    "Service profit transaction সঠিক নয়"
+                                }
+                            } else {
+                                require(
+                                    profitTransaction ==
+                                        null
+                                ) {
+                                    "Zero-profit service-এ profit transaction থাকা যাবে না"
+                                }
+                            }
+                        }
+
+                    val generatedProfitRows =
+                        transactions.filter {
+                            it.sourceKey
+                                ?.startsWith(
+                                    "DIGITAL_SERVICE:"
+                                ) == true
+                        }
+
+                    val expectedProfitRows =
+                        digitalServiceTransactions
+                            .count {
+                                kotlin.math.abs(
+                                    it.profit
+                                ) >= 0.0001
+                            }
+
+                    require(
+                        generatedProfitRows.size ==
+                            expectedProfitRows
+                    ) {
+                        "Service profit row সংখ্যা সঠিক নয়"
+                    }
                 }
 
                 if (backupVersion >= 3) {
@@ -1637,6 +2602,7 @@ class FamilyKhataViewModel(application: Application) : AndroidViewModel(applicat
                 }
 
                 database.withTransaction {
+                    dao.clearDigitalServiceTransactions()
                     dao.clearFinancialAccountEntries()
                     dao.clearFinancialAccounts()
                     dao.clearBakiEntries()
@@ -1657,6 +2623,12 @@ class FamilyKhataViewModel(application: Application) : AndroidViewModel(applicat
 
                     financialAccounts.forEach {
                         dao.insertFinancialAccount(it)
+                    }
+
+                    digitalServiceTransactions.forEach {
+                        dao.insertDigitalServiceTransaction(
+                            it
+                        )
                     }
 
                     financialAccountEntries.forEach {
@@ -1699,6 +2671,7 @@ class FamilyKhataViewModel(application: Application) : AndroidViewModel(applicat
                     entries.size +
                     financialAccounts.size +
                     financialAccountEntries.size +
+                    digitalServiceTransactions.size +
                     inventoryProducts.size +
                     inventoryBatches.size +
                     inventoryUnits.size +

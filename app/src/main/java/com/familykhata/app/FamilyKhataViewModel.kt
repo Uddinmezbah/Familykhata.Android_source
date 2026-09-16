@@ -512,7 +512,7 @@ class FamilyKhataViewModel(application: Application) : AndroidViewModel(applicat
 
                 JSONObject().apply {
                     put("format", "hisabi-khata-backup")
-                    put("version", 7)
+                    put("version", 8)
                     put("createdAt", System.currentTimeMillis())
                     put("transactions", JSONArray().apply {
                         transactions.forEach { item ->
@@ -667,7 +667,7 @@ class FamilyKhataViewModel(application: Application) : AndroidViewModel(applicat
                     "এটি হিসাবী খাতার সঠিক ব্যাকআপ ফাইল নয়"
                 }
                 val backupVersion = root.optInt("version")
-                require(backupVersion in 1..7) {
+                require(backupVersion in 1..8) {
                     "এই ব্যাকআপ ভার্সনটি এখনো সমর্থিত নয়"
                 }
 
@@ -827,6 +827,20 @@ class FamilyKhataViewModel(application: Application) : AndroidViewModel(applicat
                             }
                             .toSet()
 
+                    val productBaseUnitKeys =
+                        inventoryProducts
+                            .associate { product ->
+                                product.id to
+                                    product.unit
+                                        .trim()
+                                        .ifBlank {
+                                            "pcs"
+                                        }
+                                        .lowercase(
+                                            Locale.ROOT
+                                        )
+                            }
+
                     if (backupVersion >= 7) {
                         val unitArray =
                             root.optJSONArray(
@@ -884,6 +898,15 @@ class FamilyKhataViewModel(application: Application) : AndroidViewModel(applicat
                                     sortOrder > 0
                             ) {
                                 "পণ্যের ইউনিট তথ্য সঠিক নয়"
+                            }
+
+                            require(
+                                unitKey !=
+                                    productBaseUnitKeys[
+                                        productId
+                                    ]
+                            ) {
+                                "অতিরিক্ত ইউনিট Base Unit-এর সমান হতে পারবে না"
                             }
 
                             require(

@@ -32,7 +32,9 @@ data class ProductUnitInput(
 data class RetailSaleLineInput(
     val productId: Long,
     val quantity: Int,
-    val unitPrice: Double
+    val unitPrice: Double,
+    val unitName: String = "",
+    val unitFactor: Int = 1
 )
 
 @OptIn(ExperimentalCoroutinesApi::class)
@@ -577,6 +579,7 @@ class InventoryViewModel(application: Application) : AndroidViewModel(applicatio
             lines.filter {
                 it.productId > 0L &&
                     it.quantity > 0 &&
+                    it.unitFactor > 0 &&
                     it.unitPrice.isFinite() &&
                     it.unitPrice >= 0.0
             }
@@ -620,6 +623,9 @@ class InventoryViewModel(application: Application) : AndroidViewModel(applicatio
                         data class ResolvedLine(
                             val input: RetailSaleLineInput,
                             val product: ProductEntity,
+                            val unitName: String,
+                            val unitFactor: Int,
+                            val baseQuantity: Int,
                             val allocations: List<BatchUse>,
                             val unitCost: Double,
                             val lineTotal: Double
@@ -650,8 +656,110 @@ class InventoryViewModel(application: Application) : AndroidViewModel(applicatio
                                     "Product belongs to another business"
                                 }
 
+                                val baseUnitKey =
+                                    product.unit
+                                        .trim()
+                                        .ifBlank {
+                                            "pcs"
+                                        }
+                                        .lowercase(
+                                            Locale.ROOT
+                                        )
+
+                                val requestedUnitKey =
+                                    input.unitName
+                                        .trim()
+                                        .lowercase(
+                                            Locale.ROOT
+                                        )
+
+                                val resolvedUnitName:
+                                    String
+
+                                val resolvedUnitFactor:
+                                    Int
+
+                                if (
+                                    requestedUnitKey
+                                        .isBlank() ||
+                                    requestedUnitKey ==
+                                        baseUnitKey
+                                ) {
+                                    require(
+                                        input.unitFactor ==
+                                            1
+                                    ) {
+                                        "Invalid base unit factor"
+                                    }
+
+                                    resolvedUnitName =
+                                        product.unit
+                                            .trim()
+                                            .ifBlank {
+                                                "pcs"
+                                            }
+
+                                    resolvedUnitFactor =
+                                        1
+                                } else {
+                                    val conversion =
+                                        requireNotNull(
+                                            dao
+                                                .getProductUnitConversionsOnce(
+                                                    product.id
+                                                )
+                                                .firstOrNull {
+                                                    it.unitKey ==
+                                                        requestedUnitKey
+                                                }
+                                        ) {
+                                            "Product unit not found"
+                                        }
+
+                                    require(
+                                        conversion
+                                            .baseQuantity ==
+                                            input.unitFactor
+                                    ) {
+                                        "Product unit factor changed"
+                                    }
+
+                                    require(
+                                        conversion
+                                            .baseQuantity >
+                                            1
+                                    )
+
+                                    resolvedUnitName =
+                                        conversion.unitName
+
+                                    resolvedUnitFactor =
+                                        conversion.baseQuantity
+                                }
+
+                                val baseQuantityLong =
+                                    input.quantity
+                                        .toLong() *
+                                        resolvedUnitFactor
+                                            .toLong()
+
+                                require(
+                                    baseQuantityLong in
+                                        1L..
+                                        Int.MAX_VALUE
+                                            .toLong()
+                                ) {
+                                    "Sale quantity overflow"
+                                }
+
+                                val baseQuantity =
+                                    baseQuantityLong
+                                        .toInt()
+
                                 val batches =
-                                    dao.getBatchesOnce(product.id)
+                                    dao.getBatchesOnce(
+                                        product.id
+                                    )
                                         .filter {
                                             it.quantity > 0
                                         }
@@ -659,13 +767,16 @@ class InventoryViewModel(application: Application) : AndroidViewModel(applicatio
                                 require(
                                     batches.sumOf {
                                         it.quantity
-                                    } >= input.quantity
+                                            .toLong()
+                                    } >=
+                                        baseQuantity
+                                            .toLong()
                                 ) {
                                     "Not enough stock"
                                 }
 
                                 var remaining =
-                                    input.quantity
+                                    baseQuantity
 
                                 val allocations =
                                     mutableListOf<BatchUse>()
@@ -688,23 +799,39 @@ class InventoryViewModel(application: Application) : AndroidViewModel(applicatio
                                     remaining -= used
                                 }
 
-                                require(remaining == 0)
+                                require(
+                                    remaining == 0
+                                )
 
                                 val totalCost =
                                     allocations.sumOf {
                                         it.quantity *
-                                            it.batch.purchasePrice
+                                            it.batch
+                                                .purchasePrice
                                     }
 
+                                /*
+                                 * unitCost is the cost of one SOLD unit,
+                                 * while allocations stay in Base Unit.
+                                 */
                                 val unitCost =
                                     totalCost /
-                                        input.quantity.toDouble()
+                                        input.quantity
+                                            .toDouble()
 
                                 ResolvedLine(
                                     input = input,
                                     product = product,
-                                    allocations = allocations,
-                                    unitCost = unitCost,
+                                    unitName =
+                                        resolvedUnitName,
+                                    unitFactor =
+                                        resolvedUnitFactor,
+                                    baseQuantity =
+                                        baseQuantity,
+                                    allocations =
+                                        allocations,
+                                    unitCost =
+                                        unitCost,
                                     lineTotal =
                                         input.quantity *
                                             input.unitPrice
@@ -852,9 +979,13 @@ class InventoryViewModel(application: Application) : AndroidViewModel(applicatio
                                         skuSnapshot =
                                             resolved.product.sku,
                                         unitSnapshot =
-                                            resolved.product.unit,
+                                            resolved.unitName,
+                                        unitFactor =
+                                            resolved.unitFactor,
                                         quantity =
                                             resolved.input.quantity,
+                                        baseQuantity =
+                                            resolved.baseQuantity,
                                         unitPrice =
                                             resolved.input.unitPrice,
                                         unitCost =
@@ -988,10 +1119,23 @@ class InventoryViewModel(application: Application) : AndroidViewModel(applicatio
                                 "Product context mismatch"
                             }
 
+                            val expectedBaseQuantity =
+                                if (
+                                    line.baseQuantity >
+                                    0
+                                ) {
+                                    line.baseQuantity
+                                } else {
+                                    line.quantity
+                                }
+
                             require(
                                 allocations.sumOf {
                                     it.quantity
-                                } == line.quantity
+                                        .toLong()
+                                } ==
+                                    expectedBaseQuantity
+                                        .toLong()
                             ) {
                                 "Sale stock allocation mismatch"
                             }

@@ -303,6 +303,41 @@ object V15BusinessBackupBridge {
                                 index
                             )
 
+                        /*
+                         * Backups created before retail unit snapshots
+                         * do not contain these columns. At that time
+                         * quantity was already the base-stock quantity.
+                         */
+                        if (
+                            table ==
+                            "retail_sale_lines"
+                        ) {
+                            if (
+                                !row.has(
+                                    "unitFactor"
+                                )
+                            ) {
+                                row.put(
+                                    "unitFactor",
+                                    1
+                                )
+                            }
+
+                            if (
+                                !row.has(
+                                    "baseQuantity"
+                                )
+                            ) {
+                                row.put(
+                                    "baseQuantity",
+                                    row.optInt(
+                                        "quantity",
+                                        0
+                                    )
+                                )
+                            }
+                        }
+
                         val values =
                             jsonToContentValues(
                                 row

@@ -27,6 +27,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -55,10 +56,18 @@ import kotlinx.coroutines.withContext
 private data class RetailCartLine(
     val productId: Long,
     val name: String,
-    val unit: String,
-    val available: Int,
+    val baseUnit: String,
+    val selectedUnit: String,
+    val unitFactor: Int,
+    val availableBase: Int,
+    val basePrice: Double,
     val quantity: String,
     val price: String
+)
+
+private data class RetailUnitOption(
+    val name: String,
+    val factor: Int
 )
 
 private data class RetailSaleDraft(
@@ -415,6 +424,7 @@ internal fun V16RetailSalesScreen(
 
     if (showNewSale) {
         RetailSaleDialog(
+            viewModel = vm,
             products =
                 products.filter {
                     it.totalStock > 0
@@ -1137,6 +1147,7 @@ private fun RetailSaleCard(
 
 @Composable
 private fun RetailSaleDialog(
+    viewModel: InventoryViewModel,
     products: List<ProductStockSummary>,
     saving: Boolean,
     onDismiss: () -> Unit,
@@ -1334,10 +1345,16 @@ private fun RetailSaleDialog(
                                                 product.id,
                                             name =
                                                 product.name,
-                                            unit =
+                                            baseUnit =
                                                 product.unit,
-                                            available =
+                                            selectedUnit =
+                                                product.unit,
+                                            unitFactor =
+                                                1,
+                                            availableBase =
                                                 product.totalStock,
+                                            basePrice =
+                                                product.sellingPrice,
                                             quantity =
                                                 "1",
                                             price =
@@ -1402,97 +1419,266 @@ private fun RetailSaleDialog(
                         index,
                         item ->
 
-                    Card(
-                        modifier =
-                            Modifier.fillMaxWidth()
-                    ) {
-                        Column(
-                            modifier =
-                                Modifier.padding(10.dp),
-                            verticalArrangement =
-                                Arrangement.spacedBy(6.dp)
-                        ) {
-                            Text(
-                                item.name,
-                                fontWeight =
-                                    FontWeight.SemiBold
-                            )
-
-                            Text(
-                                v15Text(
-                                    "স্টক: ${item.available} ${item.unit}",
-                                    "Stock: ${item.available} ${item.unit}"
-                                ),
-                                style =
-                                    MaterialTheme.typography
-                                        .bodySmall
-                            )
-
-                            Row(
-                                modifier =
-                                    Modifier.fillMaxWidth(),
-                                horizontalArrangement =
-                                    Arrangement.spacedBy(8.dp)
+                    key(item.productId) {
+                        val unitFlow =
+                            remember(
+                                item.productId
                             ) {
-                                OutlinedTextField(
-                                    value =
-                                        item.quantity,
-                                    onValueChange = {
-                                        cart[index] =
-                                            item.copy(
-                                                quantity = it
-                                            )
-                                    },
-                                    label = {
-                                        Text(
-                                            v15Text(
-                                                "পরিমাণ",
-                                                "Qty"
-                                            )
-                                        )
-                                    },
-                                    singleLine = true,
-                                    modifier =
-                                        Modifier.weight(1f)
-                                )
-
-                                OutlinedTextField(
-                                    value =
-                                        item.price,
-                                    onValueChange = {
-                                        cart[index] =
-                                            item.copy(
-                                                price = it
-                                            )
-                                    },
-                                    label = {
-                                        Text(
-                                            v15Text(
-                                                "দর",
-                                                "Price"
-                                            )
-                                        )
-                                    },
-                                    singleLine = true,
-                                    modifier =
-                                        Modifier.weight(1f)
-                                )
+                                viewModel
+                                    .observeProductUnitConversions(
+                                        item.productId
+                                    )
                             }
 
-                            TextButton(
-                                onClick = {
-                                    cart.removeAt(
-                                        index
+                        val unitConversions by
+                            unitFlow.collectAsState(
+                                initial =
+                                    emptyList()
+                            )
+
+                        val unitOptions =
+                            remember(
+                                item.baseUnit,
+                                unitConversions
+                            ) {
+                                buildList {
+                                    add(
+                                        RetailUnitOption(
+                                            name =
+                                                item.baseUnit,
+                                            factor =
+                                                1
+                                        )
                                     )
-                                },
-                                enabled = !saving
+
+                                    unitConversions
+                                        .filter {
+                                            it.unitName
+                                                .isNotBlank() &&
+                                                it.baseQuantity >
+                                                    1 &&
+                                                !it.unitName
+                                                    .equals(
+                                                        item.baseUnit,
+                                                        ignoreCase =
+                                                            true
+                                                    )
+                                        }
+                                        .forEach {
+                                            add(
+                                                RetailUnitOption(
+                                                    name =
+                                                        it.unitName,
+                                                    factor =
+                                                        it.baseQuantity
+                                                )
+                                            )
+                                        }
+                                }
+                            }
+
+                        val selectedFactor =
+                            item.unitFactor
+                                .coerceAtLeast(1)
+
+                        val availableSelected =
+                            item.availableBase /
+                                selectedFactor
+
+                        Card(
+                            modifier =
+                                Modifier.fillMaxWidth()
+                        ) {
+                            Column(
+                                modifier =
+                                    Modifier.padding(10.dp),
+                                verticalArrangement =
+                                    Arrangement.spacedBy(6.dp)
                             ) {
                                 Text(
-                                    v15Text(
-                                        "সরান",
-                                        "Remove"
-                                    )
+                                    item.name,
+                                    fontWeight =
+                                        FontWeight.SemiBold
                                 )
+
+                                Text(
+                                    v15Text(
+                                        "স্টক: ${item.availableBase} ${item.baseUnit} • ${availableSelected} ${item.selectedUnit} পর্যন্ত",
+                                        "Stock: ${item.availableBase} ${item.baseUnit} • up to ${availableSelected} ${item.selectedUnit}"
+                                    ),
+                                    style =
+                                        MaterialTheme.typography
+                                            .bodySmall
+                                )
+
+                                if (
+                                    unitOptions.size > 1
+                                ) {
+                                    Text(
+                                        v15Text(
+                                            "বিক্রির ইউনিট",
+                                            "Selling unit"
+                                        ),
+                                        style =
+                                            MaterialTheme
+                                                .typography
+                                                .bodySmall,
+                                        fontWeight =
+                                            FontWeight.SemiBold
+                                    )
+
+                                    Column {
+                                        unitOptions
+                                            .forEach { option ->
+                                                TextButton(
+                                                    onClick = {
+                                                        cart[index] =
+                                                            item.copy(
+                                                                selectedUnit =
+                                                                    option.name,
+                                                                unitFactor =
+                                                                    option.factor,
+                                                                price =
+                                                                    retailMoney(
+                                                                        item.basePrice *
+                                                                            option.factor
+                                                                    )
+                                                            )
+                                                    },
+                                                    enabled =
+                                                        !saving
+                                                ) {
+                                                    val relation =
+                                                        if (
+                                                            option.factor ==
+                                                            1
+                                                        ) {
+                                                            option.name
+                                                        } else {
+                                                            "${option.name} • 1 = ${option.factor} ${item.baseUnit}"
+                                                        }
+
+                                                    Text(
+                                                        if (
+                                                            item.selectedUnit
+                                                                .equals(
+                                                                    option.name,
+                                                                    ignoreCase =
+                                                                        true
+                                                                ) &&
+                                                            item.unitFactor ==
+                                                                option.factor
+                                                        ) {
+                                                            "✓ $relation"
+                                                        } else {
+                                                            relation
+                                                        }
+                                                    )
+                                                }
+                                            }
+                                    }
+                                }
+
+                                Row(
+                                    modifier =
+                                        Modifier.fillMaxWidth(),
+                                    horizontalArrangement =
+                                        Arrangement.spacedBy(8.dp)
+                                ) {
+                                    OutlinedTextField(
+                                        value =
+                                            item.quantity,
+                                        onValueChange = {
+                                            cart[index] =
+                                                item.copy(
+                                                    quantity = it
+                                                )
+                                        },
+                                        label = {
+                                            Text(
+                                                v15Text(
+                                                    "পরিমাণ (${item.selectedUnit})",
+                                                    "Qty (${item.selectedUnit})"
+                                                )
+                                            )
+                                        },
+                                        singleLine = true,
+                                        modifier =
+                                            Modifier.weight(1f)
+                                    )
+
+                                    OutlinedTextField(
+                                        value =
+                                            item.price,
+                                        onValueChange = {
+                                            cart[index] =
+                                                item.copy(
+                                                    price = it
+                                                )
+                                        },
+                                        label = {
+                                            Text(
+                                                v15Text(
+                                                    "দর / ${item.selectedUnit}",
+                                                    "Price / ${item.selectedUnit}"
+                                                )
+                                            )
+                                        },
+                                        singleLine = true,
+                                        modifier =
+                                            Modifier.weight(1f)
+                                    )
+                                }
+
+                                if (
+                                    item.unitFactor > 1
+                                ) {
+                                    val enteredQuantity =
+                                        item.quantity
+                                            .retailIntOrNull()
+
+                                    if (
+                                        enteredQuantity != null &&
+                                        enteredQuantity > 0
+                                    ) {
+                                        val baseNeeded =
+                                            enteredQuantity
+                                                .toLong() *
+                                                item.unitFactor
+                                                    .toLong()
+
+                                        Text(
+                                            v15Text(
+                                                "${enteredQuantity} ${item.selectedUnit} = ${baseNeeded} ${item.baseUnit}",
+                                                "${enteredQuantity} ${item.selectedUnit} = ${baseNeeded} ${item.baseUnit}"
+                                            ),
+                                            style =
+                                                MaterialTheme
+                                                    .typography
+                                                    .bodySmall,
+                                            color =
+                                                MaterialTheme
+                                                    .colorScheme
+                                                    .onSurfaceVariant
+                                        )
+                                    }
+                                }
+
+                                TextButton(
+                                    onClick = {
+                                        cart.removeAt(
+                                            index
+                                        )
+                                    },
+                                    enabled = !saving
+                                ) {
+                                    Text(
+                                        v15Text(
+                                            "সরান",
+                                            "Remove"
+                                        )
+                                    )
+                                }
                             }
                         }
                     }
@@ -1787,18 +1973,38 @@ private fun RetailSaleDialog(
                             item.price
                                 .retailDoubleOrNull()
 
+                        val baseQuantity =
+                            if (
+                                quantity != null &&
+                                quantity > 0 &&
+                                item.unitFactor > 0
+                            ) {
+                                quantity.toLong() *
+                                    item.unitFactor
+                                        .toLong()
+                            } else {
+                                -1L
+                            }
+
                         if (
                             quantity == null ||
                             quantity <= 0 ||
-                            quantity >
-                                item.available ||
+                            item.unitFactor <= 0 ||
+                            baseQuantity <= 0L ||
+                            baseQuantity >
+                                item.availableBase
+                                    .toLong() ||
+                            baseQuantity >
+                                Int.MAX_VALUE
+                                    .toLong() ||
                             price == null ||
+                            !price.isFinite() ||
                             price < 0.0
                         ) {
                             error =
                                 v15Text(
-                                    "পণ্যের পরিমাণ, স্টক ও বিক্রয় মূল্য যাচাই করুন।",
-                                    "Check item quantity, available stock and selling price."
+                                    "পণ্যের পরিমাণ, ইউনিট, স্টক ও বিক্রয় মূল্য যাচাই করুন।",
+                                    "Check item quantity, unit, available stock and selling price."
                                 )
                             return@Button
                         }
@@ -1810,7 +2016,11 @@ private fun RetailSaleDialog(
                                 quantity =
                                     quantity,
                                 unitPrice =
-                                    price
+                                    price,
+                                unitName =
+                                    item.selectedUnit,
+                                unitFactor =
+                                    item.unitFactor
                             )
                     }
 

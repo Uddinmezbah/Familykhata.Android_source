@@ -122,7 +122,7 @@ import com.familykhata.app.production.ProductionItemRoleEntity
         RetailSaleStockAllocationEntity::class,
         ProductUnitConversionEntity::class
     ],
-    version = 14,
+    version = 15,
     exportSchema = false
 )
 abstract class InventoryDatabase : RoomDatabase() {
@@ -2465,6 +2465,43 @@ abstract class InventoryDatabase : RoomDatabase() {
                 }
             }
 
+        private val MIGRATION_14_15 =
+            object : Migration(
+                14,
+                15
+            ) {
+                override fun migrate(
+                    db: SupportSQLiteDatabase
+                ) {
+                    db.execSQL(
+                        """
+                        ALTER TABLE `retail_sale_lines`
+                        ADD COLUMN `unitFactor`
+                        INTEGER NOT NULL DEFAULT 1
+                        """.trimIndent()
+                    )
+
+                    db.execSQL(
+                        """
+                        ALTER TABLE `retail_sale_lines`
+                        ADD COLUMN `baseQuantity`
+                        INTEGER NOT NULL DEFAULT 0
+                        """.trimIndent()
+                    )
+
+                    /*
+                     * Existing v14 sale quantities were already stored
+                     * directly in base stock units.
+                     */
+                    db.execSQL(
+                        """
+                        UPDATE `retail_sale_lines`
+                        SET `baseQuantity` = `quantity`
+                        """.trimIndent()
+                    )
+                }
+            }
+
         fun get(context: Context): InventoryDatabase = INSTANCE ?: synchronized(this) {
             INSTANCE ?: Room.databaseBuilder(
                 context.applicationContext,
@@ -2484,7 +2521,8 @@ abstract class InventoryDatabase : RoomDatabase() {
                     MIGRATION_10_11,
                     MIGRATION_11_12,
                     MIGRATION_12_13,
-                    MIGRATION_13_14
+                    MIGRATION_13_14,
+                    MIGRATION_14_15
                 )
                 .build()
                 .also { INSTANCE = it }

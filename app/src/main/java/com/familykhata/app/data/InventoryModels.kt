@@ -188,7 +188,11 @@ data class RetailSaleLineEntity(
     val productNameSnapshot: String,
     val skuSnapshot: String = "",
     val unitSnapshot: String = "pcs",
+    @ColumnInfo(defaultValue = "1")
+    val unitFactor: Int = 1,
     val quantity: Int,
+    @ColumnInfo(defaultValue = "0")
+    val baseQuantity: Int = 0,
     val unitPrice: Double,
     val unitCost: Double,
     val lineTotal: Double,

@@ -2,4 +2,5 @@
 <paths xmlns:android="http://schemas.android.com/apk/res/android">
     <cache-path name="statements" path="ledger_statements/" />
     <cache-path name="retail_invoices" path="retail_invoices/" />
+    <cache-path name="delivery_challans" path="delivery_challans/" />
 </paths>

@@ -1,5 +1,7 @@
 package com.familykhata.app.ui
 
+import android.content.ClipData
+import android.content.Intent
 import android.widget.Toast
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.layout.Arrangement
@@ -26,10 +28,12 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.core.content.FileProvider
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.familykhata.app.FamilyKhataViewModel
 import com.familykhata.app.data.ProductEntity
@@ -52,9 +56,14 @@ import com.familykhata.app.dealerbusiness.DealerSaleLineEntity
 import com.familykhata.app.dealerbusiness.DealerSaleLineInput
 import com.familykhata.app.dealerbusiness.DealerSalesReturnEntity
 import com.familykhata.app.dealerbusiness.DealerSupplierPaymentEntity
+import com.familykhata.app.report.writeDeliveryChallanPdf
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 private fun String.dealerBusinessNormalizeNumber(): String =
     buildString(length) {
@@ -189,6 +198,9 @@ internal fun V16DealerBusinessScreen(
         androidx.compose.ui.platform
             .LocalContext.current
 
+    val scope =
+        rememberCoroutineScope()
+
     val companies by vm.companies.collectAsState()
     val areas by vm.areas.collectAsState()
     val customers by vm.customers.collectAsState()
@@ -278,6 +290,10 @@ internal fun V16DealerBusinessScreen(
 
     var showDeliveryChallan by remember {
         mutableStateOf(false)
+    }
+
+    var sharingChallanId by remember {
+        mutableStateOf<Long?>(null)
     }
 
     var showWarehouseDamage by remember {
@@ -1108,6 +1124,141 @@ internal fun V16DealerBusinessScreen(
                                     "Status: ${challan.status}"
                                 )
                             )
+
+                            OutlinedButton(
+                                enabled =
+                                    sharingChallanId ==
+                                        null,
+                                modifier =
+                                    Modifier
+                                        .fillMaxWidth(),
+                                onClick = {
+                                    sharingChallanId =
+                                        challan.id
+
+                                    val bangla =
+                                        V15LanguageState
+                                            .isBangla()
+
+                                    scope.launch {
+                                        try {
+                                            val pdf =
+                                                withContext(
+                                                    Dispatchers.IO
+                                                ) {
+                                                    val lines =
+                                                        vm
+                                                            .loadDeliveryLineStatuses(
+                                                                challan.id
+                                                            )
+                                                            .map {
+                                                                it.line
+                                                            }
+
+                                                    writeDeliveryChallanPdf(
+                                                        context =
+                                                            context
+                                                                .applicationContext,
+                                                        challan =
+                                                            challan,
+                                                        lines =
+                                                            lines,
+                                                        bangla =
+                                                            bangla
+                                                    )
+                                                }
+
+                                            val uri =
+                                                FileProvider
+                                                    .getUriForFile(
+                                                        context,
+                                                        "${context.packageName}.statements",
+                                                        pdf.file
+                                                    )
+
+                                            val intent =
+                                                Intent(
+                                                    Intent.ACTION_SEND
+                                                ).apply {
+                                                    type =
+                                                        "application/pdf"
+
+                                                    putExtra(
+                                                        Intent.EXTRA_STREAM,
+                                                        uri
+                                                    )
+
+                                                    putExtra(
+                                                        Intent.EXTRA_SUBJECT,
+                                                        "Hisabi Khata - ${challan.challanNo}"
+                                                    )
+
+                                                    clipData =
+                                                        ClipData
+                                                            .newRawUri(
+                                                                "Delivery challan",
+                                                                uri
+                                                            )
+
+                                                    addFlags(
+                                                        Intent.FLAG_GRANT_READ_URI_PERMISSION
+                                                    )
+                                                }
+
+                                            context.startActivity(
+                                                Intent.createChooser(
+                                                    intent,
+                                                    v15Text(
+                                                        "চালান PDF শেয়ার করুন",
+                                                        "Share challan PDF"
+                                                    )
+                                                )
+                                            )
+                                        } catch (
+                                            cancelled:
+                                                CancellationException
+                                        ) {
+                                            throw cancelled
+                                        } catch (
+                                            _: Exception
+                                        ) {
+                                            Toast.makeText(
+                                                context,
+                                                v15Text(
+                                                    "চালান PDF তৈরি বা শেয়ার করা যায়নি।",
+                                                    "Unable to create or share challan PDF."
+                                                ),
+                                                Toast.LENGTH_LONG
+                                            ).show()
+                                        } finally {
+                                            if (
+                                                sharingChallanId ==
+                                                challan.id
+                                            ) {
+                                                sharingChallanId =
+                                                    null
+                                            }
+                                        }
+                                    }
+                                }
+                            ) {
+                                Text(
+                                    if (
+                                        sharingChallanId ==
+                                        challan.id
+                                    ) {
+                                        v15Text(
+                                            "PDF তৈরি হচ্ছে…",
+                                            "Creating PDF…"
+                                        )
+                                    } else {
+                                        v15Text(
+                                            "PDF চালান শেয়ার",
+                                            "Share PDF challan"
+                                        )
+                                    }
+                                )
+                            }
 
                             if (
                                 canWrite &&

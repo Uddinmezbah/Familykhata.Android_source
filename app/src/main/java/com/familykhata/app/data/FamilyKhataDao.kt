@@ -145,6 +145,105 @@ interface FamilyKhataDao {
     )
     fun observeWorkspaceBakiEntries(workspace: String): Flow<List<BakiEntryEntity>>
 
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insertFinancialAccount(
+        account: FinancialAccountEntity
+    ): Long
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insertFinancialAccountEntry(
+        entry: FinancialAccountEntryEntity
+    ): Long
+
+    @Query(
+        """
+        SELECT
+            a.id AS id,
+            a.name AS name,
+            a.type AS type,
+            a.provider AS provider,
+            a.openingBalance AS openingBalance,
+            a.openingBalance +
+                COALESCE(SUM(e.balanceDelta), 0) AS balance,
+            a.workspace AS workspace,
+            a.isActive AS isActive
+        FROM financial_accounts a
+        LEFT JOIN financial_account_entries e
+            ON e.accountId = a.id
+        WHERE a.workspace = :workspace
+        GROUP BY a.id
+        ORDER BY
+            a.isActive DESC,
+            a.name COLLATE NOCASE ASC
+        """
+    )
+    fun observeFinancialAccounts(
+        workspace: String
+    ): Flow<List<FinancialAccountSummary>>
+
+    @Query(
+        """
+        SELECT *
+        FROM financial_accounts
+        WHERE id = :accountId
+        LIMIT 1
+        """
+    )
+    suspend fun getFinancialAccountOnce(
+        accountId: Long
+    ): FinancialAccountEntity?
+
+    @Query(
+        """
+        SELECT
+            a.openingBalance +
+            COALESCE(
+                (
+                    SELECT SUM(e.balanceDelta)
+                    FROM financial_account_entries e
+                    WHERE e.accountId = a.id
+                ),
+                0
+            )
+        FROM financial_accounts a
+        WHERE a.id = :accountId
+        LIMIT 1
+        """
+    )
+    suspend fun getFinancialAccountBalanceOnce(
+        accountId: Long
+    ): Double?
+
+    @Query(
+        """
+        SELECT *
+        FROM financial_account_entries
+        WHERE accountId = :accountId
+        ORDER BY createdAt DESC, id DESC
+        """
+    )
+    fun observeFinancialAccountEntries(
+        accountId: Long
+    ): Flow<List<FinancialAccountEntryEntity>>
+
+    @Query(
+        "SELECT * FROM financial_accounts ORDER BY id ASC"
+    )
+    suspend fun getAllFinancialAccounts():
+        List<FinancialAccountEntity>
+
+    @Query(
+        "SELECT * FROM financial_account_entries ORDER BY id ASC"
+    )
+    suspend fun getAllFinancialAccountEntries():
+        List<FinancialAccountEntryEntity>
+
+    @Query("DELETE FROM financial_account_entries")
+    suspend fun clearFinancialAccountEntries()
+
+    @Query("DELETE FROM financial_accounts")
+    suspend fun clearFinancialAccounts()
+
     @Query("SELECT * FROM transactions ORDER BY id ASC")
     suspend fun getAllTransactions(): List<TransactionEntity>
 

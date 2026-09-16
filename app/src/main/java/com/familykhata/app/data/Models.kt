@@ -57,6 +57,68 @@ data class BakiEntryEntity(
     val createdAt: Long = System.currentTimeMillis()
 )
 
+@Entity(
+    tableName = "financial_accounts",
+    indices = [
+        Index(value = ["workspace", "name"]),
+        Index(value = ["workspace", "type"])
+    ]
+)
+data class FinancialAccountEntity(
+    @PrimaryKey(autoGenerate = true)
+    val id: Long = 0,
+    val name: String,
+    val type: String,
+    val provider: String = "",
+    val openingBalance: Double = 0.0,
+    val workspace: String = "SHOP",
+    val isActive: Boolean = true,
+    val createdAt: Long = System.currentTimeMillis()
+)
+
+@Entity(
+    tableName = "financial_account_entries",
+    foreignKeys = [
+        ForeignKey(
+            entity = FinancialAccountEntity::class,
+            parentColumns = ["id"],
+            childColumns = ["accountId"],
+            onDelete = ForeignKey.CASCADE
+        )
+    ],
+    indices = [
+        Index("accountId"),
+        Index(value = ["workspace", "createdAt"]),
+        Index("transferGroupId"),
+        Index(value = ["sourceKey"], unique = true)
+    ]
+)
+data class FinancialAccountEntryEntity(
+    @PrimaryKey(autoGenerate = true)
+    val id: Long = 0,
+    val accountId: Long,
+    val entryType: String,
+    val amount: Double,
+    val balanceDelta: Double,
+    val relatedAccountId: Long? = null,
+    val transferGroupId: String? = null,
+    val sourceKey: String? = null,
+    val note: String = "",
+    val workspace: String = "SHOP",
+    val createdAt: Long = System.currentTimeMillis()
+)
+
+data class FinancialAccountSummary(
+    val id: Long,
+    val name: String,
+    val type: String,
+    val provider: String,
+    val openingBalance: Double,
+    val balance: Double,
+    val workspace: String,
+    val isActive: Boolean
+)
+
 data class DashboardTotals(
     val income: Double,
     val expense: Double

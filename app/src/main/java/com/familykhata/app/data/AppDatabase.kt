@@ -8,8 +8,14 @@ import androidx.room.migration.Migration
 import androidx.sqlite.db.SupportSQLiteDatabase
 
 @Database(
-    entities = [TransactionEntity::class, BakiPersonEntity::class, BakiEntryEntity::class],
-    version = 4,
+    entities = [
+        TransactionEntity::class,
+        BakiPersonEntity::class,
+        BakiEntryEntity::class,
+        FinancialAccountEntity::class,
+        FinancialAccountEntryEntity::class
+    ],
+    version = 5,
     exportSchema = false
 )
 abstract class AppDatabase : RoomDatabase() {
@@ -50,6 +56,99 @@ abstract class AppDatabase : RoomDatabase() {
             }
         }
 
+        private val MIGRATION_4_5 =
+            object : Migration(4, 5) {
+                override fun migrate(
+                    db: SupportSQLiteDatabase
+                ) {
+                    db.execSQL(
+                        """
+                        CREATE TABLE IF NOT EXISTS `financial_accounts` (
+                            `id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+                            `name` TEXT NOT NULL,
+                            `type` TEXT NOT NULL,
+                            `provider` TEXT NOT NULL,
+                            `openingBalance` REAL NOT NULL,
+                            `workspace` TEXT NOT NULL,
+                            `isActive` INTEGER NOT NULL,
+                            `createdAt` INTEGER NOT NULL
+                        )
+                        """.trimIndent()
+                    )
+
+                    db.execSQL(
+                        """
+                        CREATE INDEX IF NOT EXISTS
+                        `index_financial_accounts_workspace_name`
+                        ON `financial_accounts` (`workspace`, `name`)
+                        """.trimIndent()
+                    )
+
+                    db.execSQL(
+                        """
+                        CREATE INDEX IF NOT EXISTS
+                        `index_financial_accounts_workspace_type`
+                        ON `financial_accounts` (`workspace`, `type`)
+                        """.trimIndent()
+                    )
+
+                    db.execSQL(
+                        """
+                        CREATE TABLE IF NOT EXISTS `financial_account_entries` (
+                            `id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+                            `accountId` INTEGER NOT NULL,
+                            `entryType` TEXT NOT NULL,
+                            `amount` REAL NOT NULL,
+                            `balanceDelta` REAL NOT NULL,
+                            `relatedAccountId` INTEGER,
+                            `transferGroupId` TEXT,
+                            `sourceKey` TEXT,
+                            `note` TEXT NOT NULL,
+                            `workspace` TEXT NOT NULL,
+                            `createdAt` INTEGER NOT NULL,
+                            FOREIGN KEY(`accountId`)
+                                REFERENCES `financial_accounts`(`id`)
+                                ON UPDATE NO ACTION
+                                ON DELETE CASCADE
+                        )
+                        """.trimIndent()
+                    )
+
+                    db.execSQL(
+                        """
+                        CREATE INDEX IF NOT EXISTS
+                        `index_financial_account_entries_accountId`
+                        ON `financial_account_entries` (`accountId`)
+                        """.trimIndent()
+                    )
+
+                    db.execSQL(
+                        """
+                        CREATE INDEX IF NOT EXISTS
+                        `index_financial_account_entries_workspace_createdAt`
+                        ON `financial_account_entries`
+                        (`workspace`, `createdAt`)
+                        """.trimIndent()
+                    )
+
+                    db.execSQL(
+                        """
+                        CREATE INDEX IF NOT EXISTS
+                        `index_financial_account_entries_transferGroupId`
+                        ON `financial_account_entries` (`transferGroupId`)
+                        """.trimIndent()
+                    )
+
+                    db.execSQL(
+                        """
+                        CREATE UNIQUE INDEX IF NOT EXISTS
+                        `index_financial_account_entries_sourceKey`
+                        ON `financial_account_entries` (`sourceKey`)
+                        """.trimIndent()
+                    )
+                }
+            }
+
         fun get(context: Context): AppDatabase = INSTANCE ?: synchronized(this) {
             INSTANCE ?: Room.databaseBuilder(
                 context.applicationContext,
@@ -59,7 +158,8 @@ abstract class AppDatabase : RoomDatabase() {
                 .addMigrations(
                     MIGRATION_1_2,
                     MIGRATION_2_3,
-                    MIGRATION_3_4
+                    MIGRATION_3_4,
+                    MIGRATION_4_5
                 )
                 .build()
                 .also { INSTANCE = it }

@@ -11,6 +11,9 @@ import com.familykhata.app.data.BakiPersonEntity
 import com.familykhata.app.data.BakiPersonSummary
 import com.familykhata.app.data.DashboardTotals
 import com.familykhata.app.data.DueReceivableItem
+import com.familykhata.app.data.FinancialAccountEntity
+import com.familykhata.app.data.FinancialAccountEntryEntity
+import com.familykhata.app.data.FinancialAccountSummary
 import com.familykhata.app.data.InventoryBackupBridge
 import com.familykhata.app.data.ProductEntity
 import com.familykhata.app.data.ProductUnitConversionEntity
@@ -34,6 +37,7 @@ import java.text.SimpleDateFormat
 import java.util.Calendar
 import java.util.Date
 import java.util.Locale
+import java.util.UUID
 
 private const val TRIAL_DAYS = 30
 private const val DAY_MS = 86_400_000L
@@ -91,6 +95,18 @@ class FamilyKhataViewModel(application: Application) : AndroidViewModel(applicat
             DashboardTotals(0.0, 0.0)
         )
 
+    val financialAccounts:
+        StateFlow<List<FinancialAccountSummary>> =
+        _selectedWorkspace
+            .flatMapLatest { workspace ->
+                dao.observeFinancialAccounts(workspace)
+            }
+            .stateIn(
+                viewModelScope,
+                SharingStarted.WhileSubscribed(5_000),
+                emptyList()
+            )
+
     val bakiPeople: StateFlow<List<BakiPersonSummary>> = _selectedWorkspace
         .flatMapLatest { workspace -> dao.observeBakiSummaries(workspace) }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
@@ -129,6 +145,177 @@ class FamilyKhataViewModel(application: Application) : AndroidViewModel(applicat
             )
         }
     }
+
+    fun addFinancialAccount(
+        name: String,
+        type: String,
+        provider: String = "",
+        openingBalance: Double = 0.0,
+        onDone: (Boolean) -> Unit = {}
+    ) {
+        val cleanName = name.trim()
+        val cleanType =
+            type.trim().uppercase(Locale.ROOT)
+
+        val allowedTypes =
+            setOf(
+                "CASH",
+                "MOBILE_WALLET",
+                "BANK",
+                "CARD",
+                "OTHER"
+            )
+
+        if (
+            !canWriteNow() ||
+            cleanName.isBlank() ||
+            cleanType !in allowedTypes ||
+            !openingBalance.isFinite() ||
+            openingBalance < 0.0
+        ) {
+            onDone(false)
+            return
+        }
+
+        val workspace =
+            _selectedWorkspace.value
+
+        viewModelScope.launch {
+            val success =
+                runCatching {
+                    dao.insertFinancialAccount(
+                        FinancialAccountEntity(
+                            name = cleanName,
+                            type = cleanType,
+                            provider = provider.trim(),
+                            openingBalance =
+                                openingBalance,
+                            workspace = workspace
+                        )
+                    ) > 0L
+                }.getOrDefault(false)
+
+            onDone(success)
+        }
+    }
+
+    fun transferBetweenAccounts(
+        fromAccountId: Long,
+        toAccountId: Long,
+        amount: Double,
+        note: String = "",
+        onDone: (Boolean) -> Unit = {}
+    ) {
+        if (
+            !canWriteNow() ||
+            fromAccountId <= 0L ||
+            toAccountId <= 0L ||
+            fromAccountId == toAccountId ||
+            !amount.isFinite() ||
+            amount <= 0.0
+        ) {
+            onDone(false)
+            return
+        }
+
+        val workspace =
+            _selectedWorkspace.value
+
+        viewModelScope.launch {
+            val success =
+                runCatching {
+                    database.withTransaction {
+                        val from =
+                            requireNotNull(
+                                dao.getFinancialAccountOnce(
+                                    fromAccountId
+                                )
+                            )
+
+                        val to =
+                            requireNotNull(
+                                dao.getFinancialAccountOnce(
+                                    toAccountId
+                                )
+                            )
+
+                        require(
+                            from.workspace == workspace &&
+                                to.workspace == workspace
+                        )
+
+                        require(
+                            from.isActive &&
+                                to.isActive
+                        )
+
+                        val available =
+                            requireNotNull(
+                                dao.getFinancialAccountBalanceOnce(
+                                    from.id
+                                )
+                            )
+
+                        require(
+                            available + 0.0001 >=
+                                amount
+                        )
+
+                        val groupId =
+                            UUID.randomUUID()
+                                .toString()
+
+                        val now =
+                            System.currentTimeMillis()
+
+                        dao.insertFinancialAccountEntry(
+                            FinancialAccountEntryEntity(
+                                accountId = from.id,
+                                entryType = "TRANSFER_OUT",
+                                amount = amount,
+                                balanceDelta = -amount,
+                                relatedAccountId = to.id,
+                                transferGroupId = groupId,
+                                sourceKey =
+                                    "ACCOUNT_TRANSFER:" +
+                                        "$groupId:OUT",
+                                note = note.trim(),
+                                workspace = workspace,
+                                createdAt = now
+                            )
+                        )
+
+                        dao.insertFinancialAccountEntry(
+                            FinancialAccountEntryEntity(
+                                accountId = to.id,
+                                entryType = "TRANSFER_IN",
+                                amount = amount,
+                                balanceDelta = amount,
+                                relatedAccountId = from.id,
+                                transferGroupId = groupId,
+                                sourceKey =
+                                    "ACCOUNT_TRANSFER:" +
+                                        "$groupId:IN",
+                                note = note.trim(),
+                                workspace = workspace,
+                                createdAt = now
+                            )
+                        )
+                    }
+
+                    true
+                }.getOrDefault(false)
+
+            onDone(success)
+        }
+    }
+
+    fun observeFinancialAccountEntries(
+        accountId: Long
+    ): Flow<List<FinancialAccountEntryEntity>> =
+        dao.observeFinancialAccountEntries(
+            accountId
+        )
 
     fun deleteTransaction(item: TransactionEntity) {
         if (!canWriteNow()) return
@@ -524,7 +711,14 @@ class FamilyKhataViewModel(application: Application) : AndroidViewModel(applicat
                 val transactions = dao.getAllTransactions()
                 val people = dao.getAllPeople()
                 val entries = dao.getAllBakiEntries()
-                val inventory = InventoryBackupBridge.export(getApplication())
+                val financialAccounts =
+                    dao.getAllFinancialAccounts()
+                val financialAccountEntries =
+                    dao.getAllFinancialAccountEntries()
+                val inventory =
+                    InventoryBackupBridge.export(
+                        getApplication()
+                    )
                 val businessData =
                     V15BusinessBackupBridge.export(
                         getApplication()
@@ -532,7 +726,7 @@ class FamilyKhataViewModel(application: Application) : AndroidViewModel(applicat
 
                 JSONObject().apply {
                     put("format", "hisabi-khata-backup")
-                    put("version", 8)
+                    put("version", 9)
                     put("createdAt", System.currentTimeMillis())
                     put("transactions", JSONArray().apply {
                         transactions.forEach { item ->
@@ -578,6 +772,104 @@ class FamilyKhataViewModel(application: Application) : AndroidViewModel(applicat
                             })
                         }
                     })
+                    put(
+                        "financialAccounts",
+                        JSONArray().apply {
+                            financialAccounts.forEach { account ->
+                                put(
+                                    JSONObject().apply {
+                                        put("id", account.id)
+                                        put("name", account.name)
+                                        put("type", account.type)
+                                        put(
+                                            "provider",
+                                            account.provider
+                                        )
+                                        put(
+                                            "openingBalance",
+                                            account.openingBalance
+                                        )
+                                        put(
+                                            "workspace",
+                                            account.workspace
+                                        )
+                                        put(
+                                            "isActive",
+                                            account.isActive
+                                        )
+                                        put(
+                                            "createdAt",
+                                            account.createdAt
+                                        )
+                                    }
+                                )
+                            }
+                        }
+                    )
+
+                    put(
+                        "financialAccountEntries",
+                        JSONArray().apply {
+                            financialAccountEntries.forEach { entry ->
+                                put(
+                                    JSONObject().apply {
+                                        put("id", entry.id)
+                                        put(
+                                            "accountId",
+                                            entry.accountId
+                                        )
+                                        put(
+                                            "entryType",
+                                            entry.entryType
+                                        )
+                                        put(
+                                            "amount",
+                                            entry.amount
+                                        )
+                                        put(
+                                            "balanceDelta",
+                                            entry.balanceDelta
+                                        )
+
+                                        entry.relatedAccountId?.let {
+                                            put(
+                                                "relatedAccountId",
+                                                it
+                                            )
+                                        }
+
+                                        entry.transferGroupId?.let {
+                                            put(
+                                                "transferGroupId",
+                                                it
+                                            )
+                                        }
+
+                                        entry.sourceKey?.let {
+                                            put(
+                                                "sourceKey",
+                                                it
+                                            )
+                                        }
+
+                                        put(
+                                            "note",
+                                            entry.note
+                                        )
+                                        put(
+                                            "workspace",
+                                            entry.workspace
+                                        )
+                                        put(
+                                            "createdAt",
+                                            entry.createdAt
+                                        )
+                                    }
+                                )
+                            }
+                        }
+                    )
+
                     put(
                         "settings",
                         V15SettingsBackupBridge.export(
@@ -687,14 +979,27 @@ class FamilyKhataViewModel(application: Application) : AndroidViewModel(applicat
                     "এটি হিসাবী খাতার সঠিক ব্যাকআপ ফাইল নয়"
                 }
                 val backupVersion = root.optInt("version")
-                require(backupVersion in 1..8) {
+                require(backupVersion in 1..9) {
                     "এই ব্যাকআপ ভার্সনটি এখনো সমর্থিত নয়"
                 }
 
                 val transactions = mutableListOf<TransactionEntity>()
                 val people = mutableListOf<BakiPersonEntity>()
-                val entries = mutableListOf<BakiEntryEntity>()
-                val inventoryProducts = mutableListOf<ProductEntity>()
+                val entries =
+                    mutableListOf<BakiEntryEntity>()
+
+                val financialAccounts =
+                    mutableListOf<
+                        FinancialAccountEntity
+                    >()
+
+                val financialAccountEntries =
+                    mutableListOf<
+                        FinancialAccountEntryEntity
+                    >()
+
+                val inventoryProducts =
+                    mutableListOf<ProductEntity>()
                 val inventoryBatches = mutableListOf<StockBatchEntity>()
                 val inventoryUnits =
                     mutableListOf<ProductUnitConversionEntity>()
@@ -801,6 +1106,355 @@ class FamilyKhataViewModel(application: Application) : AndroidViewModel(applicat
                         restoredSourceKeys.toSet().size
                 ) {
                     "ব্যাকআপে একই sourceKey একাধিকবার আছে"
+                }
+
+                if (backupVersion >= 9) {
+                    val accountTypes =
+                        setOf(
+                            "CASH",
+                            "MOBILE_WALLET",
+                            "BANK",
+                            "CARD",
+                            "OTHER"
+                        )
+
+                    val accountArray =
+                        root.optJSONArray(
+                            "financialAccounts"
+                        ) ?: JSONArray()
+
+                    val seenAccountIds =
+                        mutableSetOf<Long>()
+
+                    for (
+                        index in
+                        0 until accountArray.length()
+                    ) {
+                        val item =
+                            accountArray
+                                .getJSONObject(index)
+
+                        val id =
+                            item.getLong("id")
+
+                        val name =
+                            item.getString("name")
+                                .trim()
+
+                        val type =
+                            item.getString("type")
+                                .trim()
+                                .uppercase(
+                                    Locale.ROOT
+                                )
+
+                        val openingBalance =
+                            item.getDouble(
+                                "openingBalance"
+                            )
+
+                        val workspace =
+                            item.getString(
+                                "workspace"
+                            )
+
+                        require(
+                            id > 0L &&
+                                id !in seenAccountIds
+                        ) {
+                            "অ্যাকাউন্ট ID সঠিক নয়"
+                        }
+
+                        require(
+                            name.isNotBlank()
+                        ) {
+                            "অ্যাকাউন্টের নাম খালি হতে পারে না"
+                        }
+
+                        require(
+                            type in accountTypes
+                        ) {
+                            "অ্যাকাউন্টের ধরন সঠিক নয়"
+                        }
+
+                        require(
+                            openingBalance.isFinite() &&
+                                openingBalance >= 0.0
+                        ) {
+                            "Opening balance সঠিক নয়"
+                        }
+
+                        require(
+                            workspace in
+                                allowedWorkspaces
+                        ) {
+                            "অ্যাকাউন্ট workspace সঠিক নয়"
+                        }
+
+                        seenAccountIds += id
+
+                        financialAccounts +=
+                            FinancialAccountEntity(
+                                id = id,
+                                name = name,
+                                type = type,
+                                provider =
+                                    item.optString(
+                                        "provider",
+                                        ""
+                                    ).trim(),
+                                openingBalance =
+                                    openingBalance,
+                                workspace =
+                                    workspace,
+                                isActive =
+                                    item.optBoolean(
+                                        "isActive",
+                                        true
+                                    ),
+                                createdAt =
+                                    item.optLong(
+                                        "createdAt",
+                                        System.currentTimeMillis()
+                                    )
+                            )
+                    }
+
+                    val accountById =
+                        financialAccounts
+                            .associateBy {
+                                it.id
+                            }
+
+                    val entryArray =
+                        root.optJSONArray(
+                            "financialAccountEntries"
+                        ) ?: JSONArray()
+
+                    val seenEntryIds =
+                        mutableSetOf<Long>()
+
+                    val seenSourceKeys =
+                        mutableSetOf<String>()
+
+                    for (
+                        index in
+                        0 until entryArray.length()
+                    ) {
+                        val item =
+                            entryArray
+                                .getJSONObject(index)
+
+                        val id =
+                            item.getLong("id")
+
+                        val accountId =
+                            item.getLong(
+                                "accountId"
+                            )
+
+                        val account =
+                            requireNotNull(
+                                accountById[
+                                    accountId
+                                ]
+                            ) {
+                                "Account entry-এর account পাওয়া যায়নি"
+                            }
+
+                        val entryType =
+                            item.getString(
+                                "entryType"
+                            )
+                                .trim()
+                                .uppercase(
+                                    Locale.ROOT
+                                )
+
+                        val amount =
+                            item.getDouble(
+                                "amount"
+                            )
+
+                        val workspace =
+                            item.getString(
+                                "workspace"
+                            )
+
+                        require(
+                            id > 0L &&
+                                id !in seenEntryIds
+                        ) {
+                            "Account entry ID সঠিক নয়"
+                        }
+
+                        require(
+                            entryType ==
+                                "TRANSFER_IN" ||
+                                entryType ==
+                                "TRANSFER_OUT"
+                        ) {
+                            "Account entry type সঠিক নয়"
+                        }
+
+                        require(
+                            amount.isFinite() &&
+                                amount > 0.0
+                        ) {
+                            "Account entry amount সঠিক নয়"
+                        }
+
+                        require(
+                            workspace ==
+                                account.workspace
+                        ) {
+                            "Account entry workspace সঠিক নয়"
+                        }
+
+                        val relatedAccountId =
+                            item.optLong(
+                                "relatedAccountId",
+                                0L
+                            ).takeIf {
+                                it > 0L
+                            }
+
+                        val related =
+                            requireNotNull(
+                                relatedAccountId
+                                    ?.let {
+                                        accountById[it]
+                                    }
+                            ) {
+                                "Transfer-এর অন্য account পাওয়া যায়নি"
+                            }
+
+                        require(
+                            related.id !=
+                                account.id &&
+                                related.workspace ==
+                                    workspace
+                        ) {
+                            "Transfer account সঠিক নয়"
+                        }
+
+                        val groupId =
+                            item.optString(
+                                "transferGroupId",
+                                ""
+                            ).trim()
+
+                        require(
+                            groupId.isNotBlank()
+                        ) {
+                            "Transfer group পাওয়া যায়নি"
+                        }
+
+                        val sourceKey =
+                            item.optString(
+                                "sourceKey",
+                                ""
+                            )
+                                .trim()
+                                .takeIf {
+                                    it.isNotEmpty()
+                                }
+
+                        if (sourceKey != null) {
+                            require(
+                                sourceKey !in
+                                    seenSourceKeys
+                            ) {
+                                "একই account sourceKey একাধিকবার আছে"
+                            }
+
+                            seenSourceKeys +=
+                                sourceKey
+                        }
+
+                        seenEntryIds += id
+
+                        financialAccountEntries +=
+                            FinancialAccountEntryEntity(
+                                id = id,
+                                accountId =
+                                    account.id,
+                                entryType =
+                                    entryType,
+                                amount =
+                                    amount,
+                                balanceDelta =
+                                    if (
+                                        entryType ==
+                                            "TRANSFER_IN"
+                                    ) {
+                                        amount
+                                    } else {
+                                        -amount
+                                    },
+                                relatedAccountId =
+                                    related.id,
+                                transferGroupId =
+                                    groupId,
+                                sourceKey =
+                                    sourceKey,
+                                note =
+                                    item.optString(
+                                        "note",
+                                        ""
+                                    ),
+                                workspace =
+                                    workspace,
+                                createdAt =
+                                    item.optLong(
+                                        "createdAt",
+                                        System.currentTimeMillis()
+                                    )
+                            )
+                    }
+
+                    financialAccountEntries
+                        .groupBy {
+                            it.transferGroupId
+                        }
+                        .forEach {
+                                (_, pair) ->
+
+                            require(
+                                pair.size == 2
+                            ) {
+                                "Transfer pair অসম্পূর্ণ"
+                            }
+
+                            val outgoing =
+                                pair.singleOrNull {
+                                    it.entryType ==
+                                        "TRANSFER_OUT"
+                                }
+
+                            val incoming =
+                                pair.singleOrNull {
+                                    it.entryType ==
+                                        "TRANSFER_IN"
+                                }
+
+                            require(
+                                outgoing != null &&
+                                    incoming != null &&
+                                    kotlin.math.abs(
+                                        outgoing.amount -
+                                            incoming.amount
+                                    ) < 0.0001 &&
+                                    outgoing.accountId ==
+                                        incoming.relatedAccountId &&
+                                    incoming.accountId ==
+                                        outgoing.relatedAccountId &&
+                                    outgoing.workspace ==
+                                        incoming.workspace
+                            ) {
+                                "Transfer pair সঠিক নয়"
+                            }
+                        }
                 }
 
                 if (backupVersion >= 3) {
@@ -983,13 +1637,31 @@ class FamilyKhataViewModel(application: Application) : AndroidViewModel(applicat
                 }
 
                 database.withTransaction {
+                    dao.clearFinancialAccountEntries()
+                    dao.clearFinancialAccounts()
                     dao.clearBakiEntries()
                     dao.clearPeople()
                     dao.clearTransactions()
 
-                    transactions.forEach { dao.insertTransaction(it) }
-                    people.forEach { dao.insertPerson(it) }
-                    entries.forEach { dao.insertBakiEntry(it) }
+                    transactions.forEach {
+                        dao.insertTransaction(it)
+                    }
+
+                    people.forEach {
+                        dao.insertPerson(it)
+                    }
+
+                    entries.forEach {
+                        dao.insertBakiEntry(it)
+                    }
+
+                    financialAccounts.forEach {
+                        dao.insertFinancialAccount(it)
+                    }
+
+                    financialAccountEntries.forEach {
+                        dao.insertFinancialAccountEntry(it)
+                    }
                 }
 
                 if (backupVersion >= 3) {
@@ -1025,6 +1697,8 @@ class FamilyKhataViewModel(application: Application) : AndroidViewModel(applicat
                 transactions.size +
                     people.size +
                     entries.size +
+                    financialAccounts.size +
+                    financialAccountEntries.size +
                     inventoryProducts.size +
                     inventoryBatches.size +
                     inventoryUnits.size +

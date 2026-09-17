@@ -248,7 +248,15 @@ fun V16FinancialAccountsDialog(
                                                         v15Text(
                                                             kind.bangla,
                                                             kind.english
-                                                        )
+                                                        ),
+                                                        style =
+                                                            MaterialTheme
+                                                                .typography
+                                                                .labelMedium,
+                                                        fontWeight =
+                                                            FontWeight.Bold,
+                                                        maxLines = 1,
+                                                        softWrap = false
                                                     )
                                                 }
                                             } else {
@@ -275,7 +283,15 @@ fun V16FinancialAccountsDialog(
                                                         v15Text(
                                                             kind.bangla,
                                                             kind.english
-                                                        )
+                                                        ),
+                                                        style =
+                                                            MaterialTheme
+                                                                .typography
+                                                                .labelMedium,
+                                                        fontWeight =
+                                                            FontWeight.Bold,
+                                                        maxLines = 1,
+                                                        softWrap = false
                                                     )
                                                 }
                                             }

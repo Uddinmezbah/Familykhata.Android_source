@@ -216,9 +216,13 @@ fun FamilyKhataApp(viewModel: FamilyKhataViewModel) {
                                         businessMode
                                     ),
                                     style =
-                                        MaterialTheme.typography.labelMedium,
+                                        MaterialTheme.typography.labelSmall,
                                     fontWeight =
-                                        FontWeight.Bold
+                                        FontWeight.Bold,
+                                    maxLines = 1,
+                                    softWrap = false,
+                                    textAlign =
+                                        TextAlign.Center
                                 )
                             }
                         )
@@ -291,17 +295,23 @@ fun FamilyKhataApp(viewModel: FamilyKhataViewModel) {
                             horizontalArrangement =
                                 Arrangement.SpaceBetween,
                             verticalAlignment =
-                                Alignment.Top
+                                Alignment.CenterVertically
                         ) {
                             Text(
                                 v15Text(
                                     "হিসাবী খাতা",
                                     "Hisabi Khata"
                                 ),
+                                modifier =
+                                    Modifier
+                                        .weight(1f)
+                                        .padding(end = 8.dp),
                                 style =
                                     MaterialTheme.typography.headlineMedium,
                                 fontWeight =
-                                    FontWeight.ExtraBold
+                                    FontWeight.ExtraBold,
+                                maxLines = 1,
+                                softWrap = false
                             )
 
                             if (trialStatus.premiumUnlocked) {
@@ -323,10 +333,14 @@ fun FamilyKhataApp(viewModel: FamilyKhataViewModel) {
                                         tab = Tab.MORE
                                     },
                                     modifier =
-                                        Modifier.padding(end = 4.dp),
+                                        Modifier.padding(
+                                            start = 4.dp,
+                                            end = 4.dp
+                                        ),
                                     contentPadding =
                                         androidx.compose.foundation.layout.PaddingValues(
-                                            0.dp
+                                            horizontal = 8.dp,
+                                            vertical = 6.dp
                                         )
                                 ) {
                                     Column(
@@ -340,6 +354,8 @@ fun FamilyKhataApp(viewModel: FamilyKhataViewModel) {
                                             ),
                                             fontWeight =
                                                 FontWeight.ExtraBold,
+                                            maxLines = 1,
+                                            softWrap = false,
                                             color =
                                                 if (trialStatus.expired)
                                                     ExpenseAccent
@@ -367,7 +383,9 @@ fun FamilyKhataApp(viewModel: FamilyKhataViewModel) {
                                                 MaterialTheme.colorScheme
                                                     .onSurfaceVariant,
                                             textAlign =
-                                                TextAlign.End
+                                                TextAlign.End,
+                                            maxLines = 1,
+                                            softWrap = false
                                         )
                                     }
                                 }

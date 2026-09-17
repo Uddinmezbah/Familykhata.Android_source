@@ -155,7 +155,7 @@ fun V16DigitalServicesDialog(
                         Modifier.fillMaxWidth(),
                     horizontalArrangement =
                         Arrangement.spacedBy(
-                            6.dp
+                            4.dp
                         )
                 ) {
                     V16ServiceModeButton(
@@ -1020,7 +1020,11 @@ private fun V16ServiceAccountButton(
                 Modifier.fillMaxWidth()
         ) {
             Text(
-                "${account.name} • ${V14DisplayState.currencySymbol} ${money(account.balance)}"
+                "${account.name} • ${V14DisplayState.currencySymbol} ${money(account.balance)}",
+                style =
+                    MaterialTheme.typography.labelMedium,
+                maxLines = 1,
+                softWrap = false
             )
         }
     } else {
@@ -1033,7 +1037,11 @@ private fun V16ServiceAccountButton(
                 Modifier.fillMaxWidth()
         ) {
             Text(
-                "${account.name} • ${V14DisplayState.currencySymbol} ${money(account.balance)}"
+                "${account.name} • ${V14DisplayState.currencySymbol} ${money(account.balance)}",
+                style =
+                    MaterialTheme.typography.labelMedium,
+                maxLines = 1,
+                softWrap = false
             )
         }
     }
@@ -1046,23 +1054,49 @@ private fun V16ServiceModeButton(
     modifier: Modifier,
     onClick: () -> Unit
 ) {
+    val contentPadding =
+        androidx.compose.foundation.layout.PaddingValues(
+            horizontal = 4.dp,
+            vertical = 8.dp
+        )
+
     if (selected) {
         Button(
             onClick =
                 onClick,
             modifier =
-                modifier
+                modifier,
+            contentPadding =
+                contentPadding
         ) {
-            Text(label)
+            Text(
+                label,
+                style =
+                    MaterialTheme.typography.labelSmall,
+                fontWeight =
+                    FontWeight.Bold,
+                maxLines = 1,
+                softWrap = false
+            )
         }
     } else {
         OutlinedButton(
             onClick =
                 onClick,
             modifier =
-                modifier
+                modifier,
+            contentPadding =
+                contentPadding
         ) {
-            Text(label)
+            Text(
+                label,
+                style =
+                    MaterialTheme.typography.labelSmall,
+                fontWeight =
+                    FontWeight.Bold,
+                maxLines = 1,
+                softWrap = false
+            )
         }
     }
 }

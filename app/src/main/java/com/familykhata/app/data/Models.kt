@@ -12,6 +12,9 @@ import androidx.room.PrimaryKey
         Index(
             value = ["sourceKey"],
             unique = true
+        ),
+        Index(
+            value = ["financialAccountId"]
         )
     ]
 )
@@ -25,6 +28,7 @@ data class TransactionEntity(
     @ColumnInfo(defaultValue = "'FAMILY'")
     val workspace: String = "FAMILY",
     val sourceKey: String? = null,
+    val financialAccountId: Long? = null,
     val createdAt: Long = System.currentTimeMillis()
 )
 

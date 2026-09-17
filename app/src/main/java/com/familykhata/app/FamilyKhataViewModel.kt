@@ -147,19 +147,165 @@ class FamilyKhataViewModel(application: Application) : AndroidViewModel(applicat
         preferences.edit().putString("selected_workspace", workspace).apply()
     }
 
-    fun addTransaction(type: String, amount: Double, category: String, note: String) {
-        if (!canWriteNow() || amount <= 0) return
-        val workspace = _selectedWorkspace.value
+    fun addTransaction(
+        type: String,
+        amount: Double,
+        category: String,
+        note: String,
+        financialAccountId: Long? = null,
+        onDone: (Boolean) -> Unit = {}
+    ) {
+        val cleanType =
+            type.trim().uppercase(Locale.ROOT)
+
+        if (
+            !canWriteNow() ||
+            cleanType !in setOf(
+                "INCOME",
+                "EXPENSE"
+            ) ||
+            !amount.isFinite() ||
+            amount <= 0.0
+        ) {
+            onDone(false)
+            return
+        }
+
+        val workspace =
+            _selectedWorkspace.value
+
+        if (
+            workspace == "SHOP" &&
+            financialAccountId == null
+        ) {
+            onDone(false)
+            return
+        }
+
         viewModelScope.launch {
-            dao.insertTransaction(
-                TransactionEntity(
-                    type = type,
-                    amount = amount,
-                    category = category.trim().ifBlank { "অন্যান্য" },
-                    note = note.trim(),
-                    workspace = workspace
-                )
-            )
+            val success =
+                runCatching {
+                    database.withTransaction {
+                        val account =
+                            if (
+                                workspace == "SHOP"
+                            ) {
+                                requireNotNull(
+                                    dao.getFinancialAccountOnce(
+                                        financialAccountId!!
+                                    )
+                                ).also {
+                                    require(
+                                        it.workspace ==
+                                            workspace &&
+                                            it.isActive
+                                    )
+                                }
+                            } else {
+                                null
+                            }
+
+                        if (
+                            cleanType ==
+                                "EXPENSE" &&
+                            account != null
+                        ) {
+                            val available =
+                                requireNotNull(
+                                    dao.getFinancialAccountBalanceOnce(
+                                        account.id
+                                    )
+                                )
+
+                            require(
+                                available + 0.0001 >=
+                                    amount
+                            )
+                        }
+
+                        val now =
+                            System.currentTimeMillis()
+
+                        val transactionId =
+                            dao.insertTransaction(
+                                TransactionEntity(
+                                    type =
+                                        cleanType,
+                                    amount =
+                                        amount,
+                                    category =
+                                        category
+                                            .trim()
+                                            .ifBlank {
+                                                "অন্যান্য"
+                                            },
+                                    note =
+                                        note.trim(),
+                                    workspace =
+                                        workspace,
+                                    financialAccountId =
+                                        account?.id,
+                                    createdAt =
+                                        now
+                                )
+                            )
+
+                        require(
+                            transactionId > 0L
+                        )
+
+                        if (account != null) {
+                            dao.insertFinancialAccountEntry(
+                                FinancialAccountEntryEntity(
+                                    accountId =
+                                        account.id,
+                                    entryType =
+                                        if (
+                                            cleanType ==
+                                                "INCOME"
+                                        ) {
+                                            "TRANSACTION_IN"
+                                        } else {
+                                            "TRANSACTION_OUT"
+                                        },
+                                    amount =
+                                        amount,
+                                    balanceDelta =
+                                        if (
+                                            cleanType ==
+                                                "INCOME"
+                                        ) {
+                                            amount
+                                        } else {
+                                            -amount
+                                        },
+                                    sourceKey =
+                                        "TRANSACTION:" +
+                                            transactionId,
+                                    note =
+                                        listOf(
+                                            category.trim(),
+                                            note.trim()
+                                        )
+                                            .filter {
+                                                it.isNotBlank()
+                                            }
+                                            .joinToString(
+                                                " • "
+                                            ),
+                                    workspace =
+                                        workspace,
+                                    createdAt =
+                                        now
+                                )
+                            )
+                        }
+                    }
+
+                    true
+                }.getOrDefault(false)
+
+            onDone(success)
         }
     }
 
@@ -723,7 +869,22 @@ class FamilyKhataViewModel(application: Application) : AndroidViewModel(applicat
         ) {
             return
         }
-        viewModelScope.launch { dao.deleteTransaction(item) }
+
+        viewModelScope.launch {
+            database.withTransaction {
+                if (
+                    item.financialAccountId !=
+                        null
+                ) {
+                    dao.deleteFinancialAccountEntryBySourceKey(
+                        "TRANSACTION:" +
+                            item.id
+                    )
+                }
+
+                dao.deleteTransaction(item)
+            }
+        }
     }
 
     fun updateTransaction(
@@ -731,9 +892,13 @@ class FamilyKhataViewModel(application: Application) : AndroidViewModel(applicat
         type: String,
         amount: Double,
         category: String,
-        note: String
+        note: String,
+        financialAccountId: Long? =
+            item.financialAccountId,
+        onDone: (Boolean) -> Unit = {}
     ) {
-        val cleanType = type.trim().uppercase(Locale.US)
+        val cleanType =
+            type.trim().uppercase(Locale.US)
 
         if (
             !canWriteNow() ||
@@ -741,23 +906,195 @@ class FamilyKhataViewModel(application: Application) : AndroidViewModel(applicat
                 ?.startsWith(
                     "DIGITAL_SERVICE:"
                 ) == true ||
-            cleanType !in setOf("INCOME", "EXPENSE") ||
-            amount <= 0
+            cleanType !in setOf(
+                "INCOME",
+                "EXPENSE"
+            ) ||
+            !amount.isFinite() ||
+            amount <= 0.0 ||
+            (
+                item.workspace == "SHOP" &&
+                    financialAccountId == null
+            )
         ) {
+            onDone(false)
             return
         }
 
         viewModelScope.launch {
-            dao.updateTransaction(
-                transactionId = item.id,
-                type = cleanType,
-                amount = amount,
-                category =
-                    category.trim().ifBlank {
-                        "অন্যান্য"
-                    },
-                note = note.trim()
-            )
+            val success =
+                runCatching {
+                    database.withTransaction {
+                        val entryKey =
+                            "TRANSACTION:" +
+                                item.id
+
+                        val oldEntry =
+                            dao.getFinancialAccountEntryBySourceKey(
+                                entryKey
+                            )
+
+                        val account =
+                            if (
+                                item.workspace ==
+                                    "SHOP"
+                            ) {
+                                requireNotNull(
+                                    dao.getFinancialAccountOnce(
+                                        financialAccountId!!
+                                    )
+                                ).also {
+                                    require(
+                                        it.workspace ==
+                                            item.workspace &&
+                                            (
+                                                it.isActive ||
+                                                it.id ==
+                                                    item.financialAccountId
+                                            )
+                                    )
+                                }
+                            } else {
+                                null
+                            }
+
+                        val newDelta =
+                            if (
+                                cleanType ==
+                                    "INCOME"
+                            ) {
+                                amount
+                            } else {
+                                -amount
+                            }
+
+                        if (
+                            oldEntry != null &&
+                            (
+                                account == null ||
+                                oldEntry.accountId !=
+                                    account.id
+                            )
+                        ) {
+                            val oldAccountBalance =
+                                requireNotNull(
+                                    dao.getFinancialAccountBalanceOnce(
+                                        oldEntry.accountId
+                                    )
+                                )
+
+                            val oldAccountAfterRemoval =
+                                oldAccountBalance -
+                                    oldEntry.balanceDelta
+
+                            require(
+                                oldAccountAfterRemoval >=
+                                    -0.0001
+                            )
+                        }
+
+                        if (account != null) {
+                            val targetBalance =
+                                requireNotNull(
+                                    dao.getFinancialAccountBalanceOnce(
+                                        account.id
+                                    )
+                                )
+
+                            val oldDeltaOnTarget =
+                                oldEntry
+                                    ?.takeIf {
+                                        it.accountId ==
+                                            account.id
+                                    }
+                                    ?.balanceDelta
+                                    ?: 0.0
+
+                            val targetAfterUpdate =
+                                targetBalance -
+                                    oldDeltaOnTarget +
+                                    newDelta
+
+                            require(
+                                targetAfterUpdate >=
+                                    -0.0001
+                            )
+                        }
+
+                        dao.deleteFinancialAccountEntryBySourceKey(
+                            entryKey
+                        )
+
+                        dao.updateTransaction(
+                            transactionId =
+                                item.id,
+                            type =
+                                cleanType,
+                            amount =
+                                amount,
+                            category =
+                                category
+                                    .trim()
+                                    .ifBlank {
+                                        "অন্যান্য"
+                                    },
+                            note =
+                                note.trim(),
+                            financialAccountId =
+                                account?.id
+                        )
+
+                        if (account != null) {
+                            dao.insertFinancialAccountEntry(
+                                FinancialAccountEntryEntity(
+                                    accountId =
+                                        account.id,
+                                    entryType =
+                                        if (
+                                            cleanType ==
+                                                "INCOME"
+                                        ) {
+                                            "TRANSACTION_IN"
+                                        } else {
+                                            "TRANSACTION_OUT"
+                                        },
+                                    amount =
+                                        amount,
+                                    balanceDelta =
+                                        if (
+                                            cleanType ==
+                                                "INCOME"
+                                        ) {
+                                            amount
+                                        } else {
+                                            -amount
+                                        },
+                                    sourceKey =
+                                        entryKey,
+                                    note =
+                                        listOf(
+                                            category.trim(),
+                                            note.trim()
+                                        )
+                                            .filter {
+                                                it.isNotBlank()
+                                            }
+                                            .joinToString(
+                                                " • "
+                                            ),
+                                    workspace =
+                                        item.workspace,
+                                    createdAt =
+                                        item.createdAt
+                                )
+                            )
+                        }
+                    }
+
+                    true
+                }.getOrDefault(false)
+
+            onDone(success)
         }
     }
 
@@ -1136,7 +1473,7 @@ class FamilyKhataViewModel(application: Application) : AndroidViewModel(applicat
 
                 JSONObject().apply {
                     put("format", "hisabi-khata-backup")
-                    put("version", 10)
+                    put("version", 11)
                     put("createdAt", System.currentTimeMillis())
                     put("transactions", JSONArray().apply {
                         transactions.forEach { item ->
@@ -1153,6 +1490,15 @@ class FamilyKhataViewModel(application: Application) : AndroidViewModel(applicat
                                         it
                                     )
                                 }
+
+                                item.financialAccountId
+                                    ?.let {
+                                        put(
+                                            "financialAccountId",
+                                            it
+                                        )
+                                    }
+
                                 put("createdAt", item.createdAt)
                             })
                         }
@@ -1472,7 +1818,7 @@ class FamilyKhataViewModel(application: Application) : AndroidViewModel(applicat
                     "এটি হিসাবী খাতার সঠিক ব্যাকআপ ফাইল নয়"
                 }
                 val backupVersion = root.optInt("version")
-                require(backupVersion in 1..10) {
+                require(backupVersion in 1..11) {
                     "এই ব্যাকআপ ভার্সনটি এখনো সমর্থিত নয়"
                 }
 
@@ -1533,7 +1879,24 @@ class FamilyKhataViewModel(application: Application) : AndroidViewModel(applicat
                             } else {
                                 null
                             },
-                        createdAt = item.optLong("createdAt", System.currentTimeMillis())
+                        financialAccountId =
+                            if (
+                                backupVersion >= 11
+                            ) {
+                                item.optLong(
+                                    "financialAccountId",
+                                    0L
+                                ).takeIf {
+                                    it > 0L
+                                }
+                            } else {
+                                null
+                            },
+                        createdAt =
+                            item.optLong(
+                                "createdAt",
+                                System.currentTimeMillis()
+                            )
                     )
                 }
 
@@ -1814,20 +2177,30 @@ class FamilyKhataViewModel(application: Application) : AndroidViewModel(applicat
                         }
 
                         val allowedEntryTypes =
-                            if (
-                                backupVersion >= 10
-                            ) {
-                                setOf(
-                                    "TRANSFER_IN",
-                                    "TRANSFER_OUT",
-                                    "SERVICE_IN",
-                                    "SERVICE_OUT"
-                                )
-                            } else {
-                                setOf(
-                                    "TRANSFER_IN",
-                                    "TRANSFER_OUT"
-                                )
+                            when {
+                                backupVersion >= 11 ->
+                                    setOf(
+                                        "TRANSFER_IN",
+                                        "TRANSFER_OUT",
+                                        "SERVICE_IN",
+                                        "SERVICE_OUT",
+                                        "TRANSACTION_IN",
+                                        "TRANSACTION_OUT"
+                                    )
+
+                                backupVersion >= 10 ->
+                                    setOf(
+                                        "TRANSFER_IN",
+                                        "TRANSFER_OUT",
+                                        "SERVICE_IN",
+                                        "SERVICE_OUT"
+                                    )
+
+                                else ->
+                                    setOf(
+                                        "TRANSFER_IN",
+                                        "TRANSFER_OUT"
+                                    )
                             }
 
                         require(
@@ -1860,22 +2233,38 @@ class FamilyKhataViewModel(application: Application) : AndroidViewModel(applicat
                             }
 
                         val related =
-                            requireNotNull(
-                                relatedAccountId
-                                    ?.let {
-                                        accountById[it]
-                                    }
-                            ) {
-                                "Transfer-এর অন্য account পাওয়া যায়নি"
-                            }
+                            relatedAccountId
+                                ?.let {
+                                    accountById[it]
+                                }
 
-                        require(
-                            related.id !=
-                                account.id &&
-                                related.workspace ==
-                                    workspace
-                        ) {
-                            "Transfer account সঠিক নয়"
+                        val needsRelatedAccount =
+                            entryType ==
+                                "TRANSFER_IN" ||
+                                entryType ==
+                                    "TRANSFER_OUT" ||
+                                entryType ==
+                                    "SERVICE_IN" ||
+                                entryType ==
+                                    "SERVICE_OUT"
+
+                        if (needsRelatedAccount) {
+                            require(
+                                related != null &&
+                                    related.id !=
+                                        account.id &&
+                                    related.workspace ==
+                                        workspace
+                            ) {
+                                "Related account সঠিক নয়"
+                            }
+                        } else {
+                            require(
+                                relatedAccountId ==
+                                    null
+                            ) {
+                                "Transaction entry-তে related account থাকা যাবে না"
+                            }
                         }
 
                         val groupId =
@@ -1951,7 +2340,7 @@ class FamilyKhataViewModel(application: Application) : AndroidViewModel(applicat
                                         -amount
                                     },
                                 relatedAccountId =
-                                    related.id,
+                                    related?.id,
                                 transferGroupId =
                                     groupId,
                                 sourceKey =
@@ -2019,6 +2408,119 @@ class FamilyKhataViewModel(application: Application) : AndroidViewModel(applicat
                                 "Transfer pair সঠিক নয়"
                             }
                         }
+                }
+
+                if (backupVersion >= 11) {
+                    val transactionAccountById =
+                        financialAccounts
+                            .associateBy {
+                                it.id
+                            }
+
+                    val transactionAccountEntries =
+                        financialAccountEntries
+                            .filter {
+                                it.entryType ==
+                                    "TRANSACTION_IN" ||
+                                    it.entryType ==
+                                        "TRANSACTION_OUT"
+                            }
+
+                    val linkedTransactions =
+                        transactions.filter {
+                            it.financialAccountId !=
+                                null
+                        }
+
+                    require(
+                        transactionAccountEntries.size ==
+                            linkedTransactions.size
+                    ) {
+                        "Transaction account entry সংখ্যা সঠিক নয়"
+                    }
+
+                    linkedTransactions.forEach {
+                            transaction ->
+
+                        require(
+                            transaction.workspace ==
+                                "SHOP"
+                        ) {
+                            "Linked transaction workspace সঠিক নয়"
+                        }
+
+                        val account =
+                            requireNotNull(
+                                transactionAccountById[
+                                    transaction
+                                        .financialAccountId
+                                ]
+                            ) {
+                                "Transaction-এর account পাওয়া যায়নি"
+                            }
+
+                        require(
+                            account.workspace ==
+                                transaction.workspace
+                        ) {
+                            "Transaction account workspace সঠিক নয়"
+                        }
+
+                        val expectedKey =
+                            "TRANSACTION:" +
+                                transaction.id
+
+                        val linkedEntry =
+                            transactionAccountEntries
+                                .singleOrNull {
+                                    it.sourceKey ==
+                                        expectedKey
+                                }
+
+                        val expectedType =
+                            if (
+                                transaction.type ==
+                                    "INCOME"
+                            ) {
+                                "TRANSACTION_IN"
+                            } else {
+                                "TRANSACTION_OUT"
+                            }
+
+                        val expectedDelta =
+                            if (
+                                transaction.type ==
+                                    "INCOME"
+                            ) {
+                                transaction.amount
+                            } else {
+                                -transaction.amount
+                            }
+
+                        require(
+                            linkedEntry != null &&
+                                linkedEntry.accountId ==
+                                    account.id &&
+                                linkedEntry.entryType ==
+                                    expectedType &&
+                                kotlin.math.abs(
+                                    linkedEntry.amount -
+                                        transaction.amount
+                                ) < 0.0001 &&
+                                kotlin.math.abs(
+                                    linkedEntry.balanceDelta -
+                                        expectedDelta
+                                ) < 0.0001 &&
+                                linkedEntry.relatedAccountId ==
+                                    null &&
+                                linkedEntry.transferGroupId ==
+                                    null &&
+                                linkedEntry.workspace ==
+                                    transaction.workspace
+                        ) {
+                            "Transaction account link সঠিক নয়"
+                        }
+                    }
                 }
 
                 if (backupVersion >= 10) {

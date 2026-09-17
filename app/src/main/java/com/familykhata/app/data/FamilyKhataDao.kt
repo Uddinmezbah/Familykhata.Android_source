@@ -10,7 +10,9 @@ import kotlinx.coroutines.flow.Flow
 @Dao
 interface FamilyKhataDao {
     @Insert(onConflict = OnConflictStrategy.REPLACE)
-    suspend fun insertTransaction(item: TransactionEntity)
+    suspend fun insertTransaction(
+        item: TransactionEntity
+    ): Long
 
     @Delete
     suspend fun deleteTransaction(item: TransactionEntity)
@@ -21,7 +23,8 @@ interface FamilyKhataDao {
         SET type = :type,
             amount = :amount,
             category = :category,
-            note = :note
+            note = :note,
+            financialAccountId = :financialAccountId
         WHERE id = :transactionId
         """
     )
@@ -30,7 +33,8 @@ interface FamilyKhataDao {
         type: String,
         amount: Double,
         category: String,
-        note: String
+        note: String,
+        financialAccountId: Long?
     )
 
     @Query("SELECT * FROM transactions WHERE workspace = :workspace ORDER BY createdAt DESC")
@@ -225,6 +229,28 @@ interface FamilyKhataDao {
     fun observeFinancialAccountEntries(
         accountId: Long
     ): Flow<List<FinancialAccountEntryEntity>>
+
+    @Query(
+        """
+        SELECT *
+        FROM financial_account_entries
+        WHERE sourceKey = :sourceKey
+        LIMIT 1
+        """
+    )
+    suspend fun getFinancialAccountEntryBySourceKey(
+        sourceKey: String
+    ): FinancialAccountEntryEntity?
+
+    @Query(
+        """
+        DELETE FROM financial_account_entries
+        WHERE sourceKey = :sourceKey
+        """
+    )
+    suspend fun deleteFinancialAccountEntryBySourceKey(
+        sourceKey: String
+    )
 
     @Query(
         "SELECT * FROM financial_accounts ORDER BY id ASC"

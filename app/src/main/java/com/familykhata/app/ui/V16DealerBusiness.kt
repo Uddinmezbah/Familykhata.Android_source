@@ -4979,10 +4979,8 @@ private fun DealerPurchaseForm(
                 .verticalScroll(
                     rememberScrollState()
                 )
-                .padding(
-                    horizontal = 12.dp,
-                    bottom = 28.dp
-                ),
+                .padding(horizontal = 12.dp)
+                .padding(bottom = 28.dp),
         verticalArrangement =
             Arrangement.spacedBy(8.dp)
     ) {
@@ -5336,10 +5334,8 @@ private fun DealerSaleForm(
                 .verticalScroll(
                     rememberScrollState()
                 )
-                .padding(
-                    horizontal = 12.dp,
-                    bottom = 28.dp
-                ),
+                .padding(horizontal = 12.dp)
+                .padding(bottom = 28.dp),
         verticalArrangement =
             Arrangement.spacedBy(8.dp)
     ) {
@@ -5674,10 +5670,8 @@ private fun DealerCollectionForm(
                 .verticalScroll(
                     rememberScrollState()
                 )
-                .padding(
-                    horizontal = 12.dp,
-                    bottom = 28.dp
-                ),
+                .padding(horizontal = 12.dp)
+                .padding(bottom = 28.dp),
         verticalArrangement =
             Arrangement.spacedBy(8.dp)
     ) {
@@ -5847,10 +5841,8 @@ private fun DealerSupplierPaymentForm(
                 .verticalScroll(
                     rememberScrollState()
                 )
-                .padding(
-                    horizontal = 12.dp,
-                    bottom = 28.dp
-                ),
+                .padding(horizontal = 12.dp)
+                .padding(bottom = 28.dp),
         verticalArrangement =
             Arrangement.spacedBy(8.dp)
     ) {
@@ -6011,10 +6003,8 @@ private fun DealerExpenseForm(
                 .verticalScroll(
                     rememberScrollState()
                 )
-                .padding(
-                    horizontal = 12.dp,
-                    bottom = 28.dp
-                ),
+                .padding(horizontal = 12.dp)
+                .padding(bottom = 28.dp),
         verticalArrangement =
             Arrangement.spacedBy(8.dp)
     ) {
@@ -6135,10 +6125,8 @@ private fun DealerSalesReturnForm(
                 .verticalScroll(
                     rememberScrollState()
                 )
-                .padding(
-                    horizontal = 12.dp,
-                    bottom = 28.dp
-                ),
+                .padding(horizontal = 12.dp)
+                .padding(bottom = 28.dp),
         verticalArrangement =
             Arrangement.spacedBy(8.dp)
     ) {
@@ -6309,10 +6297,8 @@ private fun DealerPurchaseReturnForm(
                 .verticalScroll(
                     rememberScrollState()
                 )
-                .padding(
-                    horizontal = 12.dp,
-                    bottom = 28.dp
-                ),
+                .padding(horizontal = 12.dp)
+                .padding(bottom = 28.dp),
         verticalArrangement =
             Arrangement.spacedBy(8.dp)
     ) {
@@ -6722,10 +6708,8 @@ private fun DealerDeliverySaleForm(
                 .verticalScroll(
                     rememberScrollState()
                 )
-                .padding(
-                    horizontal = 12.dp,
-                    bottom = 28.dp
-                ),
+                .padding(horizontal = 12.dp)
+                .padding(bottom = 28.dp),
         verticalArrangement =
             Arrangement.spacedBy(8.dp)
     ) {
@@ -7232,10 +7216,8 @@ private fun DealerDeliverySettlementForm(
                 .verticalScroll(
                     rememberScrollState()
                 )
-                .padding(
-                    horizontal = 12.dp,
-                    bottom = 28.dp
-                ),
+                .padding(horizontal = 12.dp)
+                .padding(bottom = 28.dp),
         verticalArrangement =
             Arrangement.spacedBy(8.dp)
     ) {
@@ -7679,10 +7661,8 @@ private fun DealerDeliveryChallanForm(
                 .verticalScroll(
                     rememberScrollState()
                 )
-                .padding(
-                    horizontal = 12.dp,
-                    bottom = 28.dp
-                ),
+                .padding(horizontal = 12.dp)
+                .padding(bottom = 28.dp),
         verticalArrangement =
             Arrangement.spacedBy(8.dp)
     ) {
@@ -8297,10 +8277,8 @@ private fun DealerWarehouseDamageForm(
                 .verticalScroll(
                     rememberScrollState()
                 )
-                .padding(
-                    horizontal = 12.dp,
-                    bottom = 28.dp
-                ),
+                .padding(horizontal = 12.dp)
+                .padding(bottom = 28.dp),
         verticalArrangement =
             Arrangement.spacedBy(8.dp)
     ) {
@@ -8578,10 +8556,8 @@ private fun DealerDeliveryChallanMetaForm(
                 .verticalScroll(
                     rememberScrollState()
                 )
-                .padding(
-                    horizontal = 12.dp,
-                    bottom = 28.dp
-                ),
+                .padding(horizontal = 12.dp)
+                .padding(bottom = 28.dp),
         verticalArrangement =
             Arrangement.spacedBy(8.dp)
     ) {
@@ -8785,10 +8761,8 @@ private fun DealerDeliverySettlementMetaForm(
                 .verticalScroll(
                     rememberScrollState()
                 )
-                .padding(
-                    horizontal = 12.dp,
-                    bottom = 28.dp
-                ),
+                .padding(horizontal = 12.dp)
+                .padding(bottom = 28.dp),
         verticalArrangement =
             Arrangement.spacedBy(8.dp)
     ) {
@@ -8962,10 +8936,8 @@ private fun DealerWarehouseDamageEditForm(
                 .verticalScroll(
                     rememberScrollState()
                 )
-                .padding(
-                    horizontal = 12.dp,
-                    bottom = 28.dp
-                ),
+                .padding(horizontal = 12.dp)
+                .padding(bottom = 28.dp),
         verticalArrangement =
             Arrangement.spacedBy(8.dp)
     ) {
@@ -9137,10 +9109,8 @@ private fun DealerPackSetupForm(
                 .verticalScroll(
                     rememberScrollState()
                 )
-                .padding(
-                    horizontal = 12.dp,
-                    bottom = 28.dp
-                ),
+                .padding(horizontal = 12.dp)
+                .padding(bottom = 28.dp),
         verticalArrangement =
             Arrangement.spacedBy(8.dp)
     ) {
@@ -9325,10 +9295,8 @@ private fun DealerDeliveryPersonForm(
                 .verticalScroll(
                     rememberScrollState()
                 )
-                .padding(
-                    horizontal = 12.dp,
-                    bottom = 28.dp
-                ),
+                .padding(horizontal = 12.dp)
+                .padding(bottom = 28.dp),
         verticalArrangement =
             Arrangement.spacedBy(7.dp)
     ) {
@@ -9496,10 +9464,8 @@ private fun DealerCompanyForm(
                 .verticalScroll(
                     rememberScrollState()
                 )
-                .padding(
-                    horizontal = 12.dp,
-                    bottom = 28.dp
-                ),
+                .padding(horizontal = 12.dp)
+                .padding(bottom = 28.dp),
         verticalArrangement =
             Arrangement.spacedBy(7.dp)
     ) {
@@ -9657,10 +9623,8 @@ private fun DealerAreaForm(
                 .verticalScroll(
                     rememberScrollState()
                 )
-                .padding(
-                    horizontal = 12.dp,
-                    bottom = 28.dp
-                ),
+                .padding(horizontal = 12.dp)
+                .padding(bottom = 28.dp),
         verticalArrangement =
             Arrangement.spacedBy(7.dp)
     ) {
@@ -9797,10 +9761,8 @@ private fun DealerCustomerForm(
                 .verticalScroll(
                     rememberScrollState()
                 )
-                .padding(
-                    horizontal = 12.dp,
-                    bottom = 28.dp
-                ),
+                .padding(horizontal = 12.dp)
+                .padding(bottom = 28.dp),
         verticalArrangement =
             Arrangement.spacedBy(7.dp)
     ) {

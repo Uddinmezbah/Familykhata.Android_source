@@ -1517,10 +1517,8 @@ private fun RetailSaleForm(
                 .verticalScroll(
                     rememberScrollState()
                 )
-                .padding(
-                    horizontal = 12.dp,
-                    bottom = 28.dp
-                ),
+                .padding(horizontal = 12.dp)
+                .padding(bottom = 28.dp),
         verticalArrangement =
             Arrangement.spacedBy(8.dp)
     ) {

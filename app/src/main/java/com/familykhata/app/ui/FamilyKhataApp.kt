@@ -333,13 +333,13 @@ fun FamilyKhataApp(viewModel: FamilyKhataViewModel) {
                                         Modifier
                                             .fillMaxSize()
                                             .padding(
-                                                horizontal = 10.dp,
+                                                horizontal = 8.dp,
                                                 vertical = 6.dp
                                             ),
                                     verticalAlignment =
                                         Alignment.CenterVertically,
                                     horizontalArrangement =
-                                        Arrangement.spacedBy(6.dp)
+                                        Arrangement.spacedBy(5.dp)
                                 ) {
                                     homeLogoFile?.let { logoFile ->
                                         AsyncImage(
@@ -351,7 +351,7 @@ fun FamilyKhataApp(viewModel: FamilyKhataViewModel) {
                                                 ),
                                             modifier =
                                                 Modifier
-                                                    .size(24.dp)
+                                                    .size(22.dp)
                                                     .clip(
                                                         RoundedCornerShape(
                                                             7.dp
@@ -372,7 +372,7 @@ fun FamilyKhataApp(viewModel: FamilyKhataViewModel) {
                                         modifier = Modifier.weight(1f),
                                         style =
                                             MaterialTheme.typography.labelLarge,
-                                        fontWeight = FontWeight.Bold,
+                                        fontWeight = FontWeight.ExtraBold,
                                         maxLines = 1,
                                         softWrap = false
                                     )
@@ -420,11 +420,6 @@ fun FamilyKhataApp(viewModel: FamilyKhataViewModel) {
                             }
                         }
 
-                        Spacer(
-                            modifier =
-                                Modifier.weight(1f)
-                        )
-
                         Button(
                             onClick = {
                                 if (!isRefreshing) {
@@ -434,9 +429,9 @@ fun FamilyKhataApp(viewModel: FamilyKhataViewModel) {
                                 }
                             },
                             enabled = !isRefreshing,
-                            modifier = Modifier.size(44.dp),
+                            modifier = Modifier.height(44.dp),
                             shape = RoundedCornerShape(50),
-                            contentPadding = androidx.compose.foundation.layout.PaddingValues(0.dp),
+                            contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 12.dp, vertical = 0.dp),
                             colors = androidx.compose.material3.ButtonDefaults.buttonColors(
                                 containerColor = workspaceAccent(workspace),
                                 contentColor = Color.White,
@@ -452,9 +447,11 @@ fun FamilyKhataApp(viewModel: FamilyKhataViewModel) {
                                 )
                             } else {
                                 Text(
-                                    "↻",
-                                    style = MaterialTheme.typography.titleLarge,
-                                    fontWeight = FontWeight.ExtraBold
+                                    v15Text("রিফ্রেশ", "Refresh"),
+                                    style = MaterialTheme.typography.labelLarge,
+                                    fontWeight = FontWeight.Black,
+                                    maxLines = 1,
+                                    softWrap = false
                                 )
                             }
                         }

@@ -97,8 +97,9 @@ internal fun TopCornerMenuButton(
                     horizontal = 12.dp,
                     vertical = 10.dp
                 ),
+            style = MaterialTheme.typography.headlineSmall,
             fontWeight =
-                FontWeight.Bold
+                FontWeight.Black
         )
     }
 }

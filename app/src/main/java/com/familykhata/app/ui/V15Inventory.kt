@@ -2672,10 +2672,8 @@ private fun AddStockPage(
         modifier =
             Modifier
                 .fillMaxSize()
-                .padding(
-                    horizontal = 12.dp,
-                    bottom = 24.dp
-                ),
+                .padding(horizontal = 12.dp)
+                .padding(bottom = 24.dp),
         verticalArrangement =
             Arrangement.spacedBy(10.dp)
     ) {

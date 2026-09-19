@@ -17,6 +17,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.lazy.LazyColumn
@@ -27,6 +28,8 @@ import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.NavigationBar
 import androidx.compose.material3.NavigationBarItem
@@ -45,6 +48,8 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
@@ -59,7 +64,9 @@ import com.familykhata.app.data.BakiEntryEntity
 import com.familykhata.app.data.BakiPersonSummary
 import com.familykhata.app.data.FinancialAccountSummary
 import com.familykhata.app.data.TransactionEntity
+import coil.compose.AsyncImage
 import org.json.JSONObject
+import java.io.File
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
@@ -99,6 +106,40 @@ fun FamilyKhataApp(viewModel: FamilyKhataViewModel) {
     val trialStatus by viewModel.trialStatus.collectAsState()
     val isPinConfigured by viewModel.isPinConfigured.collectAsState()
     val appContext = LocalContext.current
+
+    val homePreferences =
+        remember(appContext) {
+            appContext.getSharedPreferences(
+                "hisabi_khata_v14_settings",
+                Context.MODE_PRIVATE
+            )
+        }
+
+    val homeProfileName =
+        homePreferences
+            .getString("profile_name", "")
+            .orEmpty()
+            .trim()
+
+    val homeBusinessName =
+        homePreferences
+            .getString("business_name", "")
+            .orEmpty()
+            .trim()
+
+    val homeLogoFile =
+        homePreferences
+            .getString("business_logo_path", "")
+            .orEmpty()
+            .trim()
+            .takeIf { it.isNotBlank() }
+            ?.let(::File)
+            ?.takeIf { it.exists() }
+
+    var showHomeProfileMenu by
+        remember {
+            mutableStateOf(false)
+        }
 
     val premiumBillingManager =
         remember(appContext) {
@@ -243,10 +284,33 @@ fun FamilyKhataApp(viewModel: FamilyKhataViewModel) {
                         modifier =
                             Modifier.fillMaxWidth(),
                         verticalAlignment =
-                            Alignment.CenterVertically
+                            Alignment.CenterVertically,
+                        horizontalArrangement =
+                            Arrangement.spacedBy(8.dp)
                     ) {
                         TopCornerMenuButton {
                             showSettingsMenu = true
+                        }
+
+                        homeLogoFile?.let { logoFile ->
+                            AsyncImage(
+                                model = logoFile,
+                                contentDescription =
+                                    v15Text(
+                                        "দোকানের লোগো",
+                                        "Business logo"
+                                    ),
+                                modifier =
+                                    Modifier
+                                        .size(40.dp)
+                                        .clip(
+                                            RoundedCornerShape(
+                                                12.dp
+                                            )
+                                        ),
+                                contentScale =
+                                    ContentScale.Crop
+                            )
                         }
 
                         Spacer(
@@ -254,34 +318,88 @@ fun FamilyKhataApp(viewModel: FamilyKhataViewModel) {
                                 Modifier.weight(1f)
                         )
 
-                        Button(
-                            onClick = {
-                                appRefreshToken =
-                                    appRefreshToken + 1L
+                        Box {
+                            TextButton(
+                                onClick = {
+                                    showHomeProfileMenu =
+                                        true
+                                }
+                            ) {
+                                Text(
+                                    "👤 ${
+                                        homeProfileName
+                                            .ifBlank {
+                                                v15Text(
+                                                    "প্রোফাইল",
+                                                    "Profile"
+                                                )
+                                            }
+                                    }  ▾",
+                                    fontWeight =
+                                        FontWeight.Bold,
+                                    maxLines = 1,
+                                    softWrap = false
+                                )
+                            }
 
-                                viewModel.refreshTrialStatus()
-                            },
-                            modifier =
-                                Modifier.height(42.dp),
-                            colors =
-                                androidx.compose.material3.ButtonDefaults
-                                    .buttonColors(
-                                        containerColor =
-                                            workspaceAccent(
-                                                workspace
-                                            ),
-                                        contentColor =
-                                            Color.White
-                                    )
-                        ) {
-                            Text(
-                                v15Text(
-                                    "↻ রিফ্রেশ",
-                                    "↻ Refresh"
-                                ),
-                                fontWeight =
-                                    FontWeight.ExtraBold
-                            )
+                            DropdownMenu(
+                                expanded =
+                                    showHomeProfileMenu,
+                                onDismissRequest = {
+                                    showHomeProfileMenu =
+                                        false
+                                }
+                            ) {
+                                DropdownMenuItem(
+                                    text = {
+                                        Text(
+                                            v15Text(
+                                                "প্রোফাইল ও ব্যবসার তথ্য",
+                                                "Profile & business info"
+                                            )
+                                        )
+                                    },
+                                    onClick = {
+                                        showHomeProfileMenu =
+                                            false
+                                        showSettingsMenu =
+                                            true
+                                    }
+                                )
+
+                                DropdownMenuItem(
+                                    text = {
+                                        Text(
+                                            v15Text(
+                                                "＋ নতুন দোকান যোগ করুন",
+                                                "＋ Add new shop"
+                                            )
+                                        )
+                                    },
+                                    onClick = {},
+                                    enabled = false
+                                )
+
+                                DropdownMenuItem(
+                                    text = {
+                                        Text(
+                                            v15Text(
+                                                "↻ রিফ্রেশ",
+                                                "↻ Refresh"
+                                            )
+                                        )
+                                    },
+                                    onClick = {
+                                        showHomeProfileMenu =
+                                            false
+                                        appRefreshToken =
+                                            appRefreshToken +
+                                                1L
+                                        viewModel
+                                            .refreshTrialStatus()
+                                    }
+                                )
+                            }
                         }
                     }
 
@@ -399,6 +517,8 @@ fun FamilyKhataApp(viewModel: FamilyKhataViewModel) {
 
                         WorkspaceSwitcher(
                             selected = workspace,
+                            businessName =
+                                homeBusinessName,
                             onSelect = {
                                 viewModel.selectWorkspace(it)
                                 V15DeepNavigationState.clear()
@@ -655,6 +775,7 @@ private fun BrandHeader(workspace: String) {
 @Composable
 private fun WorkspaceSwitcher(
     selected: String,
+    businessName: String,
     onSelect: (String) -> Unit
 ) {
     Surface(
@@ -695,7 +816,13 @@ private fun WorkspaceSwitcher(
                 )
                 WorkspaceCard(
                     symbol = "▦",
-                    label = v15Text("দোকান/\nপ্রতিষ্ঠান","Business"),
+                    label =
+                        businessName.ifBlank {
+                            v15Text(
+                                "দোকান/\nপ্রতিষ্ঠান",
+                                "Business"
+                            )
+                        },
                     value = "SHOP",
                     selected = selected,
                     modifier = Modifier.weight(1f),
@@ -739,7 +866,11 @@ private fun WorkspaceCard(
             verticalArrangement = Arrangement.spacedBy(4.dp)
         ) {
             Text(
-                symbol,
+                if (isSelected) {
+                    "✓ $symbol"
+                } else {
+                    symbol
+                },
                 style = MaterialTheme.typography.titleLarge,
                 fontWeight = FontWeight.ExtraBold,
                 color = if (isSelected) Color.White else accent

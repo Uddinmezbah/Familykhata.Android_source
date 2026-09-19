@@ -77,14 +77,13 @@ internal fun TopCornerMenuButton(
         colors =
             CardDefaults.cardColors(
                 containerColor =
-                    MaterialTheme.colorScheme.surfaceVariant
+                    Color(0xFF334155),
+                contentColor = Color.White
             ),
         border =
             BorderStroke(
                 1.dp,
-                MaterialTheme.colorScheme.outline.copy(
-                    alpha = 0.22f
-                )
+                Color.White.copy(alpha = 0.18f)
             )
     ) {
         Text(

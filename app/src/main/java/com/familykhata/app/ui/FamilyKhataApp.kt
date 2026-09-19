@@ -318,14 +318,13 @@ fun FamilyKhataApp(viewModel: FamilyKhataViewModel) {
                                 colors =
                                     CardDefaults.cardColors(
                                         containerColor =
-                                            MaterialTheme.colorScheme.surfaceVariant
+                                            Color(0xFF176B63),
+                                        contentColor = Color.White
                                     ),
                                 border =
                                     BorderStroke(
                                         1.dp,
-                                        MaterialTheme.colorScheme.outline.copy(
-                                            alpha = 0.22f
-                                        )
+                                        Color.White.copy(alpha = 0.18f)
                                     )
                             ) {
                                 Row(
@@ -378,10 +377,6 @@ fun FamilyKhataApp(viewModel: FamilyKhataViewModel) {
                                         overflow = TextOverflow.Ellipsis
                                     )
 
-                                    Text(
-                                        "⌄",
-                                        fontWeight = FontWeight.ExtraBold
-                                    )
                                 }
                             }
 

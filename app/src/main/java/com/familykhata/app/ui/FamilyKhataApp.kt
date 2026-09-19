@@ -18,6 +18,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.lazy.LazyColumn
@@ -56,6 +57,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.familykhata.app.FamilyKhataViewModel
 import com.familykhata.app.PremiumBillingManager
@@ -303,17 +305,15 @@ fun FamilyKhataApp(viewModel: FamilyKhataViewModel) {
                             showSettingsMenu = true
                         }
 
-                        Box(
-                            modifier = Modifier.weight(1f)
-                        ) {
+                        Box {
                             Card(
                                 onClick = {
                                     showHomeProfileMenu = true
                                 },
                                 modifier =
                                     Modifier
-                                        .fillMaxWidth()
-                                        .height(42.dp),
+                                        .widthIn(max = 180.dp)
+                                        .height(40.dp),
                                 shape = RoundedCornerShape(18.dp),
                                 colors =
                                     CardDefaults.cardColors(
@@ -369,12 +369,13 @@ fun FamilyKhataApp(viewModel: FamilyKhataViewModel) {
                                                 "Business"
                                             )
                                         },
-                                        modifier = Modifier.weight(1f),
+                                        modifier = Modifier.widthIn(max = 118.dp),
                                         style =
                                             MaterialTheme.typography.labelLarge,
                                         fontWeight = FontWeight.ExtraBold,
                                         maxLines = 1,
-                                        softWrap = false
+                                        softWrap = false,
+                                        overflow = TextOverflow.Ellipsis
                                     )
 
                                     Text(
@@ -420,6 +421,8 @@ fun FamilyKhataApp(viewModel: FamilyKhataViewModel) {
                             }
                         }
 
+                        Spacer(modifier = Modifier.weight(1f))
+
                         Button(
                             onClick = {
                                 if (!isRefreshing) {
@@ -429,9 +432,9 @@ fun FamilyKhataApp(viewModel: FamilyKhataViewModel) {
                                 }
                             },
                             enabled = !isRefreshing,
-                            modifier = Modifier.height(44.dp),
+                            modifier = Modifier.height(40.dp),
                             shape = RoundedCornerShape(50),
-                            contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 12.dp, vertical = 0.dp),
+                            contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 10.dp, vertical = 0.dp),
                             colors = androidx.compose.material3.ButtonDefaults.buttonColors(
                                 containerColor = workspaceAccent(workspace),
                                 contentColor = Color.White,

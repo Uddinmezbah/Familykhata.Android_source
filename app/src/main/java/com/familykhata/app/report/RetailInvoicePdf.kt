@@ -75,6 +75,39 @@ suspend fun writeRetailInvoicePdf(
     val accent = Color.rgb(11, 122, 83)
     val lightAccent = Color.rgb(232, 243, 237)
 
+    val profilePreferences =
+        context.getSharedPreferences(
+            "hisabi_khata_v14_settings",
+            Context.MODE_PRIVATE
+        )
+
+    val businessName =
+        profilePreferences.getString("business_name", "").orEmpty().trim()
+
+    val businessAddress =
+        profilePreferences.getString("business_address", "").orEmpty().trim()
+
+    val businessPhone =
+        profilePreferences.getString("profile_phone", "").orEmpty().trim()
+
+    val businessLogoPath =
+        profilePreferences.getString("business_logo_path", "").orEmpty().trim()
+
+    val businessLogo =
+        runCatching {
+            businessLogoPath
+                .takeIf { it.isNotBlank() }
+                ?.let { path ->
+                    File(path)
+                        .takeIf { it.isFile }
+                        ?.let { file ->
+                            android.graphics.BitmapFactory.decodeFile(
+                                file.absolutePath
+                            )
+                        }
+                }
+        }.getOrNull()
+
     fun text(
         bn: String,
         en: String
@@ -323,22 +356,97 @@ suspend fun writeRetailInvoicePdf(
             }
         )
 
-        draw(
-            layout(
-                "Hisabi Khata  |  " +
+        val headerText =
+            buildString {
+                append(
+                    businessName.ifBlank {
+                        "Hisabi Khata"
+                    }
+                )
+                append("\n")
+                append(
                     text(
                         "বিক্রয় ইনভয়েস",
                         "Sales Invoice"
-                    ),
-                width,
+                    )
+                )
+
+                if (businessAddress.isNotBlank()) {
+                    append("\n")
+                    append(businessAddress)
+                }
+
+                if (businessPhone.isNotBlank()) {
+                    append("\n")
+                    append(
+                        text(
+                            "ফোন: ",
+                            "Phone: "
+                        )
+                    )
+                    append(businessPhone)
+                }
+            }
+
+        val logoSize =
+            if (businessLogo != null) {
+                48f
+            } else {
+                0f
+            }
+
+        val headerX =
+            if (businessLogo != null) {
+                94f
+            } else {
+                36f
+            }
+
+        val headerWidth =
+            if (businessLogo != null) {
+                465
+            } else {
+                width
+            }
+
+        val headerLayout =
+            layout(
+                headerText,
+                headerWidth,
                 bold = true,
-                size = 16f
-            ),
-            36f,
+                size = 13f
+            )
+
+        businessLogo?.let { bitmap ->
+            canvas.drawBitmap(
+                bitmap,
+                null,
+                android.graphics.RectF(
+                    36f,
+                    42f,
+                    84f,
+                    90f
+                ),
+                Paint(Paint.ANTI_ALIAS_FLAG)
+            )
+        }
+
+        draw(
+            headerLayout,
+            headerX,
             42f
         )
 
-        y = 80f
+        y =
+            maxOf(
+                100f,
+                42f +
+                    maxOf(
+                        headerLayout.height.toFloat(),
+                        logoSize
+                    ) +
+                    10f
+            )
 
         if (inItems) {
             tableHeader()

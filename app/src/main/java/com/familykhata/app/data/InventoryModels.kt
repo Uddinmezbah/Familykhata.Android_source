@@ -165,6 +165,41 @@ data class RetailSaleEntity(
     val createdAt: Long = System.currentTimeMillis()
 )
 
+
+@Entity(
+    tableName = "retail_sale_payments",
+    foreignKeys = [
+        ForeignKey(
+            entity = RetailSaleEntity::class,
+            parentColumns = ["id"],
+            childColumns = ["saleId"],
+            onDelete = ForeignKey.CASCADE
+        )
+    ],
+    indices = [
+        Index("saleId"),
+        Index("financialAccountId"),
+        Index(
+            value = ["eventKey"],
+            unique = true
+        )
+    ]
+)
+data class RetailSalePaymentEntity(
+    @PrimaryKey(autoGenerate = true)
+    val id: Long = 0,
+    val eventKey: String,
+    val saleId: Long,
+    val financialAccountId: Long,
+    val amount: Double,
+    val paymentMethod: String,
+    val note: String = "",
+    val paidAt: Long =
+        System.currentTimeMillis(),
+    val createdAt: Long =
+        System.currentTimeMillis()
+)
+
 @Entity(
     tableName = "retail_sale_lines",
     foreignKeys = [

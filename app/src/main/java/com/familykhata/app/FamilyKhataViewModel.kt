@@ -1460,6 +1460,9 @@ class FamilyKhataViewModel(application: Application) : AndroidViewModel(applicat
                     dao.getAllFinancialAccounts()
                 val financialAccountEntries =
                     dao.getAllFinancialAccountEntries()
+                        .filterNot {
+                            it.entryType == "RETAIL_SALE_IN"
+                        }
                 val digitalServiceTransactions =
                     dao.getAllDigitalServiceTransactions()
                 val inventory =
@@ -1473,8 +1476,33 @@ class FamilyKhataViewModel(application: Application) : AndroidViewModel(applicat
 
                 JSONObject().apply {
                     put("format", "hisabi-khata-backup")
-                    put("version", 11)
+                    put("version", 12)
                     put("createdAt", System.currentTimeMillis())
+                    put(
+                        "inventoryRetailSales",
+                        InventoryBackupBridge.retailSalesToJson(
+                            inventory.retailSales
+                        )
+                    )
+                    put(
+                        "inventoryRetailSaleLines",
+                        InventoryBackupBridge.retailSaleLinesToJson(
+                            inventory.retailSaleLines
+                        )
+                    )
+                    put(
+                        "inventoryRetailSaleStockAllocations",
+                        InventoryBackupBridge
+                            .retailSaleStockAllocationsToJson(
+                                inventory.retailSaleStockAllocations
+                            )
+                    )
+                    put(
+                        "inventoryRetailSalePayments",
+                        InventoryBackupBridge.retailSalePaymentsToJson(
+                            inventory.retailSalePayments
+                        )
+                    )
                     put("transactions", JSONArray().apply {
                         transactions.forEach { item ->
                             put(JSONObject().apply {
@@ -1818,7 +1846,7 @@ class FamilyKhataViewModel(application: Application) : AndroidViewModel(applicat
                     "এটি হিসাবী খাতার সঠিক ব্যাকআপ ফাইল নয়"
                 }
                 val backupVersion = root.optInt("version")
-                require(backupVersion in 1..11) {
+                require(backupVersion in 1..12) {
                     "এই ব্যাকআপ ভার্সনটি এখনো সমর্থিত নয়"
                 }
 
@@ -2178,6 +2206,17 @@ class FamilyKhataViewModel(application: Application) : AndroidViewModel(applicat
 
                         val allowedEntryTypes =
                             when {
+                                backupVersion >= 12 ->
+                                    setOf(
+                                        "TRANSFER_IN",
+                                        "TRANSFER_OUT",
+                                        "SERVICE_IN",
+                                        "SERVICE_OUT",
+                                        "TRANSACTION_IN",
+                                        "TRANSACTION_OUT",
+                                        "RETAIL_SALE_IN"
+                                    )
+
                                 backupVersion >= 11 ->
                                     setOf(
                                         "TRANSFER_IN",
@@ -3115,6 +3154,60 @@ class FamilyKhataViewModel(application: Application) : AndroidViewModel(applicat
                     }
                 }
 
+                val inventoryRetailSales =
+                    if (backupVersion >= 12) {
+                        InventoryBackupBridge.retailSalesFromJson(
+                            root.optJSONArray(
+                                "inventoryRetailSales"
+                            ) ?: JSONArray()
+                        )
+                    } else {
+                        emptyList()
+                    }
+
+                val inventoryRetailSaleLines =
+                    if (backupVersion >= 12) {
+                        InventoryBackupBridge.retailSaleLinesFromJson(
+                            root.optJSONArray(
+                                "inventoryRetailSaleLines"
+                            ) ?: JSONArray()
+                        )
+                    } else {
+                        emptyList()
+                    }
+
+                val inventoryRetailSaleStockAllocations =
+                    if (backupVersion >= 12) {
+                        InventoryBackupBridge
+                            .retailSaleStockAllocationsFromJson(
+                                root.optJSONArray(
+                                    "inventoryRetailSaleStockAllocations"
+                                ) ?: JSONArray()
+                            )
+                    } else {
+                        emptyList()
+                    }
+
+                val inventoryRetailSalePayments =
+                    if (backupVersion >= 12) {
+                        InventoryBackupBridge.retailSalePaymentsFromJson(
+                            root.optJSONArray(
+                                "inventoryRetailSalePayments"
+                            ) ?: JSONArray()
+                        )
+                    } else {
+                        emptyList()
+                    }
+
+                val restorableFinancialAccountEntries =
+                    if (backupVersion >= 12) {
+                        financialAccountEntries.filterNot {
+                            it.entryType == "RETAIL_SALE_IN"
+                        }
+                    } else {
+                        financialAccountEntries
+                    }
+
                 database.withTransaction {
                     dao.clearDigitalServiceTransactions()
                     dao.clearFinancialAccountEntries()
@@ -3145,18 +3238,98 @@ class FamilyKhataViewModel(application: Application) : AndroidViewModel(applicat
                         )
                     }
 
-                    financialAccountEntries.forEach {
+                    restorableFinancialAccountEntries.forEach {
                         dao.insertFinancialAccountEntry(it)
                     }
                 }
 
                 if (backupVersion >= 3) {
                     InventoryBackupBridge.restore(
-                        getApplication(),
-                        inventoryProducts,
-                        inventoryBatches,
-                        inventoryUnits
+                        context = getApplication(),
+                        products = inventoryProducts,
+                        batches = inventoryBatches,
+                        unitConversions = inventoryUnits,
+                        retailSales = inventoryRetailSales,
+                        retailSaleLines =
+                            inventoryRetailSaleLines,
+                        retailSaleStockAllocations =
+                            inventoryRetailSaleStockAllocations,
+                        retailSalePayments =
+                            inventoryRetailSalePayments
                     )
+                }
+
+                if (backupVersion >= 12) {
+                    val retailSalesById =
+                        inventoryRetailSales.associateBy {
+                            it.id
+                        }
+
+                    database.withTransaction {
+                        inventoryRetailSalePayments.forEach {
+                                payment ->
+
+                            val sale =
+                                requireNotNull(
+                                    retailSalesById[
+                                        payment.saleId
+                                    ]
+                                ) {
+                                    "Retail payment sale missing"
+                                }
+
+                            if (sale.status != "CANCELLED") {
+                                val account =
+                                    requireNotNull(
+                                        dao.getFinancialAccountOnce(
+                                            payment.financialAccountId
+                                        )
+                                    ) {
+                                        "Retail payment account missing"
+                                    }
+
+                                require(
+                                    account.workspace ==
+                                        sale.workspace
+                                ) {
+                                    "Retail payment account workspace mismatch"
+                                }
+
+                                val sourceKey =
+                                    "RETAIL_SALE_ACCOUNT:${payment.eventKey}"
+
+                                dao.deleteFinancialAccountEntryBySourceKey(
+                                    sourceKey
+                                )
+
+                                val inserted =
+                                    dao.insertFinancialAccountEntry(
+                                        FinancialAccountEntryEntity(
+                                            accountId =
+                                                payment.financialAccountId,
+                                            entryType =
+                                                "RETAIL_SALE_IN",
+                                            amount =
+                                                payment.amount,
+                                            balanceDelta =
+                                                payment.amount,
+                                            sourceKey =
+                                                sourceKey,
+                                            note =
+                                                "Retail sale ${sale.invoiceNo} • ${payment.paymentMethod}",
+                                            workspace =
+                                                sale.workspace,
+                                            createdAt =
+                                                payment.paidAt
+                                        )
+                                    )
+
+                                require(inserted > 0L) {
+                                    "Retail projection restore failed"
+                                }
+                            }
+                        }
+                    }
                 }
 
                 val businessRowsRestored =
@@ -3184,11 +3357,15 @@ class FamilyKhataViewModel(application: Application) : AndroidViewModel(applicat
                     people.size +
                     entries.size +
                     financialAccounts.size +
-                    financialAccountEntries.size +
+                    restorableFinancialAccountEntries.size +
                     digitalServiceTransactions.size +
                     inventoryProducts.size +
                     inventoryBatches.size +
                     inventoryUnits.size +
+                    inventoryRetailSales.size +
+                    inventoryRetailSaleLines.size +
+                    inventoryRetailSaleStockAllocations.size +
+                    inventoryRetailSalePayments.size +
                     businessRowsRestored
             }.onSuccess(onDone).onFailure {
                 onError(it.message ?: "ব্যাকআপ রিস্টোর করা যায়নি")

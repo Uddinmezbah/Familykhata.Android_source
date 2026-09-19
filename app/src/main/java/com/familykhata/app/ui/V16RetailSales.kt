@@ -77,6 +77,7 @@ private data class RetailSaleDraft(
     val discount: Double,
     val paid: Double,
     val paymentMethod: String,
+    val financialAccountId: Long?,
     val bakiPersonId: Long?,
     val customerName: String,
     val customerPhone: String,
@@ -94,6 +95,16 @@ internal fun V16RetailSalesScreen(
     val products by vm.products.collectAsState()
     val sales by vm.retailSales.collectAsState()
     val bakiPeople by vm.bakiPeople.collectAsState()
+    val financialAccounts by
+        vm.financialAccounts.collectAsState()
+
+    val activeFinancialAccounts =
+        remember(financialAccounts) {
+            financialAccounts.filter {
+                it.isActive
+            }
+        }
+
     val context = LocalContext.current
 
     var showNewSale by remember {
@@ -118,6 +129,20 @@ internal fun V16RetailSalesScreen(
 
     var collectionAmount by remember {
         mutableStateOf("")
+    }
+
+    var collectionFinancialAccountId by remember {
+        mutableStateOf<Long?>(null)
+    }
+
+    androidx.compose.runtime.LaunchedEffect(
+        collectingSale?.id,
+        activeFinancialAccounts
+    ) {
+        collectionFinancialAccountId =
+            activeFinancialAccounts
+                .singleOrNull()
+                ?.id
     }
 
     var collectionBusy by remember {
@@ -185,6 +210,8 @@ internal fun V16RetailSalesScreen(
             RetailSaleForm(
                 viewModel = vm,
                 bakiPeople = bakiPeople,
+                financialAccounts =
+                    activeFinancialAccounts,
                 products =
                     products.filter {
                         it.totalStock > 0
@@ -213,6 +240,8 @@ internal fun V16RetailSalesScreen(
                             draft.paid,
                         paymentMethod =
                             draft.paymentMethod,
+                        financialAccountId =
+                            draft.financialAccountId,
                         bakiPersonId =
                             draft.bakiPersonId,
                         customerName =
@@ -486,6 +515,28 @@ internal fun V16RetailSalesScreen(
                         )
                     )
 
+                    Text(
+                        v15Text(
+                            "যে হিসাবে টাকা জমা হবে",
+                            "Financial Account"
+                        ),
+                        fontWeight =
+                            FontWeight.SemiBold
+                    )
+
+                    RetailFinancialAccountPicker(
+                        accounts =
+                            activeFinancialAccounts,
+                        selectedId =
+                            collectionFinancialAccountId,
+                        enabled =
+                            !collectionBusy,
+                        onSelect = {
+                            collectionFinancialAccountId =
+                                it
+                        }
+                    )
+
                     OutlinedTextField(
                         value =
                             collectionAmount,
@@ -516,6 +567,28 @@ internal fun V16RetailSalesScreen(
                             collectionAmount
                                 .retailDoubleOrNull()
 
+                        val selectedAccountId =
+                            collectionFinancialAccountId
+
+                        if (
+                            selectedAccountId == null ||
+                            activeFinancialAccounts.none {
+                                it.id ==
+                                    selectedAccountId
+                            }
+                        ) {
+                            Toast.makeText(
+                                context,
+                                v15Text(
+                                    "টাকা জমার আর্থিক হিসাব নির্বাচন করুন",
+                                    "Select a Financial Account"
+                                ),
+                                Toast.LENGTH_SHORT
+                            ).show()
+
+                            return@Button
+                        }
+
                         if (
                             amount == null ||
                             amount <= 0.0 ||
@@ -542,7 +615,9 @@ internal fun V16RetailSalesScreen(
                             saleId =
                                 sale.id,
                             amount =
-                                amount
+                                amount,
+                            financialAccountId =
+                                selectedAccountId
                         ) { success ->
                             collectionBusy =
                                 false
@@ -1386,6 +1461,8 @@ private fun RetailSaleCard(
 private fun RetailSaleForm(
     viewModel: InventoryViewModel,
     bakiPeople: List<BakiPersonSummary>,
+    financialAccounts:
+        List<com.familykhata.app.data.FinancialAccountSummary>,
     products: List<ProductStockSummary>,
     saving: Boolean,
     onDismiss: () -> Unit,
@@ -1421,6 +1498,27 @@ private fun RetailSaleForm(
 
     var paymentMethod by remember {
         mutableStateOf("CASH")
+    }
+
+    var selectedFinancialAccountId by remember {
+        mutableStateOf<Long?>(null)
+    }
+
+    androidx.compose.runtime.LaunchedEffect(
+        financialAccounts
+    ) {
+        if (
+            selectedFinancialAccountId == null ||
+            financialAccounts.none {
+                it.id ==
+                    selectedFinancialAccountId
+            }
+        ) {
+            selectedFinancialAccountId =
+                financialAccounts
+                    .singleOrNull()
+                    ?.id
+        }
     }
 
     var note by remember {
@@ -1975,120 +2073,36 @@ private fun RetailSaleForm(
 
                 Text(
                     v15Text(
-                        "পেমেন্ট পদ্ধতি",
-                        "Payment method"
+                        "যে হিসাবে টাকা জমা হবে",
+                        "Financial Account"
                     ),
                     fontWeight =
                         FontWeight.Bold
                 )
 
-                Row(
-                    modifier =
-                        Modifier.fillMaxWidth(),
-                    horizontalArrangement =
-                        Arrangement.spacedBy(6.dp)
-                ) {
-                    RetailPaymentButton(
-                        code = "CASH",
-                        label =
-                            v15Text(
-                                "ক্যাশ",
-                                "Cash"
-                            ),
-                        selected =
-                            paymentMethod ==
-                                "CASH",
-                        onSelect = {
-                            paymentMethod =
-                                "CASH"
-                        },
-                        modifier =
-                            Modifier.weight(1f)
-                    )
+                RetailFinancialAccountPicker(
+                    accounts =
+                        financialAccounts,
+                    selectedId =
+                        selectedFinancialAccountId,
+                    enabled =
+                        !saving,
+                    onSelect = {
+                        selectedFinancialAccountId =
+                            it
+                    }
+                )
 
-                    RetailPaymentButton(
-                        code = "BKASH",
-                        label = "bKash",
-                        selected =
-                            paymentMethod ==
-                                "BKASH",
-                        onSelect = {
-                            paymentMethod =
-                                "BKASH"
-                        },
-                        modifier =
-                            Modifier.weight(1f)
-                    )
-
-                    RetailPaymentButton(
-                        code = "NAGAD",
-                        label = "Nagad",
-                        selected =
-                            paymentMethod ==
-                                "NAGAD",
-                        onSelect = {
-                            paymentMethod =
-                                "NAGAD"
-                        },
-                        modifier =
-                            Modifier.weight(1f)
-                    )
-                }
-
-                Row(
-                    modifier =
-                        Modifier.fillMaxWidth(),
-                    horizontalArrangement =
-                        Arrangement.spacedBy(6.dp)
-                ) {
-                    RetailPaymentButton(
-                        code = "ROCKET",
-                        label = "Rocket",
-                        selected =
-                            paymentMethod ==
-                                "ROCKET",
-                        onSelect = {
-                            paymentMethod =
-                                "ROCKET"
-                        },
-                        modifier =
-                            Modifier.weight(1f)
-                    )
-
-                    RetailPaymentButton(
-                        code = "BANK",
-                        label =
-                            v15Text(
-                                "ব্যাংক",
-                                "Bank"
-                            ),
-                        selected =
-                            paymentMethod ==
-                                "BANK",
-                        onSelect = {
-                            paymentMethod =
-                                "BANK"
-                        },
-                        modifier =
-                            Modifier.weight(1f)
-                    )
-
-                    RetailPaymentButton(
-                        code = "CARD",
-                        label =
-                            v15Text(
-                                "কার্ড",
-                                "Card"
-                            ),
-                        selected =
-                            paymentMethod ==
-                                "CARD",
-                        onSelect = {
-                            paymentMethod =
-                                "CARD"
-                        },
-                        modifier =
-                            Modifier.weight(1f)
+                if (financialAccounts.isEmpty()) {
+                    Text(
+                        v15Text(
+                            "আদায় থাকলে আগে একটি সক্রিয় আর্থিক হিসাব তৈরি করুন।",
+                            "Create an active Financial Account before recording a payment."
+                        ),
+                        style =
+                            MaterialTheme.typography.bodySmall,
+                        color =
+                            MaterialTheme.colorScheme.error
                     )
                 }
 
@@ -2422,6 +2436,22 @@ private fun RetailSaleForm(
                                 )
                         }
 
+                        cleanPaid > 0.0001 &&
+                            (
+                                selectedFinancialAccountId ==
+                                    null ||
+                                financialAccounts.none {
+                                    it.id ==
+                                        selectedFinancialAccountId
+                                }
+                            ) -> {
+                            error =
+                                v15Text(
+                                    "আদায় থাকলে আর্থিক হিসাব নির্বাচন করুন।",
+                                    "Select a Financial Account for the payment."
+                                )
+                        }
+
                         (
                             total -
                                 cleanPaid
@@ -2455,7 +2485,20 @@ private fun RetailSaleForm(
                                     paid =
                                         cleanPaid,
                                     paymentMethod =
-                                        paymentMethod,
+                                        if (
+                                            cleanPaid >
+                                            0.0001
+                                        ) {
+                                            paymentMethod
+                                        } else {
+                                            "UNPAID"
+                                        },
+                                    financialAccountId =
+                                        selectedFinancialAccountId
+                                            ?.takeIf {
+                                                cleanPaid >
+                                                    0.0001
+                                            },
                                     bakiPersonId =
                                         selectedBakiPersonId
                                             ?.takeIf {
@@ -2626,6 +2669,63 @@ private fun retailStatusLabel(
             )
     }
 
+@Composable
+private fun RetailFinancialAccountPicker(
+    accounts:
+        List<com.familykhata.app.data.FinancialAccountSummary>,
+    selectedId: Long?,
+    enabled: Boolean,
+    onSelect: (Long) -> Unit
+) {
+    if (accounts.isEmpty()) {
+        return
+    }
+
+    Column(
+        verticalArrangement =
+            Arrangement.spacedBy(6.dp)
+    ) {
+        accounts.forEach { account ->
+            val detail =
+                account.provider
+                    .ifBlank {
+                        account.type
+                    }
+                    .trim()
+
+            val label =
+                if (
+                    detail.isBlank() ||
+                    detail.equals(
+                        account.name,
+                        ignoreCase = true
+                    )
+                ) {
+                    account.name
+                } else {
+                    "${account.name} • $detail"
+                }
+
+            OutlinedButton(
+                onClick = {
+                    onSelect(account.id)
+                },
+                enabled = enabled,
+                modifier =
+                    Modifier.fillMaxWidth()
+            ) {
+                Text(
+                    if (selectedId == account.id) {
+                        "✓ $label"
+                    } else {
+                        label
+                    }
+                )
+            }
+        }
+    }
+}
+
 private fun retailPaymentLabel(
     method: String
 ): String =
@@ -2650,6 +2750,19 @@ private fun retailPaymentLabel(
             v15Text(
                 "কার্ড",
                 "Card"
+            )
+
+        "WALLET" -> "Wallet"
+        "MIXED" -> "Mixed"
+        "UNPAID" ->
+            v15Text(
+                "বাকি",
+                "Unpaid"
+            )
+        "OTHER" ->
+            v15Text(
+                "অন্যান্য",
+                "Other"
             )
 
         else -> method

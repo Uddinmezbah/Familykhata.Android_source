@@ -2946,7 +2946,7 @@ private fun MoreScreen(viewModel: FamilyKhataViewModel) {
                     }
 
                     val version = root.optInt("version")
-                    require(version in 1..11) {
+                    require(version in 1..12) {
                         v15Text(
                             "এই ব্যাকআপ ভার্সনটি সমর্থিত নয়",
                             "This backup version is not supported"
@@ -3164,6 +3164,26 @@ private fun MoreScreen(viewModel: FamilyKhataViewModel) {
         val previewBatches =
             previewRoot.optJSONArray("inventoryBatches")
                 ?.length() ?: 0
+
+        val previewRetailSales =
+            previewRoot.optJSONArray(
+                "inventoryRetailSales"
+            )?.length() ?: 0
+
+        val previewRetailSaleLines =
+            previewRoot.optJSONArray(
+                "inventoryRetailSaleLines"
+            )?.length() ?: 0
+
+        val previewRetailSaleStockAllocations =
+            previewRoot.optJSONArray(
+                "inventoryRetailSaleStockAllocations"
+            )?.length() ?: 0
+
+        val previewRetailSalePayments =
+            previewRoot.optJSONArray(
+                "inventoryRetailSalePayments"
+            )?.length() ?: 0
 
         val hasBusinessData =
             previewRoot.optJSONObject("businessData") != null

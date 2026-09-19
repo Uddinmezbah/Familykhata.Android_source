@@ -1,5 +1,8 @@
 package com.familykhata.app.data
 
+import org.json.JSONArray
+import org.json.JSONObject
+
 import android.content.Context
 import androidx.room.Database
 import androidx.room.Room
@@ -120,9 +123,10 @@ import com.familykhata.app.production.ProductionItemRoleEntity
         RetailSaleEntity::class,
         RetailSaleLineEntity::class,
         RetailSaleStockAllocationEntity::class,
+        RetailSalePaymentEntity::class,
         ProductUnitConversionEntity::class
     ],
-    version = 16,
+    version = 17,
     exportSchema = false
 )
 abstract class InventoryDatabase : RoomDatabase() {
@@ -2565,6 +2569,65 @@ abstract class InventoryDatabase : RoomDatabase() {
                 }
             }
 
+
+        private val MIGRATION_16_17 =
+            object : Migration(
+                16,
+                17
+            ) {
+                override fun migrate(
+                    db: SupportSQLiteDatabase
+                ) {
+                    db.execSQL(
+                        """
+                        CREATE TABLE IF NOT EXISTS
+                        `retail_sale_payments` (
+                            `id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+                            `eventKey` TEXT NOT NULL,
+                            `saleId` INTEGER NOT NULL,
+                            `financialAccountId` INTEGER NOT NULL,
+                            `amount` REAL NOT NULL,
+                            `paymentMethod` TEXT NOT NULL,
+                            `note` TEXT NOT NULL,
+                            `paidAt` INTEGER NOT NULL,
+                            `createdAt` INTEGER NOT NULL,
+                            FOREIGN KEY(`saleId`)
+                                REFERENCES `retail_sales`(`id`)
+                                ON UPDATE NO ACTION
+                                ON DELETE CASCADE
+                        )
+                        """.trimIndent()
+                    )
+
+                    db.execSQL(
+                        """
+                        CREATE INDEX IF NOT EXISTS
+                        `index_retail_sale_payments_saleId`
+                        ON `retail_sale_payments`
+                        (`saleId`)
+                        """.trimIndent()
+                    )
+
+                    db.execSQL(
+                        """
+                        CREATE INDEX IF NOT EXISTS
+                        `index_retail_sale_payments_financialAccountId`
+                        ON `retail_sale_payments`
+                        (`financialAccountId`)
+                        """.trimIndent()
+                    )
+
+                    db.execSQL(
+                        """
+                        CREATE UNIQUE INDEX IF NOT EXISTS
+                        `index_retail_sale_payments_eventKey`
+                        ON `retail_sale_payments`
+                        (`eventKey`)
+                        """.trimIndent()
+                    )
+                }
+            }
+
         fun get(context: Context): InventoryDatabase = INSTANCE ?: synchronized(this) {
             INSTANCE ?: Room.databaseBuilder(
                 context.applicationContext,
@@ -2586,7 +2649,8 @@ abstract class InventoryDatabase : RoomDatabase() {
                     MIGRATION_12_13,
                     MIGRATION_13_14,
                     MIGRATION_14_15,
-                    MIGRATION_15_16
+                    MIGRATION_15_16,
+                    MIGRATION_16_17
                 )
                 .build()
                 .also { INSTANCE = it }
@@ -2597,7 +2661,12 @@ abstract class InventoryDatabase : RoomDatabase() {
 data class InventoryBackupData(
     val products: List<ProductEntity>,
     val batches: List<StockBatchEntity>,
-    val unitConversions: List<ProductUnitConversionEntity>
+    val unitConversions: List<ProductUnitConversionEntity>,
+    val retailSales: List<RetailSaleEntity>,
+    val retailSaleLines: List<RetailSaleLineEntity>,
+    val retailSaleStockAllocations:
+        List<RetailSaleStockAllocationEntity>,
+    val retailSalePayments: List<RetailSalePaymentEntity>
 )
 
 object InventoryBackupBridge {
@@ -2607,7 +2676,15 @@ object InventoryBackupBridge {
             products = dao.getAllProducts(),
             batches = dao.getAllBatches(),
             unitConversions =
-                dao.getAllProductUnitConversions()
+                dao.getAllProductUnitConversions(),
+            retailSales =
+                dao.getAllRetailSales(),
+            retailSaleLines =
+                dao.getAllRetailSaleLines(),
+            retailSaleStockAllocations =
+                dao.getAllRetailSaleStockAllocations(),
+            retailSalePayments =
+                dao.getAllRetailSalePayments()
         )
     }
 
@@ -2617,11 +2694,29 @@ object InventoryBackupBridge {
         batches: List<StockBatchEntity>,
         unitConversions:
             List<ProductUnitConversionEntity> =
+                emptyList(),
+        retailSales:
+            List<RetailSaleEntity> =
+                emptyList(),
+        retailSaleLines:
+            List<RetailSaleLineEntity> =
+                emptyList(),
+        retailSaleStockAllocations:
+            List<RetailSaleStockAllocationEntity> =
+                emptyList(),
+        retailSalePayments:
+            List<RetailSalePaymentEntity> =
                 emptyList()
     ) {
         val db = InventoryDatabase.get(context)
         val dao = db.dao()
+
         db.withTransaction {
+            dao.clearRetailSalePayments()
+            dao.clearRetailSaleStockAllocations()
+            dao.clearRetailSaleLines()
+            dao.clearRetailSales()
+
             dao.clearProductUnitConversions()
             dao.clearBatches()
             dao.clearProducts()
@@ -2637,6 +2732,216 @@ object InventoryBackupBridge {
             batches.forEach {
                 dao.insertBatch(it)
             }
+
+            retailSales.forEach {
+                dao.insertRetailSale(it)
+            }
+
+            retailSaleLines.forEach {
+                dao.insertRetailSaleLine(it)
+            }
+
+            retailSaleStockAllocations.forEach {
+                dao.insertRetailSaleStockAllocation(it)
+            }
+
+            retailSalePayments.forEach {
+                dao.insertRetailSalePayment(it)
+            }
         }
     }
+
+    fun retailSalesToJson(
+        items: List<RetailSaleEntity>
+    ): JSONArray =
+        JSONArray().apply {
+            items.forEach { item ->
+                put(
+                    JSONObject().apply {
+                    put("id", item.id)
+                    put("invoiceNo", item.invoiceNo)
+                    item.bakiPersonId?.let { value ->
+                        put("bakiPersonId", value)
+                    }
+                    put("customerName", item.customerName)
+                    put("customerPhone", item.customerPhone)
+                    put("subtotal", item.subtotal)
+                    put("discount", item.discount)
+                    put("total", item.total)
+                    put("paid", item.paid)
+                    put("paymentMethod", item.paymentMethod)
+                    put("status", item.status)
+                    put("note", item.note)
+                    put("workspace", item.workspace)
+                    put("businessKey", item.businessKey)
+                    put("soldAt", item.soldAt)
+                    put("createdAt", item.createdAt)
+                    }
+                )
+            }
+        }
+
+    fun retailSalesFromJson(
+        array: JSONArray
+    ): List<RetailSaleEntity> =
+        buildList {
+            for (index in 0 until array.length()) {
+                val item = array.getJSONObject(index)
+                add(
+                    RetailSaleEntity(
+                        id = item.getLong("id"),
+                        invoiceNo = item.getString("invoiceNo"),
+                        bakiPersonId = if (item.has("bakiPersonId") && !item.isNull("bakiPersonId")) item.getLong("bakiPersonId") else null,
+                        customerName = item.getString("customerName"),
+                        customerPhone = item.getString("customerPhone"),
+                        subtotal = item.getDouble("subtotal"),
+                        discount = item.getDouble("discount"),
+                        total = item.getDouble("total"),
+                        paid = item.getDouble("paid"),
+                        paymentMethod = item.getString("paymentMethod"),
+                        status = item.getString("status"),
+                        note = item.getString("note"),
+                        workspace = item.getString("workspace"),
+                        businessKey = item.getString("businessKey"),
+                        soldAt = item.getLong("soldAt"),
+                        createdAt = item.getLong("createdAt")
+                    )
+                )
+            }
+        }
+
+
+    fun retailSaleLinesToJson(
+        items: List<RetailSaleLineEntity>
+    ): JSONArray =
+        JSONArray().apply {
+            items.forEach { item ->
+                put(
+                    JSONObject().apply {
+                    put("id", item.id)
+                    put("saleId", item.saleId)
+                    put("productId", item.productId)
+                    put("productNameSnapshot", item.productNameSnapshot)
+                    put("skuSnapshot", item.skuSnapshot)
+                    put("unitSnapshot", item.unitSnapshot)
+                    put("unitFactor", item.unitFactor)
+                    put("quantity", item.quantity)
+                    put("baseQuantity", item.baseQuantity)
+                    put("unitPrice", item.unitPrice)
+                    put("unitCost", item.unitCost)
+                    put("lineTotal", item.lineTotal)
+                    put("createdAt", item.createdAt)
+                    }
+                )
+            }
+        }
+
+    fun retailSaleLinesFromJson(
+        array: JSONArray
+    ): List<RetailSaleLineEntity> =
+        buildList {
+            for (index in 0 until array.length()) {
+                val item = array.getJSONObject(index)
+                add(
+                    RetailSaleLineEntity(
+                        id = item.getLong("id"),
+                        saleId = item.getLong("saleId"),
+                        productId = item.getLong("productId"),
+                        productNameSnapshot = item.getString("productNameSnapshot"),
+                        skuSnapshot = item.getString("skuSnapshot"),
+                        unitSnapshot = item.getString("unitSnapshot"),
+                        unitFactor = item.getInt("unitFactor"),
+                        quantity = item.getInt("quantity"),
+                        baseQuantity = item.getInt("baseQuantity"),
+                        unitPrice = item.getDouble("unitPrice"),
+                        unitCost = item.getDouble("unitCost"),
+                        lineTotal = item.getDouble("lineTotal"),
+                        createdAt = item.getLong("createdAt")
+                    )
+                )
+            }
+        }
+
+
+    fun retailSaleStockAllocationsToJson(
+        items: List<RetailSaleStockAllocationEntity>
+    ): JSONArray =
+        JSONArray().apply {
+            items.forEach { item ->
+                put(
+                    JSONObject().apply {
+                    put("id", item.id)
+                    put("saleLineId", item.saleLineId)
+                    put("batchId", item.batchId)
+                    put("quantity", item.quantity)
+                    put("unitCost", item.unitCost)
+                    put("createdAt", item.createdAt)
+                    }
+                )
+            }
+        }
+
+    fun retailSaleStockAllocationsFromJson(
+        array: JSONArray
+    ): List<RetailSaleStockAllocationEntity> =
+        buildList {
+            for (index in 0 until array.length()) {
+                val item = array.getJSONObject(index)
+                add(
+                    RetailSaleStockAllocationEntity(
+                        id = item.getLong("id"),
+                        saleLineId = item.getLong("saleLineId"),
+                        batchId = item.getLong("batchId"),
+                        quantity = item.getInt("quantity"),
+                        unitCost = item.getDouble("unitCost"),
+                        createdAt = item.getLong("createdAt")
+                    )
+                )
+            }
+        }
+
+
+    fun retailSalePaymentsToJson(
+        items: List<RetailSalePaymentEntity>
+    ): JSONArray =
+        JSONArray().apply {
+            items.forEach { item ->
+                put(
+                    JSONObject().apply {
+                    put("id", item.id)
+                    put("eventKey", item.eventKey)
+                    put("saleId", item.saleId)
+                    put("financialAccountId", item.financialAccountId)
+                    put("amount", item.amount)
+                    put("paymentMethod", item.paymentMethod)
+                    put("note", item.note)
+                    put("paidAt", item.paidAt)
+                    put("createdAt", item.createdAt)
+                    }
+                )
+            }
+        }
+
+    fun retailSalePaymentsFromJson(
+        array: JSONArray
+    ): List<RetailSalePaymentEntity> =
+        buildList {
+            for (index in 0 until array.length()) {
+                val item = array.getJSONObject(index)
+                add(
+                    RetailSalePaymentEntity(
+                        id = item.getLong("id"),
+                        eventKey = item.getString("eventKey"),
+                        saleId = item.getLong("saleId"),
+                        financialAccountId = item.getLong("financialAccountId"),
+                        amount = item.getDouble("amount"),
+                        paymentMethod = item.getString("paymentMethod"),
+                        note = item.getString("note"),
+                        paidAt = item.getLong("paidAt"),
+                        createdAt = item.getLong("createdAt")
+                    )
+                )
+            }
+        }
+
 }

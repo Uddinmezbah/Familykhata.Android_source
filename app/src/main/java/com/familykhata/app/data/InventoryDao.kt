@@ -259,6 +259,37 @@ interface InventoryDao {
         item: RetailSaleStockAllocationEntity
     ): Long
 
+    @Insert(
+        onConflict = OnConflictStrategy.ABORT
+    )
+    suspend fun insertRetailSalePayment(
+        item: RetailSalePaymentEntity
+    ): Long
+
+    @Query(
+        """
+        SELECT *
+        FROM retail_sale_payments
+        WHERE saleId = :saleId
+        ORDER BY paidAt ASC, id ASC
+        """
+    )
+    suspend fun getRetailSalePaymentsOnce(
+        saleId: Long
+    ): List<RetailSalePaymentEntity>
+
+    @Query(
+        """
+        SELECT *
+        FROM retail_sale_payments
+        WHERE saleId = :saleId
+        ORDER BY paidAt DESC, id DESC
+        """
+    )
+    fun observeRetailSalePayments(
+        saleId: Long
+    ): Flow<List<RetailSalePaymentEntity>>
+
     @Query(
         """
         SELECT *
@@ -378,14 +409,16 @@ interface InventoryDao {
         """
         UPDATE retail_sales
         SET paid = :paid,
-            status = :status
+            status = :status,
+            paymentMethod = :paymentMethod
         WHERE id = :saleId
         """
     )
     suspend fun updateRetailSalePayment(
         saleId: Long,
         paid: Double,
-        status: String
+        status: String,
+        paymentMethod: String
     )
 
     @Query(
@@ -401,5 +434,33 @@ interface InventoryDao {
     suspend fun activeRetailSaleCountForProduct(
         productId: Long
     ): Int
+
+
+    // Retail backup / restore
+    @Query("SELECT * FROM retail_sales ORDER BY id ASC")
+    suspend fun getAllRetailSales(): List<RetailSaleEntity>
+
+    @Query("SELECT * FROM retail_sale_lines ORDER BY id ASC")
+    suspend fun getAllRetailSaleLines(): List<RetailSaleLineEntity>
+
+    @Query("SELECT * FROM retail_sale_stock_allocations ORDER BY id ASC")
+    suspend fun getAllRetailSaleStockAllocations():
+        List<RetailSaleStockAllocationEntity>
+
+    @Query("SELECT * FROM retail_sale_payments ORDER BY id ASC")
+    suspend fun getAllRetailSalePayments(): List<RetailSalePaymentEntity>
+
+    @Query("DELETE FROM retail_sale_payments")
+    suspend fun clearRetailSalePayments()
+
+    @Query("DELETE FROM retail_sale_stock_allocations")
+    suspend fun clearRetailSaleStockAllocations()
+
+    @Query("DELETE FROM retail_sale_lines")
+    suspend fun clearRetailSaleLines()
+
+    @Query("DELETE FROM retail_sales")
+    suspend fun clearRetailSales()
+
 
 }

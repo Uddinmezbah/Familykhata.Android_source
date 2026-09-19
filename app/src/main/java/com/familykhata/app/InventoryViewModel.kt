@@ -8,11 +8,15 @@ import com.familykhata.app.data.AppDatabase
 import com.familykhata.app.data.BakiEntryEntity
 import com.familykhata.app.data.BakiPersonSummary
 import com.familykhata.app.data.InventoryDatabase
+import com.familykhata.app.data.FinancialAccountEntity
+import com.familykhata.app.data.FinancialAccountEntryEntity
+import com.familykhata.app.data.FinancialAccountSummary
 import com.familykhata.app.data.ProductEntity
 import com.familykhata.app.data.ProductUnitConversionEntity
 import com.familykhata.app.data.ProductStockSummary
 import com.familykhata.app.data.RetailSaleEntity
 import com.familykhata.app.data.RetailSaleLineEntity
+import com.familykhata.app.data.RetailSalePaymentEntity
 import com.familykhata.app.data.RetailSaleStockAllocationEntity
 import com.familykhata.app.data.StockBatchEntity
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -25,6 +29,7 @@ import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import java.util.Locale
+import java.util.UUID
 
 data class ProductUnitInput(
     val unitName: String,
@@ -97,6 +102,22 @@ class InventoryViewModel(application: Application) : AndroidViewModel(applicatio
                 emptyList()
             )
 
+    val financialAccounts:
+        StateFlow<List<FinancialAccountSummary>> =
+        workspace
+            .flatMapLatest { workspaceValue ->
+                bakiDao.observeFinancialAccounts(
+                    workspaceValue
+                )
+            }
+            .stateIn(
+                viewModelScope,
+                SharingStarted.WhileSubscribed(
+                    5_000
+                ),
+                emptyList()
+            )
+
     fun setContext(
         workspaceValue: String,
         shopType: String
@@ -132,6 +153,12 @@ class InventoryViewModel(application: Application) : AndroidViewModel(applicatio
             ).forEach { sale ->
                 runCatching {
                     reconcileRetailSaleBaki(
+                        sale
+                    )
+                }
+
+                runCatching {
+                    reconcileRetailSaleAccounts(
                         sale
                     )
                 }
@@ -833,6 +860,278 @@ class InventoryViewModel(application: Application) : AndroidViewModel(applicatio
     ): String =
         "RETAIL_SALE_PAYMENT:$saleId"
 
+
+    private fun retailSaleAccountSourceKey(
+        eventKey: String
+    ): String =
+        "RETAIL_SALE_ACCOUNT:$eventKey"
+
+    private fun retailPaymentMethodForAccount(
+        account: FinancialAccountEntity
+    ): String {
+        val provider =
+            account.provider
+                .trim()
+                .uppercase(
+                    Locale.ROOT
+                )
+
+        return when {
+            provider.contains("BKASH") ->
+                "BKASH"
+
+            provider.contains("NAGAD") ->
+                "NAGAD"
+
+            provider.contains("ROCKET") ->
+                "ROCKET"
+
+            account.type == "CASH" ->
+                "CASH"
+
+            account.type == "BANK" ->
+                "BANK"
+
+            account.type == "CARD" ->
+                "CARD"
+
+            account.type ==
+                "MOBILE_WALLET" ->
+                "WALLET"
+
+            else ->
+                "OTHER"
+        }
+    }
+
+    private fun mergedRetailPaymentMethod(
+        oldMethod: String,
+        alreadyPaid: Double,
+        incomingMethod: String
+    ): String {
+        if (
+            alreadyPaid <= 0.0001 ||
+            oldMethod.equals(
+                "UNPAID",
+                ignoreCase = true
+            )
+        ) {
+            return incomingMethod
+        }
+
+        return if (
+            oldMethod.equals(
+                incomingMethod,
+                ignoreCase = true
+            )
+        ) {
+            incomingMethod
+        } else {
+            "MIXED"
+        }
+    }
+
+    private suspend fun removeRetailSaleAccountCreditsSafely(
+        sale: RetailSaleEntity,
+        payments: List<RetailSalePaymentEntity>
+    ) {
+        val existingEntries =
+            mutableListOf<FinancialAccountEntryEntity>()
+
+        payments.forEach { payment ->
+            val sourceKey =
+                retailSaleAccountSourceKey(
+                    payment.eventKey
+                )
+
+            val entry =
+                bakiDao
+                    .getFinancialAccountEntryBySourceKey(
+                        sourceKey
+                    )
+
+            if (entry != null) {
+                require(
+                    entry.accountId ==
+                        payment.financialAccountId &&
+                        entry.entryType ==
+                            "RETAIL_SALE_IN" &&
+                        entry.workspace ==
+                            sale.workspace &&
+                        kotlin.math.abs(
+                            entry.balanceDelta -
+                                payment.amount
+                        ) < 0.0001
+                ) {
+                    "Retail account projection mismatch"
+                }
+
+                existingEntries += entry
+            }
+        }
+
+        existingEntries
+            .groupBy { it.accountId }
+            .forEach {
+                    (accountId, entries) ->
+
+                val amountToRemove =
+                    entries.sumOf {
+                        it.balanceDelta
+                    }
+
+                val currentBalance =
+                    requireNotNull(
+                        bakiDao
+                            .getFinancialAccountBalanceOnce(
+                                accountId
+                            )
+                    ) {
+                        "Financial account balance unavailable"
+                    }
+
+                require(
+                    currentBalance -
+                        amountToRemove >=
+                        -0.0001
+                ) {
+                    "Insufficient financial account balance for sale cancellation"
+                }
+            }
+
+        existingEntries.forEach { entry ->
+            entry.sourceKey?.let { sourceKey ->
+                bakiDao
+                    .deleteFinancialAccountEntryBySourceKey(
+                        sourceKey
+                    )
+            }
+        }
+    }
+
+    private suspend fun reconcileRetailSaleAccounts(
+        sale: RetailSaleEntity
+    ) {
+        val payments =
+            dao.getRetailSalePaymentsOnce(
+                sale.id
+            )
+
+        bakiDatabase.withTransaction {
+            if (
+                sale.status ==
+                    "CANCELLED"
+            ) {
+                removeRetailSaleAccountCreditsSafely(
+                    sale = sale,
+                    payments = payments
+                )
+                return@withTransaction
+            }
+
+            payments.forEach {
+                    payment ->
+
+                require(
+                    payment.saleId ==
+                        sale.id &&
+                        payment.amount
+                            .isFinite() &&
+                        payment.amount >
+                            0.0001
+                ) {
+                    "Invalid retail sale payment"
+                }
+
+                val account =
+                    requireNotNull(
+                        bakiDao
+                            .getFinancialAccountOnce(
+                                payment
+                                    .financialAccountId
+                            )
+                    ) {
+                        "Retail payment account not found"
+                    }
+
+                require(
+                    account.workspace ==
+                        sale.workspace
+                ) {
+                    "Retail payment account workspace mismatch"
+                }
+
+                val sourceKey =
+                    retailSaleAccountSourceKey(
+                        payment.eventKey
+                    )
+
+                val existing =
+                    bakiDao
+                        .getFinancialAccountEntryBySourceKey(
+                            sourceKey
+                        )
+
+                val matches =
+                    existing != null &&
+                        existing.accountId ==
+                            account.id &&
+                        existing.entryType ==
+                            "RETAIL_SALE_IN" &&
+                        kotlin.math.abs(
+                            existing.amount -
+                                payment.amount
+                        ) < 0.0001 &&
+                        kotlin.math.abs(
+                            existing.balanceDelta -
+                                payment.amount
+                        ) < 0.0001 &&
+                        existing.relatedAccountId ==
+                            null &&
+                        existing.transferGroupId ==
+                            null &&
+                        existing.workspace ==
+                            sale.workspace
+
+                if (!matches) {
+                    if (existing != null) {
+                        bakiDao
+                            .deleteFinancialAccountEntryBySourceKey(
+                                sourceKey
+                            )
+                    }
+
+                    val inserted =
+                        bakiDao
+                            .insertFinancialAccountEntry(
+                                FinancialAccountEntryEntity(
+                                    accountId =
+                                        account.id,
+                                    entryType =
+                                        "RETAIL_SALE_IN",
+                                    amount =
+                                        payment.amount,
+                                    balanceDelta =
+                                        payment.amount,
+                                    sourceKey =
+                                        sourceKey,
+                                    note =
+                                        "Retail sale ${sale.invoiceNo} • ${payment.paymentMethod}",
+                                    workspace =
+                                        sale.workspace,
+                                    createdAt =
+                                        payment.paidAt
+                                )
+                            )
+
+                    require(
+                        inserted > 0L
+                    )
+                }
+            }
+        }
+    }
+
     private suspend fun reconcileRetailSaleBaki(
         sale: RetailSaleEntity
     ) {
@@ -1041,6 +1340,7 @@ class InventoryViewModel(application: Application) : AndroidViewModel(applicatio
         discount: Double = 0.0,
         paid: Double = 0.0,
         paymentMethod: String = "CASH",
+        financialAccountId: Long? = null,
         customerName: String = "",
         customerPhone: String = "",
         bakiPersonId: Long? = null,
@@ -1108,6 +1408,55 @@ class InventoryViewModel(application: Application) : AndroidViewModel(applicatio
                             "Baki person not found"
                         }
                     }
+
+                    val resolvedFinancialAccount =
+                        financialAccountId
+                            ?.takeIf {
+                                it > 0L
+                            }
+                            ?.let {
+                                    accountId ->
+
+                                requireNotNull(
+                                    bakiDao
+                                        .getFinancialAccountOnce(
+                                            accountId
+                                        )
+                                ).also {
+                                        account ->
+
+                                    require(
+                                        account.workspace ==
+                                            currentWorkspace &&
+                                            account.isActive
+                                    ) {
+                                        "Invalid retail payment account"
+                                    }
+                                }
+                            }
+
+                    require(
+                        paid <= 0.0001 ||
+                            resolvedFinancialAccount != null
+                    ) {
+                        "Financial account required for paid retail sale"
+                    }
+
+                    val resolvedPaymentMethod =
+                        resolvedFinancialAccount
+                            ?.let {
+                                retailPaymentMethodForAccount(
+                                    it
+                                )
+                            }
+                            ?: paymentMethod
+                                .trim()
+                                .uppercase(
+                                    Locale.ROOT
+                                )
+                                .ifBlank {
+                                    "CASH"
+                                }
 
                     database.withTransaction {
                         data class BatchUse(
@@ -1459,12 +1808,14 @@ class InventoryViewModel(application: Application) : AndroidViewModel(applicatio
                                     total = total,
                                     paid = finalPaid,
                                     paymentMethod =
-                                        paymentMethod
-                                            .trim()
-                                            .uppercase()
-                                            .ifBlank {
-                                                "CASH"
-                                            },
+                                        if (
+                                            finalPaid >
+                                                0.0001
+                                        ) {
+                                            resolvedPaymentMethod
+                                        } else {
+                                            "UNPAID"
+                                        },
                                     status = status,
                                     note = note.trim(),
                                     workspace =
@@ -1476,6 +1827,39 @@ class InventoryViewModel(application: Application) : AndroidViewModel(applicatio
                             )
 
                         require(createdSaleId > 0L)
+
+                        if (
+                            finalPaid >
+                                0.0001 &&
+                            resolvedFinancialAccount !=
+                                null
+                        ) {
+                            val paymentId =
+                                dao.insertRetailSalePayment(
+                                    RetailSalePaymentEntity(
+                                        eventKey =
+                                            UUID.randomUUID()
+                                                .toString(),
+                                        saleId =
+                                            createdSaleId,
+                                        financialAccountId =
+                                            resolvedFinancialAccount
+                                                .id,
+                                        amount =
+                                            finalPaid,
+                                        paymentMethod =
+                                            resolvedPaymentMethod,
+                                        note =
+                                            note.trim(),
+                                        paidAt =
+                                            soldAt
+                                    )
+                                )
+
+                            require(
+                                paymentId > 0L
+                            )
+                        }
 
                         for (resolved in resolvedLines) {
                             val lineId =
@@ -1552,6 +1936,12 @@ class InventoryViewModel(application: Application) : AndroidViewModel(applicatio
                             sale
                         )
                     }
+
+                    runCatching {
+                        reconcileRetailSaleAccounts(
+                            sale
+                        )
+                    }
                 }
             }
 
@@ -1562,6 +1952,7 @@ class InventoryViewModel(application: Application) : AndroidViewModel(applicatio
     fun recordRetailSalePayment(
         saleId: Long,
         amount: Double,
+        financialAccountId: Long? = null,
         onDone: (Boolean) -> Unit = {}
     ) {
         if (
@@ -1582,6 +1973,46 @@ class InventoryViewModel(application: Application) : AndroidViewModel(applicatio
         viewModelScope.launch {
             val updatedSale =
                 runCatching {
+                    val resolvedFinancialAccount =
+                        financialAccountId
+                            ?.takeIf {
+                                it > 0L
+                            }
+                            ?.let {
+                                    accountId ->
+
+                                requireNotNull(
+                                    bakiDao
+                                        .getFinancialAccountOnce(
+                                            accountId
+                                        )
+                                ).also {
+                                        account ->
+
+                                    require(
+                                        account.workspace ==
+                                            currentWorkspace &&
+                                            account.isActive
+                                    ) {
+                                        "Invalid retail payment account"
+                                    }
+                                }
+                            }
+
+                    requireNotNull(
+                        resolvedFinancialAccount
+                    ) {
+                        "Financial account required for retail payment"
+                    }
+
+                    val incomingPaymentMethod =
+                        resolvedFinancialAccount
+                            ?.let {
+                                retailPaymentMethodForAccount(
+                                    it
+                                )
+                            }
+
                     database.withTransaction {
                         val sale =
                             requireNotNull(
@@ -1642,19 +2073,71 @@ class InventoryViewModel(application: Application) : AndroidViewModel(applicatio
                         val newStatus =
                             if (
                                 newPaid >=
-                                sale.total -
-                                    0.0001
+                                    sale.total -
+                                        0.0001
                             ) {
                                 "PAID"
                             } else {
                                 "PARTIAL"
                             }
 
+                        val newPaymentMethod =
+                            incomingPaymentMethod
+                                ?.let {
+                                    mergedRetailPaymentMethod(
+                                        oldMethod =
+                                            sale.paymentMethod,
+                                        alreadyPaid =
+                                            sale.paid,
+                                        incomingMethod =
+                                            it
+                                    )
+                                }
+                                ?: sale.paymentMethod
+
                         dao.updateRetailSalePayment(
-                            saleId = sale.id,
-                            paid = newPaid,
-                            status = newStatus
+                            saleId =
+                                sale.id,
+                            paid =
+                                newPaid,
+                            status =
+                                newStatus,
+                            paymentMethod =
+                                newPaymentMethod
                         )
+
+                        if (
+                            resolvedFinancialAccount !=
+                                null &&
+                            incomingPaymentMethod !=
+                                null
+                        ) {
+                            val paymentId =
+                                dao.insertRetailSalePayment(
+                                    RetailSalePaymentEntity(
+                                        eventKey =
+                                            UUID.randomUUID()
+                                                .toString(),
+                                        saleId =
+                                            sale.id,
+                                        financialAccountId =
+                                            resolvedFinancialAccount
+                                                .id,
+                                        amount =
+                                            amount,
+                                        paymentMethod =
+                                            incomingPaymentMethod,
+                                        note =
+                                            "Due collection ${sale.invoiceNo}",
+                                        paidAt =
+                                            System.currentTimeMillis()
+                                    )
+                                )
+
+                            require(
+                                paymentId > 0L
+                            )
+                        }
 
                         requireNotNull(
                             dao.getRetailSaleOnce(
@@ -1665,13 +2148,22 @@ class InventoryViewModel(application: Application) : AndroidViewModel(applicatio
                 }.getOrNull()
 
             /*
-             * Inventory payment is authoritative here.
-             * Baki sync is idempotent and will retry when
-             * this business context is opened again.
+             * Inventory DB is authoritative.
+             * Baki and account ledgers are idempotent
+             * cross-database projections and retry when
+             * this business context opens again.
              */
-            updatedSale?.let { sale ->
+            updatedSale?.let {
+                    sale ->
+
                 runCatching {
                     reconcileRetailSaleBaki(
+                        sale
+                    )
+                }
+
+                runCatching {
+                    reconcileRetailSaleAccounts(
                         sale
                     )
                 }
@@ -1696,6 +2188,77 @@ class InventoryViewModel(application: Application) : AndroidViewModel(applicatio
         val currentBusinessKey = businessKey.value
 
         viewModelScope.launch {
+            val saleBeforeCancellation =
+                runCatching {
+                    requireNotNull(
+                        dao.getRetailSaleOnce(
+                            saleId
+                        )
+                    ) {
+                        "Sale not found"
+                    }.also { sale ->
+                        require(
+                            sale.workspace ==
+                                currentWorkspace &&
+                                sale.businessKey ==
+                                    currentBusinessKey
+                        ) {
+                            "Sale context mismatch"
+                        }
+                    }
+                }.getOrNull()
+
+            if (saleBeforeCancellation == null) {
+                onDone(false)
+                return@launch
+            }
+
+            if (
+                saleBeforeCancellation.status ==
+                "CANCELLED"
+            ) {
+                val projectionOk =
+                    runCatching {
+                        reconcileRetailSaleAccounts(
+                            saleBeforeCancellation
+                        )
+                    }.isSuccess
+
+                onDone(projectionOk)
+                return@launch
+            }
+
+            /*
+             * Inventory DB and Financial Account DB are separate.
+             * Remove deterministic Retail credits first. If Inventory
+             * cancellation fails, recreate projection as compensation.
+             */
+            val accountReversalReady =
+                runCatching {
+                    reconcileRetailSaleAccounts(
+                        saleBeforeCancellation
+                    )
+
+                    val payments =
+                        dao.getRetailSalePaymentsOnce(
+                            saleId
+                        )
+
+                    bakiDatabase.withTransaction {
+                        removeRetailSaleAccountCreditsSafely(
+                            sale =
+                                saleBeforeCancellation,
+                            payments =
+                                payments
+                        )
+                    }
+                }.isSuccess
+
+            if (!accountReversalReady) {
+                onDone(false)
+                return@launch
+            }
+
             val result =
                 runCatching {
                     database.withTransaction {
@@ -1829,12 +2392,26 @@ class InventoryViewModel(application: Application) : AndroidViewModel(applicatio
                     }
                 }.getOrDefault(false)
 
+            if (!result) {
+                runCatching {
+                    reconcileRetailSaleAccounts(
+                        saleBeforeCancellation
+                    )
+                }
+            }
+
             if (result) {
                 dao.getRetailSaleOnce(
                     saleId
                 )?.let { sale ->
                     runCatching {
                         reconcileRetailSaleBaki(
+                            sale
+                        )
+                    }
+
+                    runCatching {
+                        reconcileRetailSaleAccounts(
                             sale
                         )
                     }

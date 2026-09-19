@@ -28,6 +28,7 @@ import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.MaterialTheme
@@ -70,6 +71,7 @@ import java.io.File
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
+import kotlinx.coroutines.delay
 
 private const val APP_PACKAGE = "com.familykhata.app"
 private const val PLAY_STORE_URL = "https://play.google.com/store/apps/details?id=$APP_PACKAGE"
@@ -161,6 +163,15 @@ fun FamilyKhataApp(viewModel: FamilyKhataViewModel) {
 
     var appRefreshToken by remember {
         mutableStateOf(0L)
+    }
+
+    var isRefreshing by remember { mutableStateOf(false) }
+
+    LaunchedEffect(isRefreshing) {
+        if (isRefreshing) {
+            delay(800)
+            isRefreshing = false
+        }
     }
 
     @Suppress("UNUSED_VARIABLE")
@@ -292,57 +303,91 @@ fun FamilyKhataApp(viewModel: FamilyKhataViewModel) {
                             showSettingsMenu = true
                         }
 
-                        homeLogoFile?.let { logoFile ->
-                            AsyncImage(
-                                model = logoFile,
-                                contentDescription =
-                                    v15Text(
-                                        "দোকানের লোগো",
-                                        "Business logo"
-                                    ),
+                        Box(
+                            modifier = Modifier.weight(1f)
+                        ) {
+                            Card(
+                                onClick = {
+                                    showHomeProfileMenu = true
+                                },
                                 modifier =
                                     Modifier
-                                        .size(22.dp)
-                                        .clip(
-                                            RoundedCornerShape(
-                                                12.dp
-                                            )
-                                        ),
-                                contentScale =
-                                    ContentScale.Crop
-                            )
-                        }
-
-                        Box {
-                            TextButton(
-                                onClick = {
-                                    showHomeProfileMenu =
-                                        true
-                                }
+                                        .fillMaxWidth()
+                                        .height(42.dp),
+                                shape = RoundedCornerShape(18.dp),
+                                colors =
+                                    CardDefaults.cardColors(
+                                        containerColor =
+                                            MaterialTheme.colorScheme.surfaceVariant
+                                    ),
+                                border =
+                                    BorderStroke(
+                                        1.dp,
+                                        MaterialTheme.colorScheme.outline.copy(
+                                            alpha = 0.22f
+                                        )
+                                    )
                             ) {
-                                Text(
-                                    "${
-                                        homeProfileName
-                                            .ifBlank {
+                                Row(
+                                    modifier =
+                                        Modifier
+                                            .fillMaxSize()
+                                            .padding(
+                                                horizontal = 10.dp,
+                                                vertical = 6.dp
+                                            ),
+                                    verticalAlignment =
+                                        Alignment.CenterVertically,
+                                    horizontalArrangement =
+                                        Arrangement.spacedBy(6.dp)
+                                ) {
+                                    homeLogoFile?.let { logoFile ->
+                                        AsyncImage(
+                                            model = logoFile,
+                                            contentDescription =
                                                 v15Text(
-                                                    "প্রোফাইল",
-                                                    "Profile"
-                                                )
-                                            }
-                                    } ▾",
-                                    fontWeight =
-                                        FontWeight.Bold,
-                                    maxLines = 1,
-                                    softWrap = false
-                                )
+                                                    "দোকানের লোগো",
+                                                    "Business logo"
+                                                ),
+                                            modifier =
+                                                Modifier
+                                                    .size(24.dp)
+                                                    .clip(
+                                                        RoundedCornerShape(
+                                                            7.dp
+                                                        )
+                                                    ),
+                                            contentScale =
+                                                ContentScale.Crop
+                                        )
+                                    }
+
+                                    Text(
+                                        homeBusinessName.ifBlank {
+                                            v15Text(
+                                                "দোকান/প্রতিষ্ঠান",
+                                                "Business"
+                                            )
+                                        },
+                                        modifier = Modifier.weight(1f),
+                                        style =
+                                            MaterialTheme.typography.labelLarge,
+                                        fontWeight = FontWeight.Bold,
+                                        maxLines = 1,
+                                        softWrap = false
+                                    )
+
+                                    Text(
+                                        "⌄",
+                                        fontWeight = FontWeight.ExtraBold
+                                    )
+                                }
                             }
 
                             DropdownMenu(
-                                expanded =
-                                    showHomeProfileMenu,
+                                expanded = showHomeProfileMenu,
                                 onDismissRequest = {
-                                    showHomeProfileMenu =
-                                        false
+                                    showHomeProfileMenu = false
                                 }
                             ) {
                                 DropdownMenuItem(
@@ -355,10 +400,8 @@ fun FamilyKhataApp(viewModel: FamilyKhataViewModel) {
                                         )
                                     },
                                     onClick = {
-                                        showHomeProfileMenu =
-                                            false
-                                        showSettingsMenu =
-                                            true
+                                        showHomeProfileMenu = false
+                                        showSettingsMenu = true
                                     }
                                 )
 
@@ -374,23 +417,6 @@ fun FamilyKhataApp(viewModel: FamilyKhataViewModel) {
                                     onClick = {},
                                     enabled = false
                                 )
-
-                                DropdownMenuItem(
-                                    text = {
-                                        Text(
-                                            v15Text("↻ রিফ্রেশ", "↻ Refresh")
-                                        )
-                                    },
-                                    onClick = {
-                                        showHomeProfileMenu =
-                                            false
-                                        appRefreshToken =
-                                            appRefreshToken +
-                                                1L
-                                        viewModel
-                                            .refreshTrialStatus()
-                                    }
-                                )
                             }
                         }
 
@@ -401,29 +427,36 @@ fun FamilyKhataApp(viewModel: FamilyKhataViewModel) {
 
                         Button(
                             onClick = {
-                                appRefreshToken =
-                                    appRefreshToken + 1L
-
-                                viewModel.refreshTrialStatus()
+                                if (!isRefreshing) {
+                                    isRefreshing = true
+                                    appRefreshToken = appRefreshToken + 1L
+                                    viewModel.refreshTrialStatus()
+                                }
                             },
-                            modifier =
-                                Modifier.height(42.dp),
-                            colors =
-                                androidx.compose.material3.ButtonDefaults
-                                    .buttonColors(
-                                        containerColor =
-                                            workspaceAccent(
-                                                workspace
-                                            ),
-                                        contentColor =
-                                            Color.White
-                                    )
-                        ) {
-                            Text(
-                                v15Text("↻ রিফ্রেশ", "↻ Refresh"),
-                                fontWeight =
-                                    FontWeight.ExtraBold
+                            enabled = !isRefreshing,
+                            modifier = Modifier.size(44.dp),
+                            shape = RoundedCornerShape(50),
+                            contentPadding = androidx.compose.foundation.layout.PaddingValues(0.dp),
+                            colors = androidx.compose.material3.ButtonDefaults.buttonColors(
+                                containerColor = workspaceAccent(workspace),
+                                contentColor = Color.White,
+                                disabledContainerColor = workspaceAccent(workspace).copy(alpha = 0.72f),
+                                disabledContentColor = Color.White
                             )
+                        ) {
+                            if (isRefreshing) {
+                                CircularProgressIndicator(
+                                    modifier = Modifier.size(20.dp),
+                                    strokeWidth = 2.4.dp,
+                                    color = Color.White
+                                )
+                            } else {
+                                Text(
+                                    "↻",
+                                    style = MaterialTheme.typography.titleLarge,
+                                    fontWeight = FontWeight.ExtraBold
+                                )
+                            }
                         }
                     }
 

@@ -89,13 +89,13 @@ internal fun TopCornerMenuButton(
     ) {
         Text(
             v15Text(
-                "☰  মেনু",
-                "☰  Menu"
+                "☰",
+                "☰"
             ),
             modifier =
                 Modifier.padding(
-                    horizontal = 14.dp,
-                    vertical = 9.dp
+                    horizontal = 12.dp,
+                    vertical = 10.dp
                 ),
             fontWeight =
                 FontWeight.Bold

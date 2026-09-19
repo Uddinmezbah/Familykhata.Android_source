@@ -27,6 +27,8 @@ interface InventoryDao {
             color = :color,
             warrantyMonths = :warrantyMonths,
             sellingPrice = :sellingPrice,
+            mrp = :mrp,
+            rackLocation = :rackLocation,
             lowStockLevel = :lowStockLevel,
             note = :note
         WHERE id = :productId
@@ -46,6 +48,8 @@ interface InventoryDao {
         color: String,
         warrantyMonths: Int,
         sellingPrice: Double,
+        mrp: Double,
+        rackLocation: String,
         lowStockLevel: Int,
         note: String
     )
@@ -68,6 +72,8 @@ interface InventoryDao {
                p.color AS color,
                p.warrantyMonths AS warrantyMonths,
                p.sellingPrice AS sellingPrice,
+               p.mrp AS mrp,
+               p.rackLocation AS rackLocation,
                p.lowStockLevel AS lowStockLevel,
                p.note AS note,
                p.workspace AS workspace,
@@ -132,11 +138,66 @@ interface InventoryDao {
     @Query("SELECT * FROM inventory_products WHERE id = :productId LIMIT 1")
     suspend fun getProductOnce(productId: Long): ProductEntity?
 
+    @Query(
+        """
+        SELECT *
+        FROM inventory_product_units
+        WHERE productId = :productId
+        ORDER BY sortOrder ASC, id ASC
+        """
+    )
+    fun observeProductUnitConversions(
+        productId: Long
+    ): Flow<List<ProductUnitConversionEntity>>
+
+    @Query(
+        """
+        SELECT *
+        FROM inventory_product_units
+        WHERE productId = :productId
+        ORDER BY sortOrder ASC, id ASC
+        """
+    )
+    suspend fun getProductUnitConversionsOnce(
+        productId: Long
+    ): List<ProductUnitConversionEntity>
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insertProductUnitConversion(
+        item: ProductUnitConversionEntity
+    ): Long
+
+    @Query(
+        """
+        DELETE FROM inventory_product_units
+        WHERE productId = :productId
+        """
+    )
+    suspend fun deleteProductUnitConversions(
+        productId: Long
+    ): Int
+
+    @Query(
+        """
+        SELECT *
+        FROM inventory_product_units
+        ORDER BY productId ASC, sortOrder ASC, id ASC
+        """
+    )
+    suspend fun getAllProductUnitConversions():
+        List<ProductUnitConversionEntity>
+
+    @Query("DELETE FROM inventory_product_units")
+    suspend fun clearProductUnitConversions()
+
     @Query("SELECT * FROM inventory_batches WHERE productId = :productId ORDER BY purchaseDate ASC, id ASC")
     fun observeBatches(productId: Long): Flow<List<StockBatchEntity>>
 
     @Query("SELECT * FROM inventory_batches WHERE productId = :productId ORDER BY purchaseDate ASC, id ASC")
     suspend fun getBatchesOnce(productId: Long): List<StockBatchEntity>
+
+    @Query("SELECT * FROM inventory_batches WHERE id = :batchId LIMIT 1")
+    suspend fun getBatchOnce(batchId: Long): StockBatchEntity?
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertBatch(item: StockBatchEntity): Long
@@ -178,4 +239,228 @@ interface InventoryDao {
 
     @Query("DELETE FROM inventory_products")
     suspend fun clearProducts()
+
+    // -----------------------------------------------------------------
+    // Retail sales
+    // -----------------------------------------------------------------
+
+    @Insert
+    suspend fun insertRetailSale(
+        item: RetailSaleEntity
+    ): Long
+
+    @Insert
+    suspend fun insertRetailSaleLine(
+        item: RetailSaleLineEntity
+    ): Long
+
+    @Insert
+    suspend fun insertRetailSaleStockAllocation(
+        item: RetailSaleStockAllocationEntity
+    ): Long
+
+    @Insert(
+        onConflict = OnConflictStrategy.ABORT
+    )
+    suspend fun insertRetailSalePayment(
+        item: RetailSalePaymentEntity
+    ): Long
+
+    @Query(
+        """
+        SELECT *
+        FROM retail_sale_payments
+        WHERE saleId = :saleId
+        ORDER BY paidAt ASC, id ASC
+        """
+    )
+    suspend fun getRetailSalePaymentsOnce(
+        saleId: Long
+    ): List<RetailSalePaymentEntity>
+
+    @Query(
+        """
+        SELECT *
+        FROM retail_sale_payments
+        WHERE saleId = :saleId
+        ORDER BY paidAt DESC, id DESC
+        """
+    )
+    fun observeRetailSalePayments(
+        saleId: Long
+    ): Flow<List<RetailSalePaymentEntity>>
+
+    @Query(
+        """
+        SELECT *
+        FROM retail_sales
+        WHERE workspace = :workspace
+          AND businessKey = :businessKey
+        ORDER BY soldAt DESC, id DESC
+        """
+    )
+    fun observeRetailSales(
+        workspace: String,
+        businessKey: String
+    ): Flow<List<RetailSaleEntity>>
+
+    @Query(
+        """
+        SELECT *
+        FROM retail_sales
+        WHERE workspace = :workspace
+          AND businessKey = :businessKey
+        ORDER BY soldAt ASC, id ASC
+        """
+    )
+    suspend fun getRetailSalesOnce(
+        workspace: String,
+        businessKey: String
+    ): List<RetailSaleEntity>
+
+    @Query(
+        """
+        SELECT *
+        FROM retail_sale_lines
+        WHERE saleId = :saleId
+        ORDER BY id ASC
+        """
+    )
+    fun observeRetailSaleLines(
+        saleId: Long
+    ): Flow<List<RetailSaleLineEntity>>
+
+    @Query(
+        """
+        SELECT *
+        FROM retail_sale_stock_allocations
+        WHERE saleLineId = :saleLineId
+        ORDER BY id ASC
+        """
+    )
+    fun observeRetailSaleStockAllocations(
+        saleLineId: Long
+    ): Flow<List<RetailSaleStockAllocationEntity>>
+
+    @Query(
+        """
+        SELECT *
+        FROM retail_sales
+        WHERE id = :saleId
+        LIMIT 1
+        """
+    )
+    suspend fun getRetailSaleOnce(
+        saleId: Long
+    ): RetailSaleEntity?
+
+    @Query(
+        """
+        SELECT *
+        FROM retail_sale_lines
+        WHERE saleId = :saleId
+        ORDER BY id ASC
+        """
+    )
+    suspend fun getRetailSaleLinesOnce(
+        saleId: Long
+    ): List<RetailSaleLineEntity>
+
+    @Query(
+        """
+        SELECT COUNT(*)
+        FROM retail_sales
+        WHERE workspace = :workspace
+          AND businessKey = :businessKey
+          AND invoiceNo = :invoiceNo
+        """
+    )
+    suspend fun retailInvoiceNumberCount(
+        workspace: String,
+        businessKey: String,
+        invoiceNo: String
+    ): Int
+
+    @Query(
+        """
+        SELECT *
+        FROM retail_sale_stock_allocations
+        WHERE saleLineId = :saleLineId
+        ORDER BY id ASC
+        """
+    )
+    suspend fun getRetailSaleStockAllocationsOnce(
+        saleLineId: Long
+    ): List<RetailSaleStockAllocationEntity>
+
+    @Query(
+        """
+        UPDATE retail_sales
+        SET status = :status
+        WHERE id = :saleId
+        """
+    )
+    suspend fun updateRetailSaleStatus(
+        saleId: Long,
+        status: String
+    )
+
+    @Query(
+        """
+        UPDATE retail_sales
+        SET paid = :paid,
+            status = :status,
+            paymentMethod = :paymentMethod
+        WHERE id = :saleId
+        """
+    )
+    suspend fun updateRetailSalePayment(
+        saleId: Long,
+        paid: Double,
+        status: String,
+        paymentMethod: String
+    )
+
+    @Query(
+        """
+        SELECT COUNT(*)
+        FROM retail_sale_lines AS line
+        INNER JOIN retail_sales AS sale
+            ON sale.id = line.saleId
+        WHERE line.productId = :productId
+          AND sale.status != 'CANCELLED'
+        """
+    )
+    suspend fun activeRetailSaleCountForProduct(
+        productId: Long
+    ): Int
+
+
+    // Retail backup / restore
+    @Query("SELECT * FROM retail_sales ORDER BY id ASC")
+    suspend fun getAllRetailSales(): List<RetailSaleEntity>
+
+    @Query("SELECT * FROM retail_sale_lines ORDER BY id ASC")
+    suspend fun getAllRetailSaleLines(): List<RetailSaleLineEntity>
+
+    @Query("SELECT * FROM retail_sale_stock_allocations ORDER BY id ASC")
+    suspend fun getAllRetailSaleStockAllocations():
+        List<RetailSaleStockAllocationEntity>
+
+    @Query("SELECT * FROM retail_sale_payments ORDER BY id ASC")
+    suspend fun getAllRetailSalePayments(): List<RetailSalePaymentEntity>
+
+    @Query("DELETE FROM retail_sale_payments")
+    suspend fun clearRetailSalePayments()
+
+    @Query("DELETE FROM retail_sale_stock_allocations")
+    suspend fun clearRetailSaleStockAllocations()
+
+    @Query("DELETE FROM retail_sale_lines")
+    suspend fun clearRetailSaleLines()
+
+    @Query("DELETE FROM retail_sales")
+    suspend fun clearRetailSales()
+
+
 }

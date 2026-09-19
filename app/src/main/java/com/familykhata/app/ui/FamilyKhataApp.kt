@@ -57,6 +57,7 @@ import com.familykhata.app.BusinessMode
 import com.familykhata.app.detectBusinessMode
 import com.familykhata.app.data.BakiEntryEntity
 import com.familykhata.app.data.BakiPersonSummary
+import com.familykhata.app.data.FinancialAccountSummary
 import com.familykhata.app.data.TransactionEntity
 import org.json.JSONObject
 import java.text.SimpleDateFormat
@@ -96,7 +97,7 @@ fun FamilyKhataApp(viewModel: FamilyKhataViewModel) {
     var historyFilterPreset by remember { mutableStateOf("ALL") }
     val workspace by viewModel.selectedWorkspace.collectAsState()
     val trialStatus by viewModel.trialStatus.collectAsState()
-    val isAppUnlocked by viewModel.isAppUnlocked.collectAsState()
+    val isPinConfigured by viewModel.isPinConfigured.collectAsState()
     val appContext = LocalContext.current
 
     val premiumBillingManager =
@@ -151,8 +152,8 @@ fun FamilyKhataApp(viewModel: FamilyKhataViewModel) {
     HisabiKhataTheme {
         if (V15LanguageState.languageCode == null) {
             LanguageOnboardingScreen()
-        } else if (!isAppUnlocked) {
-            AppLockScreen(viewModel)
+        } else if (!isPinConfigured) {
+            RequiredPinSetupScreen(viewModel)
         } else if (showSettingsMenu) {
             V14SettingsScreen(
                 viewModel = viewModel,
@@ -216,9 +217,13 @@ fun FamilyKhataApp(viewModel: FamilyKhataViewModel) {
                                         businessMode
                                     ),
                                     style =
-                                        MaterialTheme.typography.labelMedium,
+                                        MaterialTheme.typography.labelSmall,
                                     fontWeight =
-                                        FontWeight.Bold
+                                        FontWeight.Bold,
+                                    maxLines = 1,
+                                    softWrap = false,
+                                    textAlign =
+                                        TextAlign.Center
                                 )
                             }
                         )
@@ -291,17 +296,23 @@ fun FamilyKhataApp(viewModel: FamilyKhataViewModel) {
                             horizontalArrangement =
                                 Arrangement.SpaceBetween,
                             verticalAlignment =
-                                Alignment.Top
+                                Alignment.CenterVertically
                         ) {
                             Text(
                                 v15Text(
                                     "হিসাবী খাতা",
                                     "Hisabi Khata"
                                 ),
+                                modifier =
+                                    Modifier
+                                        .weight(1f)
+                                        .padding(end = 8.dp),
                                 style =
                                     MaterialTheme.typography.headlineMedium,
                                 fontWeight =
-                                    FontWeight.ExtraBold
+                                    FontWeight.ExtraBold,
+                                maxLines = 1,
+                                softWrap = false
                             )
 
                             if (trialStatus.premiumUnlocked) {
@@ -323,10 +334,14 @@ fun FamilyKhataApp(viewModel: FamilyKhataViewModel) {
                                         tab = Tab.MORE
                                     },
                                     modifier =
-                                        Modifier.padding(end = 4.dp),
+                                        Modifier.padding(
+                                            start = 4.dp,
+                                            end = 4.dp
+                                        ),
                                     contentPadding =
                                         androidx.compose.foundation.layout.PaddingValues(
-                                            0.dp
+                                            horizontal = 8.dp,
+                                            vertical = 6.dp
                                         )
                                 ) {
                                     Column(
@@ -340,6 +355,8 @@ fun FamilyKhataApp(viewModel: FamilyKhataViewModel) {
                                             ),
                                             fontWeight =
                                                 FontWeight.ExtraBold,
+                                            maxLines = 1,
+                                            softWrap = false,
                                             color =
                                                 if (trialStatus.expired)
                                                     ExpenseAccent
@@ -367,7 +384,9 @@ fun FamilyKhataApp(viewModel: FamilyKhataViewModel) {
                                                 MaterialTheme.colorScheme
                                                     .onSurfaceVariant,
                                             textAlign =
-                                                TextAlign.End
+                                                TextAlign.End,
+                                            maxLines = 1,
+                                            softWrap = false
                                         )
                                     }
                                 }
@@ -505,6 +524,16 @@ fun FamilyKhataApp(viewModel: FamilyKhataViewModel) {
 
                                 BusinessMode.DEALERSHIP ->
                                     V15DealershipScreen(
+                                        workspace = workspace,
+                                        shopType = businessType,
+                                        canWrite = !trialStatus.expired,
+                                        onExit = {
+                                            tab = Tab.DASHBOARD
+                                        }
+                                    )
+
+                                BusinessMode.DEALER_BUSINESS ->
+                                    V16DealerBusinessScreen(
                                         workspace = workspace,
                                         shopType = businessType,
                                         canWrite = !trialStatus.expired,
@@ -886,6 +915,32 @@ private fun BusinessDashboard(
     onIncomeHistory: () -> Unit,
     onExpenseHistory: () -> Unit
 ) {
+    val financialAccounts by
+        viewModel.financialAccounts.collectAsState()
+
+    val trialStatus by
+        viewModel.trialStatus.collectAsState()
+
+    var showFinancialAccounts by
+        remember {
+            mutableStateOf(false)
+        }
+
+    var showDigitalServiceMode by
+        remember {
+            mutableStateOf<String?>(null)
+        }
+
+    val activeFinancialAccounts =
+        financialAccounts.filter {
+            it.isActive
+        }
+
+    val totalFinancialBalance =
+        activeFinancialAccounts.sumOf {
+            it.balance
+        }
+
     Column(
         modifier = Modifier
             .fillMaxSize()
@@ -906,7 +961,10 @@ private fun BusinessDashboard(
                 verticalArrangement = Arrangement.spacedBy(5.dp)
             ) {
                 Text(
-                    v15Text("ব্যবসার ক্যাশ ব্যালেন্স", "Business cash balance"),
+                    v15Text(
+                        "আয়-খরচ ব্যালেন্স",
+                        "Income-expense balance"
+                    ),
                     style = MaterialTheme.typography.labelLarge,
                     color = Color.White
                 )
@@ -917,7 +975,10 @@ private fun BusinessDashboard(
                     color = Color.White
                 )
                 Text(
-                    v15Text("দোকান/প্রতিষ্ঠানের আয়-খরচের বর্তমান হিসাব", "Current business cash-flow summary"),
+                    v15Text(
+                        "এটি আয় থেকে খরচ বাদ দেওয়ার হিসাব; Cash/Bank/Wallet ব্যালেন্স নিচে আলাদা।",
+                        "Income minus expense. Cash, bank and wallet balances are tracked separately below."
+                    ),
                     style = MaterialTheme.typography.bodySmall,
                     color = Color.White
                 )
@@ -929,14 +990,14 @@ private fun BusinessDashboard(
             horizontalArrangement = Arrangement.spacedBy(10.dp)
         ) {
             MetricCard(
-                title = v15Text("মোট ক্যাশ ইন", "Total cash in"),
+                title = v15Text("মোট আয়", "Total income"),
                 amount = income,
                 modifier = Modifier.weight(1f),
                 accentColor = IncomeAccent,
                 onClick = onIncomeHistory
             )
             MetricCard(
-                title = v15Text("মোট ক্যাশ আউট", "Total cash out"),
+                title = v15Text("মোট খরচ", "Total expense"),
                 amount = expense,
                 modifier = Modifier.weight(1f),
                 accentColor = ExpenseAccent,
@@ -964,6 +1025,114 @@ private fun BusinessDashboard(
             )
         }
 
+        Surface(
+            modifier =
+                Modifier
+                    .fillMaxWidth()
+                    .clickable {
+                        showFinancialAccounts = true
+                    },
+            shape =
+                RoundedCornerShape(20.dp),
+            color =
+                ShopAccent.copy(
+                    alpha = 0.09f
+                ),
+            border =
+                BorderStroke(
+                    1.dp,
+                    ShopAccent.copy(
+                        alpha = 0.22f
+                    )
+                )
+        ) {
+            Column(
+                modifier =
+                    Modifier.padding(16.dp),
+                verticalArrangement =
+                    Arrangement.spacedBy(5.dp)
+            ) {
+                Row(
+                    modifier =
+                        Modifier.fillMaxWidth(),
+                    verticalAlignment =
+                        Alignment.CenterVertically
+                ) {
+                    Column(
+                        modifier =
+                            Modifier.weight(1f)
+                    ) {
+                        Text(
+                            v15Text(
+                                "ক্যাশ • ব্যাংক • ওয়ালেট",
+                                "Cash • Bank • Wallet"
+                            ),
+                            fontWeight =
+                                FontWeight.Bold
+                        )
+
+                        Text(
+                            v15Text(
+                                "${activeFinancialAccounts.size}টি সক্রিয় অ্যাকাউন্ট",
+                                "${activeFinancialAccounts.size} active accounts"
+                            ),
+                            style =
+                                MaterialTheme
+                                    .typography
+                                    .bodySmall,
+                            color =
+                                MaterialTheme
+                                    .colorScheme
+                                    .onSurfaceVariant
+                        )
+                    }
+
+                    Text(
+                        if (
+                            V14DisplayState
+                                .summaryVisible
+                        ) {
+                            "${V14DisplayState.currencySymbol} ${money(totalFinancialBalance)}"
+                        } else {
+                            "••••"
+                        },
+                        style =
+                            MaterialTheme
+                                .typography
+                                .titleLarge,
+                        fontWeight =
+                            FontWeight.ExtraBold,
+                        color =
+                            ShopAccent
+                    )
+                }
+
+                Text(
+                    v15Text(
+                        "এই খাতায় ট্র্যাক করা Cash, bKash, Nagad, Rocket, Bank ইত্যাদির ব্যালেন্স এবং নিজের অ্যাকাউন্টের মধ্যে টাকা ট্রান্সফার।",
+                        "Balances tracked in this account ledger for Cash, bKash, Nagad, Rocket, Bank and other accounts, with internal transfers."
+                    ),
+                    style =
+                        MaterialTheme
+                            .typography
+                            .bodySmall
+                )
+
+                Text(
+                    v15Text(
+                        "নিজের এক অ্যাকাউন্ট থেকে অন্য অ্যাকাউন্টে Transfer আয় বা খরচ নয়।",
+                        "Transfers between your own accounts are not income or expense."
+                    ),
+                    style =
+                        MaterialTheme
+                            .typography
+                            .labelSmall,
+                    color =
+                        NeutralAccent
+                )
+            }
+        }
+
         DueDashboardSection(
             viewModel = viewModel,
             onLedger = onLedger
@@ -981,19 +1150,60 @@ private fun BusinessDashboard(
         ) {
             BusinessActionCard(
                 symbol = "＋",
-                title = v15Text("ক্যাশ ইন", "Cash in"),
-                subtitle = v15Text("আয় বা টাকা জমা", "Income or money received"),
+                title = v15Text("আয়", "Income"),
+                subtitle = v15Text("ব্যবসার আয় / টাকা পাওয়া", "Business income / money received"),
                 accentColor = IncomeAccent,
                 modifier = Modifier.weight(1f),
                 onClick = onCashIn
             )
             BusinessActionCard(
                 symbol = "−",
-                title = v15Text("ক্যাশ আউট", "Cash out"),
-                subtitle = v15Text("খরচ বা টাকা বের", "Expense or money paid"),
+                title = v15Text("খরচ", "Expense"),
+                subtitle = v15Text("ব্যবসার খরচ / টাকা দেওয়া", "Business expense / money paid"),
                 accentColor = ExpenseAccent,
                 modifier = Modifier.weight(1f),
                 onClick = onCashOut
+            )
+        }
+
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(10.dp)
+        ) {
+            BusinessActionCard(
+                symbol = "↗",
+                title = v15Text(
+                    "এজেন্ট ক্যাশ আউট",
+                    "Agent Cash Out"
+                ),
+                subtitle = v15Text(
+                    "Cash → Wallet • লাভ আলাদা",
+                    "Cash → Wallet • profit tracked"
+                ),
+                accentColor = ShopAccent,
+                modifier = Modifier.weight(1f),
+                onClick = {
+                    showDigitalServiceMode =
+                        "AGENT_CASH_OUT"
+                }
+            )
+
+            BusinessActionCard(
+                symbol = "R",
+                title = v15Text(
+                    "মোবাইল রিচার্জ",
+                    "Mobile Recharge"
+                ),
+                subtitle = v15Text(
+                    "রিচার্জ • কমিশন/লাভ",
+                    "Recharge • commission/profit"
+                ),
+                accentColor = IncomeAccent,
+                modifier = Modifier.weight(1f),
+                onClick = {
+                    showDigitalServiceMode =
+                        "MOBILE_RECHARGE"
+                }
             )
         }
 
@@ -1012,7 +1222,7 @@ private fun BusinessDashboard(
             BusinessActionCard(
                 symbol = "≡",
                 title = v15Text("লেনদেন", "Transactions"),
-                subtitle = v15Text("সব ক্যাশ ইতিহাস", "All cash history"),
+                subtitle = v15Text("সব আয়-খরচের ইতিহাস", "All income/expense history"),
                 accentColor = ShopAccent,
                 modifier = Modifier.weight(1f),
                 onClick = onHistory
@@ -1042,6 +1252,33 @@ private fun BusinessDashboard(
                 )
             }
         }
+    }
+
+    if (showFinancialAccounts) {
+        V16FinancialAccountsDialog(
+            viewModel = viewModel,
+            canWrite =
+                !trialStatus.expired,
+            onDismiss = {
+                showFinancialAccounts =
+                    false
+            }
+        )
+    }
+
+    showDigitalServiceMode?.let {
+            initialMode ->
+
+        V16DigitalServicesDialog(
+            viewModel = viewModel,
+            initialMode = initialMode,
+            canWrite =
+                !trialStatus.expired,
+            onDismiss = {
+                showDigitalServiceMode =
+                    null
+            }
+        )
     }
 }
 
@@ -1156,6 +1393,39 @@ private fun AddTransactionScreen(
     canWrite: Boolean
 ) {
     val isBusiness = workspace == "SHOP"
+
+    val financialAccounts by
+        viewModel.financialAccounts
+            .collectAsState()
+
+    val activeFinancialAccounts =
+        financialAccounts.filter {
+            it.isActive
+        }
+
+    var selectedFinancialAccountId by
+        remember(workspace) {
+            mutableStateOf<Long?>(null)
+        }
+
+    LaunchedEffect(
+        workspace,
+        activeFinancialAccounts.map {
+            it.id
+        }
+    ) {
+        if (
+            selectedFinancialAccountId !in
+                activeFinancialAccounts
+                    .map { it.id }
+        ) {
+            selectedFinancialAccountId =
+                activeFinancialAccounts
+                    .singleOrNull()
+                    ?.id
+        }
+    }
+
     var type by remember(initialType) { mutableStateOf(initialType) }
     var amount by remember { mutableStateOf("") }
     var category by remember { mutableStateOf("") }
@@ -1169,13 +1439,13 @@ private fun AddTransactionScreen(
         verticalArrangement = Arrangement.spacedBy(10.dp)
     ) {
         Text(
-            if (isBusiness) v15Text("ক্যাশ লেনদেন", "Cash transaction") else v15Text("নতুন আয়/খরচ", "New income/expense"),
+            if (isBusiness) v15Text("ব্যবসার আয় / খরচ", "Business income / expense") else v15Text("নতুন আয়/খরচ", "New income/expense"),
             style = MaterialTheme.typography.titleMedium,
             fontWeight = FontWeight.Bold
         )
         if (isBusiness) {
             Text(
-                v15Text("দোকান/প্রতিষ্ঠানের টাকা আসা বা বের হওয়ার হিসাব যোগ করুন।", "Record money received or paid by the business."),
+                v15Text("দোকান/প্রতিষ্ঠানের আয় বা খরচ যোগ করুন এবং কোন অ্যাকাউন্টে টাকা আসবে/যাবে তা নির্বাচন করুন।", "Record business income or expense and select the account receiving or paying the money."),
                 style = MaterialTheme.typography.bodySmall
             )
         }
@@ -1187,8 +1457,8 @@ private fun AddTransactionScreen(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.spacedBy(8.dp)
         ) {
-            val expenseLabel = if (isBusiness) v15Text("ক্যাশ আউট", "Cash out") else v15Text("খরচ", "Expense")
-            val incomeLabel = if (isBusiness) v15Text("ক্যাশ ইন", "Cash in") else v15Text("আয়", "Income")
+            val expenseLabel = v15Text("খরচ", "Expense")
+            val incomeLabel = v15Text("আয়", "Income")
             TransactionTypeCard(
                 label = expenseLabel,
                 selected = type == "EXPENSE",
@@ -1203,6 +1473,45 @@ private fun AddTransactionScreen(
                 modifier = Modifier.weight(1f),
                 onClick = { type = "INCOME" }
             )
+        }
+
+        if (isBusiness) {
+            Text(
+                v15Text(
+                    "টাকা কোন অ্যাকাউন্টে আসবে/যাবে?",
+                    "Which account receives/pays the money?"
+                ),
+                fontWeight =
+                    FontWeight.Bold
+            )
+
+            if (
+                activeFinancialAccounts
+                    .isEmpty()
+            ) {
+                Text(
+                    v15Text(
+                        "আগে Cash • Bank • Wallet থেকে অন্তত একটি অ্যাকাউন্ট তৈরি করুন।",
+                        "Create at least one Cash, Bank or Wallet account first."
+                    ),
+                    style =
+                        MaterialTheme.typography.bodySmall,
+                    color =
+                        MaterialTheme.colorScheme.error
+                )
+            } else {
+                TransactionAccountPicker(
+                    accounts =
+                        activeFinancialAccounts,
+                    selectedId =
+                        selectedFinancialAccountId,
+                    onSelect = {
+                        selectedFinancialAccountId =
+                            it
+                        error = null
+                    }
+                )
+            }
         }
 
         OutlinedTextField(
@@ -1227,18 +1536,62 @@ private fun AddTransactionScreen(
             onClick = {
                 val value = parseAmount(amount)
                 if (value == null) {
-                    error = v15Text("সঠিক টাকার পরিমাণ লিখুন", "Enter a valid amount")
+                    error =
+                        v15Text(
+                            "সঠিক টাকার পরিমাণ লিখুন",
+                            "Enter a valid amount"
+                        )
+                } else if (
+                    isBusiness &&
+                    selectedFinancialAccountId ==
+                        null
+                ) {
+                    error =
+                        v15Text(
+                            "একটি Cash/Bank/Wallet account নির্বাচন করুন",
+                            "Select a Cash/Bank/Wallet account"
+                        )
                 } else {
-                    viewModel.addTransaction(type, value, category, note)
-                    amount = ""
-                    category = ""
-                    note = ""
-                    error = null
+                    viewModel.addTransaction(
+                        type = type,
+                        amount = value,
+                        category = category,
+                        note = note,
+                        financialAccountId =
+                            if (isBusiness) {
+                                selectedFinancialAccountId
+                            } else {
+                                null
+                            }
+                    ) { success ->
+                        if (success) {
+                            amount = ""
+                            category = ""
+                            note = ""
+                            error = null
+                        } else {
+                            error =
+                                if (
+                                    type ==
+                                        "EXPENSE"
+                                ) {
+                                    v15Text(
+                                        "অ্যাকাউন্টে পর্যাপ্ত ব্যালেন্স নেই বা তথ্য সঠিক নয়",
+                                        "Insufficient account balance or invalid data"
+                                    )
+                                } else {
+                                    v15Text(
+                                        "লেনদেন সংরক্ষণ করা যায়নি",
+                                        "Could not save transaction"
+                                    )
+                                }
+                        }
+                    }
                 }
             },
             modifier = Modifier.fillMaxWidth(),
             enabled = canWrite
-        ) { Text(if (isBusiness) v15Text("ক্যাশ লেনদেন সেভ করুন", "Save cash transaction") else v15Text("সেভ করুন", "Save")) }
+        ) { Text(if (isBusiness) v15Text("আয়/খরচ সেভ করুন", "Save income/expense") else v15Text("সেভ করুন", "Save")) }
         error?.let { Text(it, color = MaterialTheme.colorScheme.error) }
     }
 }
@@ -1276,6 +1629,71 @@ private fun TransactionTypeCard(
     }
 }
 
+
+@Composable
+private fun TransactionAccountPicker(
+    accounts: List<FinancialAccountSummary>,
+    selectedId: Long?,
+    onSelect: (Long) -> Unit
+) {
+    Column(
+        verticalArrangement =
+            Arrangement.spacedBy(6.dp)
+    ) {
+        accounts.forEach { account ->
+            val selected =
+                selectedId ==
+                    account.id
+
+            val balanceText =
+                if (
+                    V14DisplayState
+                        .summaryVisible
+                ) {
+                    "${V14DisplayState.currencySymbol} ${money(account.balance)}"
+                } else {
+                    "••••"
+                }
+
+            if (selected) {
+                Button(
+                    onClick = {
+                        onSelect(
+                            account.id
+                        )
+                    },
+                    modifier =
+                        Modifier.fillMaxWidth()
+                ) {
+                    Text(
+                        "✓ ${account.name} • $balanceText",
+                        maxLines = 1,
+                        softWrap = false
+                    )
+                }
+            } else {
+                OutlinedButton(
+                    onClick = {
+                        onSelect(
+                            account.id
+                        )
+                    },
+                    modifier =
+                        Modifier.fillMaxWidth(),
+                    enabled =
+                        account.isActive
+                ) {
+                    Text(
+                        "${account.name} • $balanceText",
+                        maxLines = 1,
+                        softWrap = false
+                    )
+                }
+            }
+        }
+    }
+}
+
 @Composable
 private fun HistoryScreen(
     viewModel: FamilyKhataViewModel,
@@ -1285,6 +1703,10 @@ private fun HistoryScreen(
 ) {
     val transactions by
         viewModel.transactions.collectAsState()
+
+    val financialAccounts by
+        viewModel.financialAccounts
+            .collectAsState()
 
     val isBusiness =
         workspace == "SHOP"
@@ -1422,6 +1844,8 @@ private fun HistoryScreen(
                     item = item,
                     isBusiness = isBusiness,
                     canWrite = canWrite,
+                    financialAccounts =
+                        financialAccounts,
                     viewModel = viewModel,
                     onDelete = {
                         viewModel.deleteTransaction(item)
@@ -1437,6 +1861,8 @@ private fun TransactionRow(
     item: TransactionEntity,
     isBusiness: Boolean,
     canWrite: Boolean,
+    financialAccounts:
+        List<FinancialAccountSummary>,
     viewModel: FamilyKhataViewModel,
     onDelete: () -> Unit
 ) {
@@ -1489,13 +1915,13 @@ private fun TransactionRow(
                     if (isBusiness) {
                         if (item.type == "INCOME")
                             v15Text(
-                                "ক্যাশ ইন",
-                                "Cash in"
+                                "আয়",
+                                "Income"
                             )
                         else
                             v15Text(
-                                "ক্যাশ আউট",
-                                "Cash out"
+                                "খরচ",
+                                "Expense"
                             )
                     } else {
                         if (item.type == "INCOME")
@@ -1527,6 +1953,37 @@ private fun TransactionRow(
                 fontWeight =
                     FontWeight.SemiBold
             )
+
+            if (
+                isBusiness &&
+                item.financialAccountId !=
+                    null
+            ) {
+                val accountName =
+                    financialAccounts
+                        .firstOrNull {
+                            it.id ==
+                                item.financialAccountId
+                        }
+                        ?.name
+                        ?: v15Text(
+                            "অ্যাকাউন্ট",
+                            "Account"
+                        )
+
+                Text(
+                    v15Text(
+                        "অ্যাকাউন্ট: $accountName",
+                        "Account: $accountName"
+                    ),
+                    style =
+                        MaterialTheme.typography
+                            .bodySmall,
+                    color =
+                        MaterialTheme.colorScheme
+                            .onSurfaceVariant
+                )
+            }
 
             if (item.note.isNotBlank()) {
                 Text(
@@ -1648,6 +2105,16 @@ private fun TransactionRow(
             mutableStateOf(item.note)
         }
 
+        var selectedFinancialAccountId by
+            remember(
+                item.id,
+                item.financialAccountId
+            ) {
+                mutableStateOf(
+                    item.financialAccountId
+                )
+            }
+
         var error by remember {
             mutableStateOf<String?>(null)
         }
@@ -1660,8 +2127,8 @@ private fun TransactionRow(
                 Text(
                     if (isBusiness)
                         v15Text(
-                            "ক্যাশ লেনদেন এডিট",
-                            "Edit cash transaction"
+                            "আয়/খরচ এডিট",
+                            "Edit income/expense"
                         )
                     else
                         v15Text(
@@ -1705,16 +2172,10 @@ private fun TransactionRow(
                                     else
                                         ""
                                 ) +
-                                    if (isBusiness)
-                                        v15Text(
-                                            "ক্যাশ ইন",
-                                            "Cash in"
-                                        )
-                                    else
-                                        v15Text(
-                                            "আয়",
-                                            "Income"
-                                        )
+                                    v15Text(
+                                        "আয়",
+                                        "Income"
+                                    )
                             )
                         }
 
@@ -1733,18 +2194,43 @@ private fun TransactionRow(
                                     else
                                         ""
                                 ) +
-                                    if (isBusiness)
-                                        v15Text(
-                                            "ক্যাশ আউট",
-                                            "Cash out"
-                                        )
-                                    else
-                                        v15Text(
-                                            "খরচ",
-                                            "Expense"
-                                        )
+                                    v15Text(
+                                        "খরচ",
+                                        "Expense"
+                                    )
                             )
                         }
+                    }
+
+                    if (isBusiness) {
+                        Text(
+                            v15Text(
+                                "Cash / Bank / Wallet account",
+                                "Cash / Bank / Wallet account"
+                            ),
+                            fontWeight =
+                                FontWeight.Bold
+                        )
+
+                        val selectableAccounts =
+                            financialAccounts
+                                .filter {
+                                    it.isActive ||
+                                        it.id ==
+                                            selectedFinancialAccountId
+                                }
+
+                        TransactionAccountPicker(
+                            accounts =
+                                selectableAccounts,
+                            selectedId =
+                                selectedFinancialAccountId,
+                            onSelect = {
+                                selectedFinancialAccountId =
+                                    it
+                                error = null
+                            }
+                        )
                     }
 
                     OutlinedTextField(
@@ -1822,16 +2308,43 @@ private fun TransactionRow(
                                     "সঠিক টাকার পরিমাণ লিখুন",
                                     "Enter a valid amount"
                                 )
+                        } else if (
+                            isBusiness &&
+                            selectedFinancialAccountId ==
+                                null
+                        ) {
+                            error =
+                                v15Text(
+                                    "একটি account নির্বাচন করুন",
+                                    "Select an account"
+                                )
                         } else {
                             viewModel.updateTransaction(
                                 item = item,
                                 type = type,
                                 amount = parsed,
                                 category = category,
-                                note = note
-                            )
-
-                            showEdit = false
+                                note = note,
+                                financialAccountId =
+                                    if (
+                                        isBusiness
+                                    ) {
+                                        selectedFinancialAccountId
+                                    } else {
+                                        null
+                                    }
+                            ) { success ->
+                                if (success) {
+                                    showEdit =
+                                        false
+                                } else {
+                                    error =
+                                        v15Text(
+                                            "আপডেট করা যায়নি। Account balance ও তথ্য যাচাই করুন।",
+                                            "Could not update. Check account balance and data."
+                                        )
+                                }
+                            }
                         }
                     }
                 ) {
@@ -2433,7 +2946,7 @@ private fun MoreScreen(viewModel: FamilyKhataViewModel) {
                     }
 
                     val version = root.optInt("version")
-                    require(version in 1..5) {
+                    require(version in 1..12) {
                         v15Text(
                             "এই ব্যাকআপ ভার্সনটি সমর্থিত নয়",
                             "This backup version is not supported"
@@ -2651,6 +3164,26 @@ private fun MoreScreen(viewModel: FamilyKhataViewModel) {
         val previewBatches =
             previewRoot.optJSONArray("inventoryBatches")
                 ?.length() ?: 0
+
+        val previewRetailSales =
+            previewRoot.optJSONArray(
+                "inventoryRetailSales"
+            )?.length() ?: 0
+
+        val previewRetailSaleLines =
+            previewRoot.optJSONArray(
+                "inventoryRetailSaleLines"
+            )?.length() ?: 0
+
+        val previewRetailSaleStockAllocations =
+            previewRoot.optJSONArray(
+                "inventoryRetailSaleStockAllocations"
+            )?.length() ?: 0
+
+        val previewRetailSalePayments =
+            previewRoot.optJSONArray(
+                "inventoryRetailSalePayments"
+            )?.length() ?: 0
 
         val hasBusinessData =
             previewRoot.optJSONObject("businessData") != null
@@ -2971,6 +3504,9 @@ private fun tabLabel(
             BusinessMode.DEALERSHIP ->
                 v15Text("ডিলার", "Dealers")
 
+            BusinessMode.DEALER_BUSINESS ->
+                v15Text("ডিলার", "Dealer")
+
             BusinessMode.SERVICE_JOB ->
                 v15Text("সার্ভিস", "Services")
 
@@ -3033,7 +3569,7 @@ private fun parseAmount(input: String): Double? {
     return normalized.toDoubleOrNull()?.takeIf { it > 0.0 }
 }
 
-private fun money(value: Double): String =
+internal fun money(value: Double): String =
     if (value % 1.0 == 0.0) value.toLong().toString()
     else String.format(Locale.US, "%.2f", value)
 

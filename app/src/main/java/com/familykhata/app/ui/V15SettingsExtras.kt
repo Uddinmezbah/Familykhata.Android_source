@@ -1,5 +1,7 @@
 package com.familykhata.app.ui
 
+import com.familykhata.app.FamilyKhataViewModel
+
 import android.Manifest
 import android.app.Activity
 import android.content.Context
@@ -57,10 +59,14 @@ private const val V15_SETTINGS_PREFS = "hisabi_khata_v14_settings"
 
 private data class ShopTypeChoice(
     val bn: String,
-    val en: String
+    val en: String,
+    val storedValue: String? = null
 ) {
     val display: String
         get() = "$bn / $en"
+
+    val value: String
+        get() = storedValue ?: display
 }
 
 private val V15_SHOP_TYPES = listOf(
@@ -105,7 +111,16 @@ private val V15_SHOP_TYPES = listOf(
     ShopTypeChoice("সার্ভিস ও রিপেয়ার", "Service & Repair"),
     ShopTypeChoice("কোচিং / শিক্ষা প্রতিষ্ঠান", "Coaching / Education"),
     ShopTypeChoice("ডিজিটাল এজেন্সি", "Digital Agency"),
-    ShopTypeChoice("ডিলারশিপ / ডিস্ট্রিবিউশন", "Dealership / Distribution"),
+    ShopTypeChoice(
+        "ডিস্ট্রিবিউশন ব্যবসা",
+        "Distribution Business",
+        "ডিলারশিপ / ডিস্ট্রিবিউশন / Dealership / Distribution"
+    ),
+    ShopTypeChoice(
+        "ডিলার ব্যবসা",
+        "Dealer Business",
+        "dealer_business"
+    ),
     ShopTypeChoice("লন্ড্রি", "Laundry"),
     ShopTypeChoice("ট্রাভেল / টিকেট", "Travel / Ticket"),
     ShopTypeChoice("কার রেন্টাল", "Car Rental"),
@@ -114,6 +129,7 @@ private val V15_SHOP_TYPES = listOf(
 
 @Composable
 internal fun V15BusinessProfileDialog(
+    viewModel: FamilyKhataViewModel,
     initialName: String,
     initialBusiness: String,
     initialPhone: String,
@@ -140,6 +156,7 @@ internal fun V15BusinessProfileDialog(
     var logoPath by remember { mutableStateOf(initialLogoPath) }
 
     var showTypePicker by remember { mutableStateOf(false) }
+    var showLogoDelete by remember { mutableStateOf(false) }
 
     val logoLauncher =
         rememberLauncherForActivityResult(
@@ -217,10 +234,7 @@ internal fun V15BusinessProfileDialog(
                 if (logoPath.isNotBlank()) {
                     TextButton(
                         onClick = {
-                            runCatching {
-                                File(logoPath).delete()
-                            }
-                            logoPath = ""
+                            showLogoDelete = true
                         }
                     ) {
                         Text(
@@ -268,7 +282,13 @@ internal fun V15BusinessProfileDialog(
                                 "Select business type"
                             )
                         } else {
-                            businessType
+                            V15_SHOP_TYPES
+                                .firstOrNull {
+                                    it.value ==
+                                        businessType
+                                }
+                                ?.display
+                                ?: businessType
                         }
                     )
                 }
@@ -328,6 +348,34 @@ internal fun V15BusinessProfileDialog(
             onSelect = {
                 businessType = it
                 showTypePicker = false
+            }
+        )
+    }
+
+    if (showLogoDelete) {
+        ProtectedDeleteDialog(
+            viewModel = viewModel,
+            title = v15Text(
+                "লোগো সরাবেন?",
+                "Remove logo?"
+            ),
+            message = v15Text(
+                "লোগোটি ডিভাইস থেকে মুছে যাবে। চালিয়ে যেতে নিরাপত্তা PIN দিন।",
+                "The logo will be deleted from this device. Enter your security PIN to continue."
+            ),
+            confirmLabel = v15Text(
+                "লোগো সরান",
+                "Remove logo"
+            ),
+            onDismiss = {
+                showLogoDelete = false
+            },
+            onConfirmed = {
+                runCatching {
+                    File(logoPath).delete()
+                }
+                logoPath = ""
+                showLogoDelete = false
             }
         )
     }
@@ -406,16 +454,20 @@ private fun V15ShopTypePicker(
                 filtered.forEach { type ->
                     val label = type.display
 
-                    if (current == label) {
+                    if (current == type.value) {
                         Button(
-                            onClick = { onSelect(label) },
+                            onClick = {
+                                onSelect(type.value)
+                            },
                             modifier = Modifier.fillMaxWidth()
                         ) {
                             Text("$label ✓")
                         }
                     } else {
                         OutlinedButton(
-                            onClick = { onSelect(label) },
+                            onClick = {
+                                onSelect(type.value)
+                            },
                             modifier = Modifier.fillMaxWidth()
                         ) {
                             Text(label)
@@ -629,6 +681,7 @@ internal fun V15InventoryNotificationSettingsDialog(
             }
         }
     )
+
 }
 
 @Composable
@@ -849,7 +902,7 @@ internal fun V15PremiumDialog(
                         "✓ Low-stock & expiry alerts"
                     ),
                     "✓ Backup / Restore / Report",
-                    "✓ PIN lock",
+                    "✓ Delete protection PIN",
                     v15Text(
                         "✓ বাংলা + English",
                         "✓ Bangla + English"
@@ -873,6 +926,56 @@ internal fun V15PremiumDialog(
                         MaterialTheme.colorScheme
                             .onSurfaceVariant
                 )
+
+                if (!billingState.active) {
+                    Text(
+                        v15Text(
+                            "Promo code থাকলে Google Play-এ redeem করে Premium সক্রিয় করতে পারবেন।",
+                            "If you have a promo code, redeem it on Google Play to activate Premium."
+                        ),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+
+                    OutlinedButton(
+                        onClick = {
+                            runCatching {
+                                context.startActivity(
+                                    Intent(
+                                        Intent.ACTION_VIEW,
+                                        Uri.parse("https://play.google.com/redeem")
+                                    )
+                                )
+                            }.onFailure {
+                                Toast.makeText(
+                                    context,
+                                    v15Text(
+                                        "Google Play redeem page খো�&�া যায়নি",
+                                        "Unable to open Google Play redeem page"
+                                    ),
+                                    Toast.LENGTH_SHORT
+                                ).show()
+                            }
+                        },
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Text(
+                            v15Text(
+                                "Promo Code Redeem করুন",
+                                "Redeem Promo Code"
+                            )
+                        )
+                    }
+
+                    Text(
+                        v15Text(
+                            "Code redeem করার পর ফিরে এসে Restore Purchases চাপুন।",
+                            "After redeeming the code, return here and tap Restore Purchases."
+                        ),
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
 
                 billingState.message
                     ?.takeIf { it.isNotBlank() }

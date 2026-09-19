@@ -116,6 +116,42 @@ object V15BusinessBackupBridge {
                     "dealership_invoice_lines",
                     "dealership_stock_allocations",
                     "dealership_payments",
+                    "dealership_returns",
+
+                    // Retail sales
+                    "retail_sales",
+                    "retail_sale_lines",
+                    "retail_sale_stock_allocations",
+
+                    // Dealer Business
+                    "dealer_business_companies",
+                    "dealer_business_areas",
+                    "dealer_business_customers",
+                    "dealer_business_purchases",
+                    "dealer_business_purchase_lines",
+                    "dealer_business_supplier_payments",
+                    "dealer_business_supplier_payment_allocations",
+                    "dealer_business_sales",
+                    "dealer_business_sale_lines",
+                    "dealer_business_stock_allocations",
+                    "dealer_business_collections",
+                    "dealer_business_collection_allocations",
+                    "dealer_business_sales_returns",
+                    "dealer_business_sales_return_allocations",
+                    "dealer_business_purchase_returns",
+                    "dealer_business_expenses",
+
+                    // Dealer Business packaging / delivery / damage
+                    "dealer_business_product_packs",
+                    "dealer_business_delivery_people",
+                    "dealer_business_delivery_challans",
+                    "dealer_business_delivery_challan_lines",
+                    "dealer_business_delivery_challan_allocations",
+                    "dealer_business_delivery_challan_sales",
+                    "dealer_business_delivery_sale_allocations",
+                    "dealer_business_delivery_settlements",
+                    "dealer_business_delivery_settlement_lines",
+                    "dealer_business_damages",
 
                     // Agro
                     "agro_cycles",
@@ -266,6 +302,82 @@ object V15BusinessBackupBridge {
                             rows.getJSONObject(
                                 index
                             )
+
+                        /*
+                         * Backups created before retail unit snapshots
+                         * do not contain these columns. At that time
+                         * quantity was already the base-stock quantity.
+                         */
+                        if (
+                            table ==
+                            "retail_sale_lines"
+                        ) {
+                            if (
+                                !row.has(
+                                    "unitFactor"
+                                )
+                            ) {
+                                row.put(
+                                    "unitFactor",
+                                    1
+                                )
+                            }
+
+                            if (
+                                !row.has(
+                                    "baseQuantity"
+                                )
+                            ) {
+                                row.put(
+                                    "baseQuantity",
+                                    row.optInt(
+                                        "quantity",
+                                        0
+                                    )
+                                )
+                            }
+                        }
+
+                        if (
+                            table ==
+                            "dealer_business_delivery_challan_lines"
+                        ) {
+                            if (
+                                !row.has(
+                                    "unitSnapshot"
+                                )
+                            ) {
+                                row.put(
+                                    "unitSnapshot",
+                                    "pcs"
+                                )
+                            }
+
+                            if (
+                                !row.has(
+                                    "unitFactor"
+                                )
+                            ) {
+                                row.put(
+                                    "unitFactor",
+                                    1
+                                )
+                            }
+
+                            if (
+                                !row.has(
+                                    "enteredQuantity"
+                                )
+                            ) {
+                                row.put(
+                                    "enteredQuantity",
+                                    row.optInt(
+                                        "quantityPieces",
+                                        0
+                                    )
+                                )
+                            }
+                        }
 
                         val values =
                             jsonToContentValues(

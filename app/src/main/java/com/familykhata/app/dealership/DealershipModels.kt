@@ -260,6 +260,54 @@ data class DealershipPaymentEntity(
     val createdAt: Long = System.currentTimeMillis()
 )
 
+@Entity(
+    tableName = "dealership_returns",
+    foreignKeys = [
+        ForeignKey(
+            entity = DealershipInvoiceEntity::class,
+            parentColumns = ["id"],
+            childColumns = ["invoiceId"],
+            onDelete = ForeignKey.CASCADE
+        ),
+        ForeignKey(
+            entity = DealershipInvoiceLineEntity::class,
+            parentColumns = ["id"],
+            childColumns = ["invoiceLineId"],
+            onDelete = ForeignKey.CASCADE
+        ),
+        ForeignKey(
+            entity = ProductEntity::class,
+            parentColumns = ["id"],
+            childColumns = ["productId"],
+            onDelete = ForeignKey.SET_NULL
+        )
+    ],
+    indices = [
+        Index("invoiceId"),
+        Index("invoiceLineId"),
+        Index("productId"),
+        Index("returnedAt")
+    ]
+)
+data class DealershipReturnEntity(
+    @PrimaryKey(autoGenerate = true)
+    val id: Long = 0,
+    val invoiceId: Long,
+    val invoiceLineId: Long,
+    val productId: Long? = null,
+    val productNameSnapshot: String,
+    val quantity: Int,
+    val unitPrice: Double,
+    val totalRefund: Double,
+    val totalCost: Double,
+    val returnType: String = "RESTOCK",
+    val returnedAt: Long = System.currentTimeMillis(),
+    val note: String = "",
+    val workspace: String = "SHOP",
+    val createdAt: Long = System.currentTimeMillis()
+)
+
+
 data class DealershipInvoiceSummary(
     val invoiceId: Long,
     val dealerId: Long?,

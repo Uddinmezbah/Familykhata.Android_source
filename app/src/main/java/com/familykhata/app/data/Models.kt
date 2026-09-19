@@ -6,14 +6,29 @@ import androidx.room.ForeignKey
 import androidx.room.Index
 import androidx.room.PrimaryKey
 
-@Entity(tableName = "transactions")
+@Entity(
+    tableName = "transactions",
+    indices = [
+        Index(
+            value = ["sourceKey"],
+            unique = true
+        ),
+        Index(
+            value = ["financialAccountId"]
+        )
+    ]
+)
 data class TransactionEntity(
-    @PrimaryKey(autoGenerate = true) val id: Long = 0,
+    @PrimaryKey(autoGenerate = true)
+    val id: Long = 0,
     val type: String, // INCOME or EXPENSE
     val amount: Double,
     val category: String,
     val note: String,
-    @ColumnInfo(defaultValue = "'FAMILY'") val workspace: String = "FAMILY",
+    @ColumnInfo(defaultValue = "'FAMILY'")
+    val workspace: String = "FAMILY",
+    val sourceKey: String? = null,
+    val financialAccountId: Long? = null,
     val createdAt: Long = System.currentTimeMillis()
 )
 
@@ -37,7 +52,13 @@ data class BakiPersonEntity(
             onDelete = ForeignKey.CASCADE
         )
     ],
-    indices = [Index("personId")]
+    indices = [
+        Index("personId"),
+        Index(
+            value = ["sourceKey"],
+            unique = true
+        )
+    ]
 )
 data class BakiEntryEntity(
     @PrimaryKey(autoGenerate = true) val id: Long = 0,
@@ -47,7 +68,120 @@ data class BakiEntryEntity(
     val balanceDelta: Double,
     val note: String = "",
     val dueAt: Long? = null,
+    val sourceKey: String? = null,
     val createdAt: Long = System.currentTimeMillis()
+)
+
+@Entity(
+    tableName = "financial_accounts",
+    indices = [
+        Index(value = ["workspace", "name"]),
+        Index(value = ["workspace", "type"])
+    ]
+)
+data class FinancialAccountEntity(
+    @PrimaryKey(autoGenerate = true)
+    val id: Long = 0,
+    val name: String,
+    val type: String,
+    val provider: String = "",
+    val openingBalance: Double = 0.0,
+    val workspace: String = "SHOP",
+    val isActive: Boolean = true,
+    val createdAt: Long = System.currentTimeMillis()
+)
+
+@Entity(
+    tableName = "financial_account_entries",
+    foreignKeys = [
+        ForeignKey(
+            entity = FinancialAccountEntity::class,
+            parentColumns = ["id"],
+            childColumns = ["accountId"],
+            onDelete = ForeignKey.CASCADE
+        )
+    ],
+    indices = [
+        Index("accountId"),
+        Index(value = ["workspace", "createdAt"]),
+        Index("transferGroupId"),
+        Index(value = ["sourceKey"], unique = true)
+    ]
+)
+data class FinancialAccountEntryEntity(
+    @PrimaryKey(autoGenerate = true)
+    val id: Long = 0,
+    val accountId: Long,
+    val entryType: String,
+    val amount: Double,
+    val balanceDelta: Double,
+    val relatedAccountId: Long? = null,
+    val transferGroupId: String? = null,
+    val sourceKey: String? = null,
+    val note: String = "",
+    val workspace: String = "SHOP",
+    val createdAt: Long = System.currentTimeMillis()
+)
+
+@Entity(
+    tableName = "digital_service_transactions",
+    foreignKeys = [
+        ForeignKey(
+            entity = FinancialAccountEntity::class,
+            parentColumns = ["id"],
+            childColumns = ["sourceAccountId"],
+            onDelete = ForeignKey.NO_ACTION
+        ),
+        ForeignKey(
+            entity = FinancialAccountEntity::class,
+            parentColumns = ["id"],
+            childColumns = ["destinationAccountId"],
+            onDelete = ForeignKey.NO_ACTION
+        )
+    ],
+    indices = [
+        Index(
+            value = ["eventKey"],
+            unique = true
+        ),
+        Index("sourceAccountId"),
+        Index("destinationAccountId"),
+        Index("serviceType"),
+        Index(
+            value = ["workspace", "createdAt"]
+        )
+    ]
+)
+data class DigitalServiceTransactionEntity(
+    @PrimaryKey(autoGenerate = true)
+    val id: Long = 0,
+    val eventKey: String,
+    val serviceType: String,
+    val sourceAccountId: Long,
+    val destinationAccountId: Long,
+    val serviceAmount: Double,
+    val customerFee: Double = 0.0,
+    val providerCharge: Double = 0.0,
+    val customerPaid: Double = 0.0,
+    val providerCost: Double = 0.0,
+    val sourceAmount: Double,
+    val destinationAmount: Double,
+    val profit: Double,
+    val note: String = "",
+    val workspace: String = "SHOP",
+    val createdAt: Long =
+        System.currentTimeMillis()
+)
+
+data class FinancialAccountSummary(
+    val id: Long,
+    val name: String,
+    val type: String,
+    val provider: String,
+    val openingBalance: Double,
+    val balance: Double,
+    val workspace: String,
+    val isActive: Boolean
 )
 
 data class DashboardTotals(

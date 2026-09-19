@@ -13,7 +13,7 @@ android {
     compileSdk = 36
 
     defaultConfig {
-        applicationId = "com.familykhata.app"
+        applicationId = "com.hisabikhata.app"
         minSdk = 24
         targetSdk = 36
         versionCode = 16

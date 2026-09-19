@@ -174,7 +174,7 @@ internal fun V14SettingsScreen(
         SettingsActionCard("🌐", v15Text("ভাষা পরিবর্তন","Change language"), v15Text("বাংলা / English","Bangla / English")) { showLanguage = true }
         SettingsActionCard("★", v15Text("প্রিমিয়াম হয়ে যান","Go Premium"), v15Text("মাসিক • বার্ষিক • Lifetime","Monthly • Yearly • Lifetime")) { showPlan = true }
         SettingsActionCard("💬", v15Text("তাগাদা মেসেজ","Reminder message"), v15Text("SMS/WhatsApp-এ প্রস্তুত বার্তা; আলাদা SMS প্যাক এখন লাগবে না","Ready message for SMS/WhatsApp; no separate SMS pack needed")) { showSmsInfo = true }
-        SettingsActionCard("🔒", v15Text("PIN / পাসওয়ার্ড পরিবর্তন","Change PIN / password"), v15Text("অ্যাপ লক সেট, পরিবর্তন বা বন্ধ করুন","Set, change or disable app lock")) { showPin = true }
+        SettingsActionCard("🔒", v15Text("নিরাপত্তা PIN পরিবর্তন","Change security PIN"), v15Text("ডাটা ডিলিট করার PIN পরিবর্তন করুন","Change the PIN required for deleting data")) { showPin = true }
         SettingsActionCard("🔔", v15Text("বাকি পরিশোধের নোটিফিকেশন","Due payment notifications"), v15Text("৩০/১৫/৭/৩ দিন আগে এবং নির্ধারিত দিনে মনে করাবে","Remind 30/15/7/3 days before and on the due date")) { showReminder = true }
         SettingsActionCard("📦", v15Text("পণ্য ও Expiry নোটিফিকেশন","Product & Expiry notifications"), v15Text("Low stock, Out of stock এবং Expiry reminder","Low stock, out-of-stock and expiry reminders")) { showInventoryAlerts = true }
         SettingsActionCard("💱", v15Text("মুদ্রা পরিবর্তন করুন","Change currency"), v15Text("প্রদর্শনের মুদ্রা বদলাবে; FX conversion হবে না","Changes display currency only; no FX conversion")) { showCurrency = true }
@@ -217,10 +217,6 @@ internal fun V14SettingsScreen(
         SettingsActionCard("▦", v15Text("আরও অ্যাপ","More apps"), v15Text("ডেভেলপারের অন্যান্য প্রজেক্ট দেখুন","View other developer projects")) { openUrlV14(context, MORE_APPS_URL_V14) }
         SettingsActionCard("🌍", v15Text("ওয়েবসাইট","Website"), v15Text("হিসাবী খাতার অফিসিয়াল ওয়েব পেজ","Official Hisabi Khata web page")) { openUrlV14(context, WEBSITE_URL_V14) }
         SettingsActionCard("✦", v15Text("ফিচার রিকোয়েস্ট","Feature request"), v15Text("যে নতুন সুবিধা চান তা জানান","Tell us which new feature you want")) { openUrlV14(context, FEATURE_URL_V14) }
-        SettingsActionCard("🔐", v15Text("এখনই অ্যাপ লক করুন","Lock app now"), v15Text("PIN চালু থাকলে সঙ্গে সঙ্গে লক হবে","Locks immediately when PIN is enabled")) {
-            viewModel.lockApp()
-            onClose()
-        }
 
         Text(
             v15Text("হিসাবী খাতা v1.5 • Offline-first • লোকাল ডেটা","Hisabi Khata v1.5 • Offline-first • Local data"),
@@ -233,6 +229,7 @@ internal fun V14SettingsScreen(
 
     if (showProfile) {
         V15BusinessProfileDialog(
+            viewModel = viewModel,
             initialName = profileName,
             initialBusiness = businessName,
             initialPhone = profilePhone,
@@ -597,12 +594,6 @@ private fun PinSettingsDialog(viewModel: FamilyKhataViewModel, onDismiss: () -> 
                 OutlinedTextField(pin, { pin = it.filter(Char::isDigit).take(6) }, label = { Text(v15Text("নতুন PIN","New PIN")) }, visualTransformation = PasswordVisualTransformation())
                 OutlinedTextField(confirm, { confirm = it.filter(Char::isDigit).take(6) }, label = { Text(v15Text("নতুন PIN আবার","Confirm new PIN")) }, visualTransformation = PasswordVisualTransformation())
                 error?.let { Text(it, color = MaterialTheme.colorScheme.error) }
-                if (configured) {
-                    OutlinedButton(
-                        onClick = { if (viewModel.disablePin(current)) onDismiss() else error = v15Text("বর্তমান PIN সঠিক নয়","Current PIN is incorrect") },
-                        modifier = Modifier.fillMaxWidth()
-                    ) { Text(v15Text("PIN বন্ধ করুন","Disable PIN")) }
-                }
             }
         },
         confirmButton = {

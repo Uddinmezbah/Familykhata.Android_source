@@ -710,9 +710,28 @@ internal fun V15InventoryScreen(
     val vm: InventoryViewModel = viewModel()
     val securityViewModel: FamilyKhataViewModel = viewModel()
     val products by vm.products.collectAsState()
-    var selectedId by remember { mutableStateOf<Long?>(null) }
-    var showRetailSales by remember { mutableStateOf(false) }
-    val selected = selectedId?.let { id -> products.firstOrNull { it.id == id } }
+    var selectedId by remember {
+        mutableStateOf<Long?>(null)
+    }
+
+    var showRetailSales by remember {
+        mutableStateOf(false)
+    }
+
+    var showAddProduct by remember {
+        mutableStateOf(false)
+    }
+
+    var showAddStock by remember {
+        mutableStateOf(false)
+    }
+
+    val selected =
+        selectedId?.let { id ->
+            products.firstOrNull {
+                it.id == id
+            }
+        }
 
     LaunchedEffect(
         workspace,
@@ -728,18 +747,39 @@ internal fun V15InventoryScreen(
         active =
             selected != null ||
                 showRetailSales ||
+                showAddProduct ||
+                showAddStock ||
                 nestedEntry
     )
 
     BackHandler(
-        enabled = showRetailSales
+        enabled = showAddProduct
+    ) {
+        showAddProduct = false
+    }
+
+    BackHandler(
+        enabled =
+            !showAddProduct &&
+                showAddStock
+    ) {
+        showAddStock = false
+    }
+
+    BackHandler(
+        enabled =
+            !showAddProduct &&
+                !showAddStock &&
+                showRetailSales
     ) {
         showRetailSales = false
     }
 
     BackHandler(
         enabled =
-            !showRetailSales &&
+            !showAddProduct &&
+                !showAddStock &&
+                !showRetailSales &&
                 selected != null
     ) {
         selectedId = null
@@ -747,13 +787,106 @@ internal fun V15InventoryScreen(
 
     BackHandler(
         enabled =
-            !showRetailSales &&
+            !showAddProduct &&
+                !showAddStock &&
+                !showRetailSales &&
                 selected == null
     ) {
         onExit()
     }
 
-    if (showRetailSales) {
+    if (showAddProduct) {
+        V15DeepScreenContainer(
+            title =
+                v15Text(
+                    "নতুন পণ্য",
+                    "New product"
+                ),
+            onBack = {
+                showAddProduct = false
+            }
+        ) {
+            AddProductForm(
+                workspace = workspace,
+                onDismiss = {
+                    showAddProduct = false
+                },
+                onSave = { input ->
+                    val p =
+                        input.product
+
+                    vm.addProduct(
+                        name = p.name,
+                        category = p.category,
+                        sku = p.sku,
+                        unit = p.unit,
+                        unitConversions =
+                            p.unitConversions,
+                        brand = p.brand,
+                        genericName =
+                            p.genericName,
+                        modelName =
+                            p.modelName,
+                        serialOrImei =
+                            p.serialOrImei,
+                        size = p.size,
+                        color = p.color,
+                        warrantyMonths =
+                            p.warrantyMonths,
+                        sellingPrice =
+                            p.sellingPrice,
+                        mrp = p.mrp,
+                        rackLocation =
+                            p.rackLocation,
+                        lowStockLevel =
+                            p.lowStockLevel,
+                        note = p.note,
+                        workspace =
+                            workspace,
+                        initialQuantity =
+                            input.initialQuantity,
+                        purchasePrice =
+                            input.purchasePrice,
+                        purchaseDate =
+                            input.purchaseDate,
+                        expiryDate =
+                            input.expiryDate,
+                        batchNo =
+                            input.batchNo,
+                        initialUnitName =
+                            input.stockUnitName,
+                        initialUnitFactor =
+                            input.stockUnitFactor
+                    )
+
+                    showAddProduct =
+                        false
+                }
+            )
+        }
+    } else if (
+        showAddStock &&
+        selected != null
+    ) {
+        V15DeepScreenContainer(
+            title =
+                v15Text(
+                    "স্টক যোগ করুন",
+                    "Add stock"
+                ),
+            onBack = {
+                showAddStock = false
+            }
+        ) {
+            AddStockPage(
+                product = selected,
+                viewModel = vm,
+                onDismiss = {
+                    showAddStock = false
+                }
+            )
+        }
+    } else if (showRetailSales) {
         V16RetailSalesScreen(
             workspace = workspace,
             shopType = shopType,
@@ -777,6 +910,9 @@ internal fun V15InventoryScreen(
                     canWrite = canWrite,
                     viewModel = vm,
                     securityViewModel = securityViewModel,
+                    onAddProduct = {
+                        showAddProduct = true
+                    },
                     onOpenSales = {
                         showRetailSales = true
                     },
@@ -792,6 +928,9 @@ internal fun V15InventoryScreen(
                 canWrite = canWrite,
                 viewModel = vm,
                 securityViewModel = securityViewModel,
+                onAddProduct = {
+                    showAddProduct = true
+                },
                 onOpenSales = {
                     showRetailSales = true
                 },
@@ -812,6 +951,9 @@ internal fun V15InventoryScreen(
                 canWrite = canWrite,
                 viewModel = vm,
                 securityViewModel = securityViewModel,
+                onAddStock = {
+                    showAddStock = true
+                },
                 onDeleted = {
                     selectedId = null
                 }
@@ -827,6 +969,7 @@ private fun ProductListScreen(
     canWrite: Boolean,
     viewModel: InventoryViewModel,
     securityViewModel: FamilyKhataViewModel,
+    onAddProduct: () -> Unit,
     onOpenSales: () -> Unit,
     onSelect: (ProductStockSummary) -> Unit
 ) {
@@ -858,10 +1001,6 @@ private fun ProductListScreen(
 
     var stockFilter by remember {
         mutableStateOf("ALL")
-    }
-
-    var showAdd by remember {
-        mutableStateOf(false)
     }
 
     var editingProduct by remember {
@@ -984,10 +1123,9 @@ private fun ProductListScreen(
         }
 
         OutlinedButton(
-            onClick = {
-                showAdd = true
-            },
-            modifier = Modifier.fillMaxWidth(),
+            onClick = onAddProduct,
+            modifier =
+                Modifier.fillMaxWidth(),
             enabled = canWrite
         ) {
             Text(
@@ -1216,46 +1354,6 @@ private fun ProductListScreen(
         )
     }
 
-    if (showAdd) {
-        AddProductDialog(
-            workspace = workspace,
-            onDismiss = { showAdd = false },
-            onSave = { input ->
-                val p = input.product
-                viewModel.addProduct(
-                    name = p.name,
-                    category = p.category,
-                    sku = p.sku,
-                    unit = p.unit,
-                    unitConversions =
-                        p.unitConversions,
-                    brand = p.brand,
-                    genericName = p.genericName,
-                    modelName = p.modelName,
-                    serialOrImei = p.serialOrImei,
-                    size = p.size,
-                    color = p.color,
-                    warrantyMonths = p.warrantyMonths,
-                    sellingPrice = p.sellingPrice,
-                    mrp = p.mrp,
-                    rackLocation = p.rackLocation,
-                    lowStockLevel = p.lowStockLevel,
-                    note = p.note,
-                    workspace = workspace,
-                    initialQuantity = input.initialQuantity,
-                    purchasePrice = input.purchasePrice,
-                    purchaseDate = input.purchaseDate,
-                    expiryDate = input.expiryDate,
-                    batchNo = input.batchNo,
-                    initialUnitName =
-                        input.stockUnitName,
-                    initialUnitFactor =
-                        input.stockUnitFactor
-                )
-                showAdd = false
-            }
-        )
-    }
 }
 
 @Composable
@@ -1568,6 +1666,7 @@ private fun ProductDetailScreen(
     canWrite: Boolean,
     viewModel: InventoryViewModel,
     securityViewModel: FamilyKhataViewModel,
+    onAddStock: () -> Unit,
     onDeleted: () -> Unit
 ) {
     val context = LocalContext.current
@@ -1639,7 +1738,6 @@ private fun ProductDetailScreen(
             }
         }
 
-    var showAddBatch by remember { mutableStateOf(false) }
     var showReduce by remember { mutableStateOf(false) }
     var showEdit by remember { mutableStateOf(false) }
     var showDelete by remember { mutableStateOf(false) }
@@ -1778,7 +1876,19 @@ private fun ProductDetailScreen(
             }
         }
         Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            Button(onClick = { showAddBatch = true }, enabled = canWrite, modifier = Modifier.weight(1f)) { Text(v15Text("＋ স্টক", "+ Stock")) }
+            Button(
+                onClick = onAddStock,
+                enabled = canWrite,
+                modifier =
+                    Modifier.weight(1f)
+            ) {
+                Text(
+                    v15Text(
+                        "＋ স্টক",
+                        "+ Stock"
+                    )
+                )
+            }
             OutlinedButton(onClick = { showReduce = true }, enabled = canWrite && product.totalStock > 0, modifier = Modifier.weight(1f)) { Text(v15Text("− স্টক", "- Stock")) }
         }
         Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -1791,26 +1901,6 @@ private fun ProductDetailScreen(
         batches.filter { it.quantity > 0 }.forEach { BatchCard(it) }
     }
 
-    if (showAddBatch) {
-        AddBatchDialog(
-            unitOptions = stockUnitOptions,
-            onDismiss = {
-                showAddBatch = false
-            }
-        ) { input ->
-            viewModel.addBatch(
-                productId = product.id,
-                quantity = input.quantity,
-                purchasePrice = input.purchasePrice,
-                purchaseDate = input.purchaseDate,
-                expiryDate = input.expiryDate,
-                batchNo = input.batchNo,
-                unitName = input.unitName,
-                unitFactor = input.unitFactor
-            )
-            showAddBatch = false
-        }
-    }
 
     if (showReduce) {
         ReduceStockDialog(
@@ -1935,7 +2025,7 @@ private fun BatchCard(item: StockBatchEntity) {
 }
 
 @Composable
-private fun AddProductDialog(
+private fun AddProductForm(
     workspace: String,
     onDismiss: () -> Unit,
     onSave: (NewProductInput) -> Unit
@@ -2047,16 +2137,24 @@ private fun AddProductDialog(
             }
             ?: initialStockUnitOptions.first()
 
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        title = {
-            Text(v15Text("নতুন পণ্য", "New product"))
-        },
-        text = {
-            Column(
-                modifier = Modifier.verticalScroll(rememberScrollState()),
-                verticalArrangement = Arrangement.spacedBy(7.dp)
-            ) {
+    BackHandler {
+        onDismiss()
+    }
+
+    Column(
+        modifier =
+            Modifier
+                .fillMaxSize()
+                .verticalScroll(
+                    rememberScrollState()
+                )
+                .padding(
+                    horizontal = 12.dp,
+                    bottom = 28.dp
+                ),
+        verticalArrangement =
+            Arrangement.spacedBy(8.dp)
+    ) {
                 if (shopType.isNotBlank()) {
                     Text(
                         v15Text(
@@ -2390,11 +2488,10 @@ private fun AddProductDialog(
                         color = MaterialTheme.colorScheme.error
                     )
                 }
-            }
-        },
-        confirmButton = {
-            TextButton(
-                onClick = {
+        Button(
+            modifier =
+                Modifier.fillMaxWidth(),
+            onClick = {
                     val unitInputs =
                         buildProductUnitInputs(
                             baseUnit = unit,
@@ -2407,7 +2504,7 @@ private fun AddProductDialog(
                                 "ইউনিট কনভার্সন ঠিক করুন। সঠিক রেফারেন্স ইউনিট এবং ধনাত্মক অনুপাত দিন।",
                                 "Check unit conversion. Select a valid reference unit and use a positive multiplier."
                             )
-                        return@TextButton
+                        return@Button
                     }
 
                     val selling =
@@ -2485,15 +2582,27 @@ private fun AddProductDialog(
                     }
                 }
             ) {
-                Text(v15Text("সেভ", "Save"))
+                Text(
+                    v15Text(
+                        "পণ্য সেভ করুন",
+                        "Save product"
+                    )
+                )
             }
-        },
-        dismissButton = {
-            TextButton(onClick = onDismiss) {
-                Text(v15Text("বাতিল", "Cancel"))
-            }
+
+        OutlinedButton(
+            onClick = onDismiss,
+            modifier =
+                Modifier.fillMaxWidth()
+        ) {
+            Text(
+                v15Text(
+                    "বাতিল",
+                    "Cancel"
+                )
+            )
         }
-    )
+    }
 
     if (showUnitPicker) {
         UnitPickerDialog(
@@ -2508,7 +2617,127 @@ private fun AddProductDialog(
 }
 
 @Composable
-private fun AddBatchDialog(
+private fun AddStockPage(
+    product: ProductStockSummary,
+    viewModel: InventoryViewModel,
+    onDismiss: () -> Unit
+) {
+    val conversionsFlow =
+        remember(product.id) {
+            viewModel
+                .observeProductUnitConversions(
+                    product.id
+                )
+        }
+
+    val conversions by
+        conversionsFlow.collectAsState(
+            initial = emptyList()
+        )
+
+    val unitOptions =
+        buildList<InventoryStockUnitOption> {
+            add(
+                InventoryStockUnitOption(
+                    name =
+                        product.unit
+                            .trim()
+                            .ifBlank {
+                                "pcs"
+                            },
+                    factor = 1
+                )
+            )
+
+            conversions.forEach {
+                    conversion ->
+
+                if (
+                    conversion.unitName
+                        .isNotBlank() &&
+                    conversion.baseQuantity > 1
+                ) {
+                    add(
+                        InventoryStockUnitOption(
+                            name =
+                                conversion.unitName,
+                            factor =
+                                conversion
+                                    .baseQuantity
+                        )
+                    )
+                }
+            }
+        }
+
+    Column(
+        modifier =
+            Modifier
+                .fillMaxSize()
+                .padding(
+                    horizontal = 12.dp,
+                    bottom = 24.dp
+                ),
+        verticalArrangement =
+            Arrangement.spacedBy(10.dp)
+    ) {
+        Text(
+            product.name,
+            style =
+                MaterialTheme
+                    .typography
+                    .titleMedium,
+            fontWeight =
+                FontWeight.Bold
+        )
+
+        Text(
+            v15Text(
+                "বর্তমান স্টক: ${product.totalStock} ${product.unit}",
+                "Current stock: ${product.totalStock} ${product.unit}"
+            ),
+            style =
+                MaterialTheme
+                    .typography
+                    .bodySmall,
+            color =
+                MaterialTheme
+                    .colorScheme
+                    .onSurfaceVariant
+        )
+
+        AddBatchForm(
+            unitOptions =
+                unitOptions,
+            onDismiss =
+                onDismiss
+        ) { input ->
+            viewModel.addBatch(
+                productId =
+                    product.id,
+                quantity =
+                    input.quantity,
+                purchasePrice =
+                    input.purchasePrice,
+                purchaseDate =
+                    input.purchaseDate,
+                expiryDate =
+                    input.expiryDate,
+                batchNo =
+                    input.batchNo,
+                unitName =
+                    input.unitName,
+                unitFactor =
+                    input.unitFactor
+            )
+
+            onDismiss()
+        }
+    }
+}
+
+@Composable
+private fun AddBatchForm(
     unitOptions: List<InventoryStockUnitOption>,
     onDismiss: () -> Unit,
     onSave: (BatchInput) -> Unit
@@ -2550,21 +2779,16 @@ private fun AddBatchDialog(
             )
         } ?: unitOptions.firstOrNull()
 
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        title = {
-            Text(
-                v15Text(
-                    "স্টক ব্যাচ যোগ করুন",
-                    "Add stock batch"
-                )
-            )
-        },
-        text = {
-            Column(
-                verticalArrangement =
-                    Arrangement.spacedBy(8.dp)
-            ) {
+    Column(
+        modifier =
+            Modifier
+                .fillMaxWidth()
+                .verticalScroll(
+                    rememberScrollState()
+                ),
+        verticalArrangement =
+            Arrangement.spacedBy(8.dp)
+    ) {
                 InventoryStockUnitSelector(
                     options = unitOptions,
                     selectedName =
@@ -2593,7 +2817,9 @@ private fun AddBatchDialog(
                             )
                         )
                     },
-                    singleLine = true
+                    singleLine = true,
+                    modifier =
+                        Modifier.fillMaxWidth()
                 )
 
                 OutlinedTextField(
@@ -2609,7 +2835,9 @@ private fun AddBatchDialog(
                             )
                         )
                     },
-                    singleLine = true
+                    singleLine = true,
+                    modifier =
+                        Modifier.fillMaxWidth()
                 )
 
                 val enteredQuantity =
@@ -2643,7 +2871,9 @@ private fun AddBatchDialog(
                     label = {
                         Text("Batch / Lot No.")
                     },
-                    singleLine = true
+                    singleLine = true,
+                    modifier =
+                        Modifier.fillMaxWidth()
                 )
 
                 DateButton(
@@ -2673,11 +2903,10 @@ private fun AddBatchDialog(
                             MaterialTheme.colorScheme.error
                     )
                 }
-            }
-        },
-        confirmButton = {
-            TextButton(
-                onClick = {
+        Button(
+            modifier =
+                Modifier.fillMaxWidth(),
+            onClick = {
                     val q =
                         qty.v15InventoryIntOrNull()
 
@@ -2733,25 +2962,25 @@ private fun AddBatchDialog(
             ) {
                 Text(
                     v15Text(
-                        "যোগ করুন",
-                        "Add"
+                        "স্টক যোগ করুন",
+                        "Add stock"
                     )
                 )
             }
-        },
-        dismissButton = {
-            TextButton(
-                onClick = onDismiss
-            ) {
-                Text(
-                    v15Text(
-                        "বাতিল",
-                        "Cancel"
-                    )
+
+        OutlinedButton(
+            onClick = onDismiss,
+            modifier =
+                Modifier.fillMaxWidth()
+        ) {
+            Text(
+                v15Text(
+                    "বাতিল",
+                    "Cancel"
                 )
-            }
+            )
         }
-    )
+    }
 }
 
 @Composable

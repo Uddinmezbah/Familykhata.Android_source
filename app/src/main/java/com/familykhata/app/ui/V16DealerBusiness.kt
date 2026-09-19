@@ -469,7 +469,27 @@ internal fun V16DealerBusinessScreen(
             showInventory ||
                 selectedPurchase != null ||
                 selectedSale != null ||
-                selectedLedgerCustomer != null
+                selectedLedgerCustomer != null ||
+                showNewCompany ||
+                companyDialog != null ||
+                showNewArea ||
+                areaDialog != null ||
+                showNewCustomer ||
+                customerDialog != null ||
+                showDeliveryPerson ||
+                showPurchase ||
+                showSale ||
+                showCollection ||
+                showSupplierPayment ||
+                showExpense ||
+                showDeliveryChallan ||
+                deliverySaleChallan != null ||
+                settlementChallan != null ||
+                showWarehouseDamage ||
+                editingDeliveryChallan != null ||
+                editingSettlementChallan != null ||
+                editingDamage != null ||
+                showPackSetup
     )
 
     if (showInventory) {
@@ -558,6 +578,982 @@ internal fun V16DealerBusinessScreen(
                     },
                 onOpenSale = {
                     selectedSale = it
+                }
+            )
+        }
+
+        return
+    }
+
+    if (
+        showNewCompany ||
+        companyDialog != null
+    ) {
+        val editing =
+            companyDialog
+
+        val closePage: () -> Unit = {
+            showNewCompany = false
+            companyDialog = null
+        }
+
+        BackHandler {
+            closePage()
+        }
+
+        V15DeepScreenContainer(
+            title =
+                if (editing == null) {
+                    v15Text(
+                        "কোম্পানি যোগ করুন",
+                        "Add company"
+                    )
+                } else {
+                    v15Text(
+                        "কোম্পানি সম্পাদনা",
+                        "Edit company"
+                    )
+                },
+            onBack = closePage
+        ) {
+            DealerCompanyForm(
+                initial = editing,
+                onDismiss = closePage,
+                onSave = {
+                        name,
+                        code,
+                        phone,
+                        contact,
+                        address,
+                        note ->
+
+                    if (editing == null) {
+                        vm.addCompany(
+                            name,
+                            code,
+                            phone,
+                            contact,
+                            address,
+                            note
+                        ) { success ->
+                            if (success) {
+                                closePage()
+                            }
+                        }
+                    } else {
+                        vm.updateCompany(
+                            editing,
+                            name,
+                            code,
+                            phone,
+                            contact,
+                            address,
+                            note
+                        ) { success ->
+                            if (success) {
+                                closePage()
+                            }
+                        }
+                    }
+                }
+            )
+        }
+
+        return
+    }
+
+    if (
+        showNewArea ||
+        areaDialog != null
+    ) {
+        val editing =
+            areaDialog
+
+        val closePage: () -> Unit = {
+            showNewArea = false
+            areaDialog = null
+        }
+
+        BackHandler {
+            closePage()
+        }
+
+        V15DeepScreenContainer(
+            title =
+                if (editing == null) {
+                    v15Text(
+                        "এরিয়া যোগ করুন",
+                        "Add area"
+                    )
+                } else {
+                    v15Text(
+                        "এরিয়া সম্পাদনা",
+                        "Edit area"
+                    )
+                },
+            onBack = closePage
+        ) {
+            DealerAreaForm(
+                initial = editing,
+                onDismiss = closePage,
+                onSave = {
+                        name,
+                        code,
+                        note ->
+
+                    if (editing == null) {
+                        vm.addArea(
+                            name,
+                            code,
+                            note
+                        ) { success ->
+                            if (success) {
+                                closePage()
+                            }
+                        }
+                    } else {
+                        vm.updateArea(
+                            editing,
+                            name,
+                            code,
+                            note
+                        ) { success ->
+                            if (success) {
+                                closePage()
+                            }
+                        }
+                    }
+                }
+            )
+        }
+
+        return
+    }
+
+    if (
+        showNewCustomer ||
+        customerDialog != null
+    ) {
+        val editing =
+            customerDialog
+
+        val closePage: () -> Unit = {
+            showNewCustomer = false
+            customerDialog = null
+        }
+
+        BackHandler {
+            closePage()
+        }
+
+        V15DeepScreenContainer(
+            title =
+                if (editing == null) {
+                    v15Text(
+                        "রিটেইলার যোগ করুন",
+                        "Add retailer"
+                    )
+                } else {
+                    v15Text(
+                        "রিটেইলার সম্পাদনা",
+                        "Edit retailer"
+                    )
+                },
+            onBack = closePage
+        ) {
+            DealerCustomerForm(
+                initial = editing,
+                areas = areas,
+                onDismiss = closePage,
+                onSave = {
+                        areaId,
+                        name,
+                        code,
+                        phone,
+                        address,
+                        creditLimit,
+                        note ->
+
+                    if (editing == null) {
+                        vm.addCustomer(
+                            areaId,
+                            name,
+                            code,
+                            phone,
+                            address,
+                            creditLimit,
+                            note
+                        ) { success ->
+                            if (success) {
+                                closePage()
+                            }
+                        }
+                    } else {
+                        vm.updateCustomer(
+                            editing,
+                            areaId,
+                            name,
+                            code,
+                            phone,
+                            address,
+                            creditLimit,
+                            note
+                        ) { success ->
+                            if (success) {
+                                closePage()
+                            }
+                        }
+                    }
+                }
+            )
+        }
+
+        return
+    }
+
+    if (showDeliveryPerson) {
+        val editing =
+            editingDeliveryPerson
+
+        val closePage: () -> Unit = {
+            showDeliveryPerson = false
+            editingDeliveryPerson = null
+        }
+
+        BackHandler {
+            closePage()
+        }
+
+        V15DeepScreenContainer(
+            title =
+                if (editing == null) {
+                    v15Text(
+                        "ডেলিভারি ম্যান যোগ করুন",
+                        "Add delivery man"
+                    )
+                } else {
+                    v15Text(
+                        "ডেলিভারি ম্যান সম্পাদনা",
+                        "Edit delivery man"
+                    )
+                },
+            onBack = closePage
+        ) {
+            DealerDeliveryPersonForm(
+                initial = editing,
+                onDismiss = closePage,
+                onSave = {
+                        name,
+                        phone,
+                        note ->
+
+                    if (editing == null) {
+                        vm.addDeliveryPerson(
+                            name = name,
+                            phone = phone,
+                            note = note
+                        ) { success ->
+                            if (success) {
+                                closePage()
+                            }
+                        }
+                    } else {
+                        vm.updateDeliveryPerson(
+                            item = editing,
+                            name = name,
+                            phone = phone,
+                            note = note
+                        ) { success ->
+                            if (success) {
+                                closePage()
+                            }
+                        }
+                    }
+                }
+            )
+        }
+
+        return
+    }
+
+    deliverySaleChallan?.let { challan ->
+        val closePage: () -> Unit = {
+            deliverySaleChallan = null
+        }
+
+        BackHandler {
+            closePage()
+        }
+
+        V15DeepScreenContainer(
+            title =
+                v15Text(
+                    "ডেলিভারি বিক্রি / বাকি",
+                    "Delivery sale / due"
+                ),
+            onBack = closePage
+        ) {
+            DealerDeliverySaleForm(
+                challan = challan,
+                customers = customers,
+                viewModel = vm,
+                onDismiss = closePage,
+                onSave = {
+                        customerId,
+                        invoiceNo,
+                        lines,
+                        collectedNow,
+                        note ->
+
+                    vm.createDeliverySale(
+                        challanId =
+                            challan.id,
+                        customerId =
+                            customerId,
+                        invoiceNo =
+                            invoiceNo,
+                        lines = lines,
+                        collectedNow =
+                            collectedNow,
+                        note = note
+                    ) { success ->
+                        if (success) {
+                            closePage()
+                        }
+                    }
+                }
+            )
+        }
+
+        return
+    }
+
+    settlementChallan?.let { challan ->
+        val closePage: () -> Unit = {
+            settlementChallan = null
+        }
+
+        BackHandler {
+            closePage()
+        }
+
+        V15DeepScreenContainer(
+            title =
+                v15Text(
+                    "রাতে মাল বুঝে নেওয়া",
+                    "Night settlement"
+                ),
+            onBack = closePage
+        ) {
+            DealerDeliverySettlementForm(
+                challan = challan,
+                viewModel = vm,
+                onDismiss = closePage,
+                onSave = {
+                        lines,
+                        cashHandedOver,
+                        note ->
+
+                    vm.settleDeliveryChallan(
+                        challanId =
+                            challan.id,
+                        lines = lines,
+                        cashHandedOver =
+                            cashHandedOver,
+                        note = note
+                    ) { success ->
+                        if (success) {
+                            closePage()
+                        }
+                    }
+                }
+            )
+        }
+
+        return
+    }
+
+    if (showWarehouseDamage) {
+        val closePage: () -> Unit = {
+            showWarehouseDamage = false
+        }
+
+        BackHandler {
+            closePage()
+        }
+
+        V15DeepScreenContainer(
+            title =
+                v15Text(
+                    "ড্যামেজ হিসাব",
+                    "Record damage"
+                ),
+            onBack = closePage
+        ) {
+            DealerWarehouseDamageForm(
+                products = products,
+                viewModel = vm,
+                onDismiss = closePage,
+                onSave = {
+                        batchId,
+                        quantity,
+                        reason,
+                        note ->
+
+                    vm.recordWarehouseDamage(
+                        batchId = batchId,
+                        quantityPieces =
+                            quantity,
+                        reason = reason,
+                        note = note
+                    ) { success ->
+                        if (success) {
+                            closePage()
+                        }
+                    }
+                }
+            )
+        }
+
+        return
+    }
+
+    editingDeliveryChallan?.let { item ->
+        val closePage: () -> Unit = {
+            editingDeliveryChallan = null
+        }
+
+        BackHandler {
+            closePage()
+        }
+
+        V15DeepScreenContainer(
+            title =
+                v15Text(
+                    "চালান তথ্য সম্পাদনা",
+                    "Edit challan information"
+                ),
+            onBack = closePage
+        ) {
+            DealerDeliveryChallanMetaForm(
+                initial = item,
+                deliveryPeople =
+                    deliveryPeople,
+                onDismiss = closePage,
+                onSave = {
+                        personId,
+                        challanNo,
+                        issuedAt,
+                        note ->
+
+                    vm.updateDeliveryChallanMeta(
+                        item = item,
+                        deliveryPersonId =
+                            personId,
+                        challanNo =
+                            challanNo,
+                        issuedAt =
+                            issuedAt,
+                        note = note
+                    ) { success ->
+                        if (success) {
+                            closePage()
+                        }
+                    }
+                }
+            )
+        }
+
+        return
+    }
+
+    editingSettlementChallan?.let { challan ->
+        val closePage: () -> Unit = {
+            editingSettlementChallan = null
+        }
+
+        BackHandler {
+            closePage()
+        }
+
+        V15DeepScreenContainer(
+            title =
+                v15Text(
+                    "সেটেলমেন্ট সম্পাদনা",
+                    "Edit settlement"
+                ),
+            onBack = closePage
+        ) {
+            DealerDeliverySettlementMetaForm(
+                challan = challan,
+                viewModel = vm,
+                onDismiss = closePage,
+                onSave = {
+                        settlement,
+                        cash,
+                        receivedAt,
+                        note ->
+
+                    vm.updateDeliverySettlementMeta(
+                        challan = challan,
+                        item = settlement,
+                        cashHandedOver =
+                            cash,
+                        receivedAt =
+                            receivedAt,
+                        note = note
+                    ) { success ->
+                        if (success) {
+                            closePage()
+                        }
+                    }
+                }
+            )
+        }
+
+        return
+    }
+
+    editingDamage?.let { item ->
+        val closePage: () -> Unit = {
+            editingDamage = null
+        }
+
+        BackHandler {
+            closePage()
+        }
+
+        V15DeepScreenContainer(
+            title =
+                v15Text(
+                    "ড্যামেজ এন্ট্রি সম্পাদনা",
+                    "Edit damage entry"
+                ),
+            onBack = closePage
+        ) {
+            DealerWarehouseDamageEditForm(
+                initial = item,
+                onDismiss = closePage,
+                onSave = {
+                        quantity,
+                        reason,
+                        note ->
+
+                    vm.updateWarehouseDamage(
+                        item = item,
+                        quantityPieces =
+                            quantity,
+                        reason = reason,
+                        note = note
+                    ) { success ->
+                        if (success) {
+                            closePage()
+                        }
+                    }
+                }
+            )
+        }
+
+        return
+    }
+
+    if (
+        showPackSetup &&
+        deleteTarget == null
+    ) {
+        val closePage: () -> Unit = {
+            showPackSetup = false
+        }
+
+        BackHandler {
+            closePage()
+        }
+
+        V15DeepScreenContainer(
+            title =
+                v15Text(
+                    "বক্স / পাতা সেটআপ",
+                    "Box / sheet setup"
+                ),
+            onBack = closePage
+        ) {
+            DealerPackSetupForm(
+                products = products,
+                packs = productPacks,
+                onDismiss = closePage,
+                onDelete = { pack ->
+                    deleteTarget =
+                        DealerDeleteTarget
+                            .ProductPack(pack)
+                },
+                onSave = {
+                        productId,
+                        piecesPerBox,
+                        piecesPerSheet ->
+
+                    vm.saveProductPack(
+                        productId =
+                            productId,
+                        piecesPerBox =
+                            piecesPerBox,
+                        piecesPerSheet =
+                            piecesPerSheet
+                    ) { success ->
+                        if (success) {
+                            closePage()
+                        }
+                    }
+                }
+            )
+        }
+
+        return
+    }
+
+    if (showPurchase) {
+        val closePage: () -> Unit = {
+            showPurchase = false
+        }
+
+        BackHandler {
+            closePage()
+        }
+
+        V15DeepScreenContainer(
+            title =
+                v15Text(
+                    "নতুন ক্রয়",
+                    "New purchase"
+                ),
+            onBack = closePage
+        ) {
+            DealerPurchaseForm(
+                companies = companies,
+                products = products,
+                onDismiss = closePage,
+                onSave = {
+                        companyId,
+                        invoiceNo,
+                        lines,
+                        paidNow,
+                        note ->
+
+                    vm.createPurchase(
+                        companyId = companyId,
+                        invoiceNo = invoiceNo,
+                        lines = lines,
+                        paidNow = paidNow,
+                        note = note
+                    ) { success ->
+                        if (success) {
+                            closePage()
+                        }
+                    }
+                }
+            )
+        }
+
+        return
+    }
+
+    if (showSale) {
+        val closePage: () -> Unit = {
+            showSale = false
+        }
+
+        BackHandler {
+            closePage()
+        }
+
+        V15DeepScreenContainer(
+            title =
+                v15Text(
+                    "নতুন বিক্রি",
+                    "New sale"
+                ),
+            onBack = closePage
+        ) {
+            DealerSaleForm(
+                customers = customers,
+                products = products,
+                onDismiss = closePage,
+                onSave = {
+                        customerId,
+                        invoiceNo,
+                        lines,
+                        collectedNow,
+                        note ->
+
+                    vm.createSale(
+                        customerId = customerId,
+                        invoiceNo = invoiceNo,
+                        lines = lines,
+                        collectedNow =
+                            collectedNow,
+                        note = note
+                    ) { success ->
+                        if (success) {
+                            closePage()
+                        }
+                    }
+                }
+            )
+        }
+
+        return
+    }
+
+    if (showCollection) {
+        val editing =
+            editingCollection
+
+        val closePage: () -> Unit = {
+            showCollection = false
+            editingCollection = null
+        }
+
+        BackHandler {
+            closePage()
+        }
+
+        V15DeepScreenContainer(
+            title =
+                if (editing == null) {
+                    v15Text(
+                        "কাস্টমার কালেকশন",
+                        "Customer collection"
+                    )
+                } else {
+                    v15Text(
+                        "কালেকশন সংশোধন",
+                        "Correct collection"
+                    )
+                },
+            onBack = closePage
+        ) {
+            DealerCollectionForm(
+                initial = editing,
+                customers = customers,
+                onDismiss = closePage,
+                onSave = {
+                        customerId,
+                        amount,
+                        collectedAt,
+                        note ->
+
+                    if (editing == null) {
+                        vm.addCollection(
+                            customerId = customerId,
+                            amount = amount,
+                            collectedAt =
+                                collectedAt,
+                            note = note
+                        ) { success ->
+                            if (success) {
+                                closePage()
+                            }
+                        }
+                    } else {
+                        vm.correctCollection(
+                            item = editing,
+                            customerId =
+                                customerId,
+                            amount = amount,
+                            collectedAt =
+                                collectedAt,
+                            note = note
+                        ) { success ->
+                            if (success) {
+                                closePage()
+                            }
+                        }
+                    }
+                }
+            )
+        }
+
+        return
+    }
+
+    if (showSupplierPayment) {
+        val editing =
+            editingSupplierPayment
+
+        val closePage: () -> Unit = {
+            showSupplierPayment = false
+            editingSupplierPayment = null
+        }
+
+        BackHandler {
+            closePage()
+        }
+
+        V15DeepScreenContainer(
+            title =
+                if (editing == null) {
+                    v15Text(
+                        "সাপ্লায়ার পেমেন্ট",
+                        "Supplier payment"
+                    )
+                } else {
+                    v15Text(
+                        "পেমেন্ট সংশোধন",
+                        "Correct payment"
+                    )
+                },
+            onBack = closePage
+        ) {
+            DealerSupplierPaymentForm(
+                initial = editing,
+                companies = companies,
+                onDismiss = closePage,
+                onSave = {
+                        companyId,
+                        amount,
+                        paidAt,
+                        note ->
+
+                    if (editing == null) {
+                        vm.addSupplierPayment(
+                            companyId =
+                                companyId,
+                            amount = amount,
+                            paidAt = paidAt,
+                            note = note
+                        ) { success ->
+                            if (success) {
+                                closePage()
+                            }
+                        }
+                    } else {
+                        vm.correctSupplierPayment(
+                            item = editing,
+                            companyId =
+                                companyId,
+                            amount = amount,
+                            paidAt = paidAt,
+                            note = note
+                        ) { success ->
+                            if (success) {
+                                closePage()
+                            }
+                        }
+                    }
+                }
+            )
+        }
+
+        return
+    }
+
+    if (showExpense) {
+        val editing =
+            editingExpense
+
+        val closePage: () -> Unit = {
+            showExpense = false
+            editingExpense = null
+        }
+
+        BackHandler {
+            closePage()
+        }
+
+        V15DeepScreenContainer(
+            title =
+                if (editing == null) {
+                    v15Text(
+                        "ব্যবসার খরচ",
+                        "Business expense"
+                    )
+                } else {
+                    v15Text(
+                        "খরচ সম্পাদনা",
+                        "Edit expense"
+                    )
+                },
+            onBack = closePage
+        ) {
+            DealerExpenseForm(
+                initial = editing,
+                onDismiss = closePage,
+                onSave = {
+                        category,
+                        amount,
+                        note ->
+
+                    if (editing == null) {
+                        vm.addExpense(
+                            category =
+                                category,
+                            amount = amount,
+                            note = note
+                        ) { success ->
+                            if (success) {
+                                closePage()
+                            }
+                        }
+                    } else {
+                        vm.updateExpense(
+                            item = editing,
+                            category =
+                                category,
+                            amount = amount,
+                            note = note
+                        ) { success ->
+                            if (success) {
+                                closePage()
+                            }
+                        }
+                    }
+                }
+            )
+        }
+
+        return
+    }
+
+    if (showDeliveryChallan) {
+        val closePage: () -> Unit = {
+            showDeliveryChallan = false
+        }
+
+        BackHandler {
+            closePage()
+        }
+
+        V15DeepScreenContainer(
+            title =
+                v15Text(
+                    "মাল দেওয়ার চালান",
+                    "Issue delivery challan"
+                ),
+            onBack = closePage
+        ) {
+            DealerDeliveryChallanForm(
+                viewModel = vm,
+                deliveryPeople =
+                    deliveryPeople,
+                products = products,
+                onDismiss = closePage,
+                onSave = {
+                        deliveryPersonId,
+                        challanNo,
+                        lines,
+                        note ->
+
+                    vm.createDeliveryChallan(
+                        deliveryPersonId =
+                            deliveryPersonId,
+                        challanNo =
+                            challanNo,
+                        lines = lines,
+                        note = note
+                    ) { success ->
+                        if (success) {
+                            closePage()
+                        }
+                    }
                 }
             )
         }
@@ -2384,320 +3380,11 @@ internal fun V16DealerBusinessScreen(
         }
     }
 
-    if (
-        showNewCompany ||
-        companyDialog != null
-    ) {
-        DealerCompanyDialog(
-            initial = companyDialog,
-            onDismiss = {
-                showNewCompany = false
-                companyDialog = null
-            },
-            onSave = {
-                    name,
-                    code,
-                    phone,
-                    contact,
-                    address,
-                    note ->
 
-                val editing =
-                    companyDialog
 
-                if (editing == null) {
-                    vm.addCompany(
-                        name,
-                        code,
-                        phone,
-                        contact,
-                        address,
-                        note
-                    ) {
-                        if (it) {
-                            showNewCompany = false
-                        }
-                    }
-                } else {
-                    vm.updateCompany(
-                        editing,
-                        name,
-                        code,
-                        phone,
-                        contact,
-                        address,
-                        note
-                    ) {
-                        if (it) {
-                            companyDialog = null
-                        }
-                    }
-                }
-            }
-        )
-    }
 
-    if (
-        showNewArea ||
-        areaDialog != null
-    ) {
-        DealerAreaDialog(
-            initial = areaDialog,
-            onDismiss = {
-                showNewArea = false
-                areaDialog = null
-            },
-            onSave = {
-                    name,
-                    code,
-                    note ->
 
-                val editing =
-                    areaDialog
 
-                if (editing == null) {
-                    vm.addArea(
-                        name,
-                        code,
-                        note
-                    ) {
-                        if (it) {
-                            showNewArea = false
-                        }
-                    }
-                } else {
-                    vm.updateArea(
-                        editing,
-                        name,
-                        code,
-                        note
-                    ) {
-                        if (it) {
-                            areaDialog = null
-                        }
-                    }
-                }
-            }
-        )
-    }
-
-    if (
-        showNewCustomer ||
-        customerDialog != null
-    ) {
-        DealerCustomerDialog(
-            initial = customerDialog,
-            areas = areas,
-            onDismiss = {
-                showNewCustomer = false
-                customerDialog = null
-            },
-            onSave = {
-                    areaId,
-                    name,
-                    code,
-                    phone,
-                    address,
-                    creditLimit,
-                    note ->
-
-                val editing =
-                    customerDialog
-
-                if (editing == null) {
-                    vm.addCustomer(
-                        areaId,
-                        name,
-                        code,
-                        phone,
-                        address,
-                        creditLimit,
-                        note
-                    ) {
-                        if (it) {
-                            showNewCustomer = false
-                        }
-                    }
-                } else {
-                    vm.updateCustomer(
-                        editing,
-                        areaId,
-                        name,
-                        code,
-                        phone,
-                        address,
-                        creditLimit,
-                        note
-                    ) {
-                        if (it) {
-                            customerDialog = null
-                        }
-                    }
-                }
-            }
-        )
-    }
-
-    if (showPurchase) {
-        DealerPurchaseDialog(
-            companies = companies,
-            products = products,
-            onDismiss = {
-                showPurchase = false
-            },
-            onSave = {
-                    companyId,
-                    invoiceNo,
-                    lines,
-                    paidNow,
-                    note ->
-
-                vm.createPurchase(
-                    companyId = companyId,
-                    invoiceNo = invoiceNo,
-                    lines = lines,
-                    paidNow = paidNow,
-                    note = note
-                ) {
-                    if (it) {
-                        showPurchase = false
-                    }
-                }
-            }
-        )
-    }
-
-    if (showSale) {
-        DealerSaleDialog(
-            customers = customers,
-            products = products,
-            onDismiss = {
-                showSale = false
-            },
-            onSave = {
-                    customerId,
-                    invoiceNo,
-                    lines,
-                    collectedNow,
-                    note ->
-
-                vm.createSale(
-                    customerId = customerId,
-                    invoiceNo = invoiceNo,
-                    lines = lines,
-                    collectedNow =
-                        collectedNow,
-                    note = note
-                ) {
-                    if (it) {
-                        showSale = false
-                    }
-                }
-            }
-        )
-    }
-
-    if (showCollection) {
-        DealerCollectionDialog(
-            initial = editingCollection,
-            customers = customers,
-            onDismiss = {
-                showCollection = false
-                editingCollection = null
-            },
-            onSave = {
-                    customerId,
-                    amount,
-                    collectedAt,
-                    note ->
-
-                val editing =
-                    editingCollection
-
-                if (editing == null) {
-                    vm.addCollection(
-                        customerId = customerId,
-                        amount = amount,
-                        collectedAt =
-                            collectedAt,
-                        note = note
-                    ) {
-                        if (it) {
-                            showCollection =
-                                false
-                        }
-                    }
-                } else {
-                    vm.correctCollection(
-                        item = editing,
-                        customerId =
-                            customerId,
-                        amount = amount,
-                        collectedAt =
-                            collectedAt,
-                        note = note
-                    ) {
-                        if (it) {
-                            showCollection =
-                                false
-                            editingCollection =
-                                null
-                        }
-                    }
-                }
-            }
-        )
-    }
-
-    if (showSupplierPayment) {
-        DealerSupplierPaymentDialog(
-            initial =
-                editingSupplierPayment,
-            companies = companies,
-            onDismiss = {
-                showSupplierPayment = false
-                editingSupplierPayment = null
-            },
-            onSave = {
-                    companyId,
-                    amount,
-                    paidAt,
-                    note ->
-
-                val editing =
-                    editingSupplierPayment
-
-                if (editing == null) {
-                    vm.addSupplierPayment(
-                        companyId = companyId,
-                        amount = amount,
-                        paidAt = paidAt,
-                        note = note
-                    ) {
-                        if (it) {
-                            showSupplierPayment =
-                                false
-                        }
-                    }
-                } else {
-                    vm.correctSupplierPayment(
-                        item = editing,
-                        companyId = companyId,
-                        amount = amount,
-                        paidAt = paidAt,
-                        note = note
-                    ) {
-                        if (it) {
-                            showSupplierPayment =
-                                false
-                            editingSupplierPayment =
-                                null
-                        }
-                    }
-                }
-            }
-        )
-    }
 
     editingPurchaseMeta?.let { item ->
         DealerTransactionMetaDialog(
@@ -2758,371 +3445,6 @@ internal fun V16DealerBusinessScreen(
                 ) {
                     if (it) {
                         editingSaleMeta = null
-                    }
-                }
-            }
-        )
-    }
-
-    deliverySaleChallan?.let {
-            challan ->
-
-        DealerDeliverySaleDialog(
-            challan = challan,
-            customers = customers,
-            viewModel = vm,
-            onDismiss = {
-                deliverySaleChallan =
-                    null
-            },
-            onSave = {
-                    customerId,
-                    invoiceNo,
-                    lines,
-                    collectedNow,
-                    note ->
-
-                vm.createDeliverySale(
-                    challanId =
-                        challan.id,
-                    customerId =
-                        customerId,
-                    invoiceNo =
-                        invoiceNo,
-                    lines =
-                        lines,
-                    collectedNow =
-                        collectedNow,
-                    note =
-                        note
-                ) {
-                    if (it) {
-                        deliverySaleChallan =
-                            null
-                    }
-                }
-            }
-        )
-    }
-
-    settlementChallan?.let {
-            challan ->
-
-        DealerDeliverySettlementDialog(
-            challan = challan,
-            viewModel = vm,
-            onDismiss = {
-                settlementChallan =
-                    null
-            },
-            onSave = {
-                    lines,
-                    cashHandedOver,
-                    note ->
-
-                vm.settleDeliveryChallan(
-                    challanId =
-                        challan.id,
-                    lines =
-                        lines,
-                    cashHandedOver =
-                        cashHandedOver,
-                    note =
-                        note
-                ) {
-                    if (it) {
-                        settlementChallan =
-                            null
-                    }
-                }
-            }
-        )
-    }
-
-    if (showDeliveryChallan) {
-        DealerDeliveryChallanDialog(
-            viewModel = vm,
-            deliveryPeople =
-                deliveryPeople,
-            products =
-                products,
-            onDismiss = {
-                showDeliveryChallan =
-                    false
-            },
-            onSave = {
-                    deliveryPersonId,
-                    challanNo,
-                    lines,
-                    note ->
-
-                vm.createDeliveryChallan(
-                    deliveryPersonId =
-                        deliveryPersonId,
-                    challanNo =
-                        challanNo,
-                    lines =
-                        lines,
-                    note =
-                        note
-                ) {
-                    if (it) {
-                        showDeliveryChallan =
-                            false
-                    }
-                }
-            }
-        )
-    }
-
-    if (showWarehouseDamage) {
-        DealerWarehouseDamageDialog(
-            products =
-                products,
-            viewModel =
-                vm,
-            onDismiss = {
-                showWarehouseDamage =
-                    false
-            },
-            onSave = {
-                    batchId,
-                    quantity,
-                    reason,
-                    note ->
-
-                vm.recordWarehouseDamage(
-                    batchId =
-                        batchId,
-                    quantityPieces =
-                        quantity,
-                    reason =
-                        reason,
-                    note =
-                        note
-                ) {
-                    if (it) {
-                        showWarehouseDamage =
-                            false
-                    }
-                }
-            }
-        )
-    }
-
-    editingDeliveryChallan?.let { item ->
-        DealerDeliveryChallanMetaDialog(
-            initial = item,
-            deliveryPeople =
-                deliveryPeople,
-            onDismiss = {
-                editingDeliveryChallan =
-                    null
-            },
-            onSave = {
-                    personId,
-                    challanNo,
-                    issuedAt,
-                    note ->
-
-                vm.updateDeliveryChallanMeta(
-                    item = item,
-                    deliveryPersonId =
-                        personId,
-                    challanNo =
-                        challanNo,
-                    issuedAt =
-                        issuedAt,
-                    note = note
-                ) {
-                    if (it) {
-                        editingDeliveryChallan =
-                            null
-                    }
-                }
-            }
-        )
-    }
-
-    editingSettlementChallan?.let {
-            challan ->
-
-        DealerDeliverySettlementMetaDialog(
-            challan = challan,
-            viewModel = vm,
-            onDismiss = {
-                editingSettlementChallan =
-                    null
-            },
-            onSave = {
-                    settlement,
-                    cash,
-                    receivedAt,
-                    note ->
-
-                vm.updateDeliverySettlementMeta(
-                    challan = challan,
-                    item = settlement,
-                    cashHandedOver =
-                        cash,
-                    receivedAt =
-                        receivedAt,
-                    note = note
-                ) {
-                    if (it) {
-                        editingSettlementChallan =
-                            null
-                    }
-                }
-            }
-        )
-    }
-
-    editingDamage?.let { item ->
-        DealerWarehouseDamageEditDialog(
-            initial = item,
-            onDismiss = {
-                editingDamage = null
-            },
-            onSave = {
-                    quantity,
-                    reason,
-                    note ->
-
-                vm.updateWarehouseDamage(
-                    item = item,
-                    quantityPieces =
-                        quantity,
-                    reason = reason,
-                    note = note
-                ) {
-                    if (it) {
-                        editingDamage = null
-                    }
-                }
-            }
-        )
-    }
-
-    if (showPackSetup) {
-        DealerPackSetupDialog(
-            products = products,
-            packs = productPacks,
-            onDismiss = {
-                showPackSetup = false
-            },
-            onDelete = { pack ->
-                deleteTarget =
-                    DealerDeleteTarget
-                        .ProductPack(pack)
-            },
-            onSave = {
-                    productId,
-                    piecesPerBox,
-                    piecesPerSheet ->
-
-                vm.saveProductPack(
-                    productId = productId,
-                    piecesPerBox =
-                        piecesPerBox,
-                    piecesPerSheet =
-                        piecesPerSheet
-                ) {
-                    if (it) {
-                        showPackSetup =
-                            false
-                    }
-                }
-            }
-        )
-    }
-
-    if (showDeliveryPerson) {
-        DealerDeliveryPersonDialog(
-            initial =
-                editingDeliveryPerson,
-            onDismiss = {
-                showDeliveryPerson =
-                    false
-
-                editingDeliveryPerson =
-                    null
-            },
-            onSave = {
-                    name,
-                    phone,
-                    note ->
-
-                val editing =
-                    editingDeliveryPerson
-
-                if (editing == null) {
-                    vm.addDeliveryPerson(
-                        name = name,
-                        phone = phone,
-                        note = note
-                    ) {
-                        if (it) {
-                            showDeliveryPerson =
-                                false
-                        }
-                    }
-                } else {
-                    vm.updateDeliveryPerson(
-                        item = editing,
-                        name = name,
-                        phone = phone,
-                        note = note
-                    ) {
-                        if (it) {
-                            showDeliveryPerson =
-                                false
-
-                            editingDeliveryPerson =
-                                null
-                        }
-                    }
-                }
-            }
-        )
-    }
-
-    if (showExpense) {
-        DealerExpenseDialog(
-            initial = editingExpense,
-            onDismiss = {
-                showExpense = false
-                editingExpense = null
-            },
-            onSave = {
-                    category,
-                    amount,
-                    note ->
-
-                val editing =
-                    editingExpense
-
-                if (editing == null) {
-                    vm.addExpense(
-                        category = category,
-                        amount = amount,
-                        note = note
-                    ) {
-                        if (it) {
-                            showExpense = false
-                        }
-                    }
-                } else {
-                    vm.updateExpense(
-                        item = editing,
-                        category = category,
-                        amount = amount,
-                        note = note
-                    ) {
-                        if (it) {
-                            showExpense = false
-                            editingExpense = null
-                        }
                     }
                 }
             }
@@ -3843,6 +4165,64 @@ private fun DealerSaleDetail(
     val deleteSecurityViewModel:
         FamilyKhataViewModel = viewModel()
 
+    returnLine?.let { line ->
+        BackHandler {
+            returnLine = null
+        }
+
+        V15DeepScreenContainer(
+            title =
+                v15Text(
+                    "বিক্রয় রিটার্ন / ড্যামেজ",
+                    "Sales return / damage"
+                ),
+            onBack = {
+                returnLine = null
+            }
+        ) {
+            DealerSalesReturnForm(
+                line = line,
+                onDismiss = {
+                    returnLine = null
+                },
+                onSave = {
+                        quantity,
+                        type,
+                        note ->
+
+                    viewModel.recordSalesReturn(
+                        saleLineId = line.id,
+                        quantity = quantity,
+                        returnType = type,
+                        note = note
+                    ) { ok ->
+                        Toast.makeText(
+                            context,
+                            if (ok) {
+                                v15Text(
+                                    "রিটার্ন সংরক্ষণ হয়েছে",
+                                    "Return saved"
+                                )
+                            } else {
+                                v15Text(
+                                    "রিটার্ন করা যায়নি",
+                                    "Return failed"
+                                )
+                            },
+                            Toast.LENGTH_SHORT
+                        ).show()
+
+                        if (ok) {
+                            returnLine = null
+                        }
+                    }
+                }
+            )
+        }
+
+        return
+    }
+
     Column(
         modifier =
             Modifier
@@ -4061,46 +4441,7 @@ private fun DealerSaleDetail(
         }
     }
 
-    returnLine?.let { line ->
-        DealerSalesReturnDialog(
-            line = line,
-            onDismiss = {
-                returnLine = null
-            },
-            onSave = {
-                    quantity,
-                    type,
-                    note ->
 
-                viewModel.recordSalesReturn(
-                    saleLineId = line.id,
-                    quantity = quantity,
-                    returnType = type,
-                    note = note
-                ) { ok ->
-                    Toast.makeText(
-                        context,
-                        if (ok) {
-                            v15Text(
-                                "রিটার্ন সংরক্ষণ হয়েছে",
-                                "Return saved"
-                            )
-                        } else {
-                            v15Text(
-                                "রিটার্ন করা যায়নি",
-                                "Return failed"
-                            )
-                        },
-                        Toast.LENGTH_SHORT
-                    ).show()
-
-                    if (ok) {
-                        returnLine = null
-                    }
-                }
-            }
-        )
-    }
 
     editingReturn?.let { item ->
         DealerReturnMetaDialog(
@@ -4228,6 +4569,63 @@ private fun DealerPurchaseDetail(
 
     val deleteSecurityViewModel:
         FamilyKhataViewModel = viewModel()
+
+    returnLine?.let { line ->
+        BackHandler {
+            returnLine = null
+        }
+
+        V15DeepScreenContainer(
+            title =
+                v15Text(
+                    "সাপ্লায়ারকে রিটার্ন",
+                    "Return to supplier"
+                ),
+            onBack = {
+                returnLine = null
+            }
+        ) {
+            DealerPurchaseReturnForm(
+                line = line,
+                onDismiss = {
+                    returnLine = null
+                },
+                onSave = {
+                        quantity,
+                        note ->
+
+                    viewModel.recordPurchaseReturn(
+                        purchaseLineId =
+                            line.id,
+                        quantity = quantity,
+                        note = note
+                    ) { ok ->
+                        Toast.makeText(
+                            context,
+                            if (ok) {
+                                v15Text(
+                                    "পারচেজ রিটার্ন সংরক্ষণ হয়েছে",
+                                    "Purchase return saved"
+                                )
+                            } else {
+                                v15Text(
+                                    "রিটার্ন করা যায়নি। স্টকে পর্যাপ্ত পণ্য আছে কিনা দেখুন।",
+                                    "Return failed. Check available stock."
+                                )
+                            },
+                            Toast.LENGTH_SHORT
+                        ).show()
+
+                        if (ok) {
+                            returnLine = null
+                        }
+                    }
+                }
+            )
+        }
+
+        return
+    }
 
     Column(
         modifier =
@@ -4447,45 +4845,7 @@ private fun DealerPurchaseDetail(
         }
     }
 
-    returnLine?.let { line ->
-        DealerPurchaseReturnDialog(
-            line = line,
-            onDismiss = {
-                returnLine = null
-            },
-            onSave = {
-                    quantity,
-                    note ->
 
-                viewModel.recordPurchaseReturn(
-                    purchaseLineId =
-                        line.id,
-                    quantity = quantity,
-                    note = note
-                ) { ok ->
-                    Toast.makeText(
-                        context,
-                        if (ok) {
-                            v15Text(
-                                "পারচেজ রিটার্ন সংরক্ষণ হয়েছে",
-                                "Purchase return saved"
-                            )
-                        } else {
-                            v15Text(
-                                "রিটার্ন করা যায়নি। স্টকে পর্যাপ্ত পণ্য আছে কিনা দেখুন।",
-                                "Return failed. Check available stock."
-                            )
-                        },
-                        Toast.LENGTH_SHORT
-                    ).show()
-
-                    if (ok) {
-                        returnLine = null
-                    }
-                }
-            }
-        )
-    }
 
     editingReturn?.let { item ->
         DealerReturnMetaDialog(
@@ -4560,7 +4920,7 @@ private fun DealerPurchaseDetail(
 }
 
 @Composable
-private fun DealerPurchaseDialog(
+private fun DealerPurchaseForm(
     companies: List<DealerCompanyEntity>,
     products: List<ProductEntity>,
     onDismiss: () -> Unit,
@@ -4611,25 +4971,21 @@ private fun DealerPurchaseDialog(
             >()
         }
 
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        title = {
-            Text(
-                v15Text(
-                    "নতুন ক্রয়",
-                    "New purchase"
-                )
-            )
-        },
-        text = {
+
             Column(
-                modifier =
-                    Modifier.verticalScroll(
-                        rememberScrollState()
-                    ),
-                verticalArrangement =
-                    Arrangement.spacedBy(7.dp)
-            ) {
+        modifier =
+            Modifier
+                .fillMaxSize()
+                .verticalScroll(
+                    rememberScrollState()
+                )
+                .padding(
+                    horizontal = 12.dp,
+                    bottom = 28.dp
+                ),
+        verticalArrangement =
+            Arrangement.spacedBy(8.dp)
+    ) {
                 Text(
                     v15Text(
                         "কোম্পানি নির্বাচন",
@@ -4873,9 +5229,8 @@ private fun DealerPurchaseDialog(
                     modifier =
                         Modifier.fillMaxWidth()
                 )
-            }
-        },
-        confirmButton = {
+
+
             TextButton(
                 onClick = {
                     val company =
@@ -4908,8 +5263,8 @@ private fun DealerPurchaseDialog(
                     )
                 )
             }
-        },
-        dismissButton = {
+
+
             TextButton(
                 onClick = onDismiss
             ) {
@@ -4920,12 +5275,13 @@ private fun DealerPurchaseDialog(
                     )
                 )
             }
-        }
-    )
+
+}
+
 }
 
 @Composable
-private fun DealerSaleDialog(
+private fun DealerSaleForm(
     customers: List<DealerCustomerEntity>,
     products: List<ProductEntity>,
     onDismiss: () -> Unit,
@@ -4972,25 +5328,21 @@ private fun DealerSaleDialog(
             >()
         }
 
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        title = {
-            Text(
-                v15Text(
-                    "নতুন বিক্রি",
-                    "New sale"
-                )
-            )
-        },
-        text = {
+
             Column(
-                modifier =
-                    Modifier.verticalScroll(
-                        rememberScrollState()
-                    ),
-                verticalArrangement =
-                    Arrangement.spacedBy(7.dp)
-            ) {
+        modifier =
+            Modifier
+                .fillMaxSize()
+                .verticalScroll(
+                    rememberScrollState()
+                )
+                .padding(
+                    horizontal = 12.dp,
+                    bottom = 28.dp
+                ),
+        verticalArrangement =
+            Arrangement.spacedBy(8.dp)
+    ) {
                 Text(
                     v15Text(
                         "রিটেইলার নির্বাচন",
@@ -5223,9 +5575,8 @@ private fun DealerSaleDialog(
                     modifier =
                         Modifier.fillMaxWidth()
                 )
-            }
-        },
-        confirmButton = {
+
+
             TextButton(
                 onClick = {
                     val customer =
@@ -5258,8 +5609,8 @@ private fun DealerSaleDialog(
                     )
                 )
             }
-        },
-        dismissButton = {
+
+
             TextButton(
                 onClick = onDismiss
             ) {
@@ -5270,12 +5621,13 @@ private fun DealerSaleDialog(
                     )
                 )
             }
-        }
-    )
+
+}
+
 }
 
 @Composable
-private fun DealerCollectionDialog(
+private fun DealerCollectionForm(
     initial: DealerCollectionEntity?,
     customers: List<DealerCustomerEntity>,
     onDismiss: () -> Unit,
@@ -5314,32 +5666,21 @@ private fun DealerCollectionDialog(
         )
     }
 
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        title = {
-            Text(
-                if (initial == null) {
-                    v15Text(
-                        "কাস্টমার কালেকশন",
-                        "Customer collection"
-                    )
-                } else {
-                    v15Text(
-                        "কালেকশন সংশোধন",
-                        "Correct collection"
-                    )
-                }
-            )
-        },
-        text = {
+
             Column(
-                modifier =
-                    Modifier.verticalScroll(
-                        rememberScrollState()
-                    ),
-                verticalArrangement =
-                    Arrangement.spacedBy(7.dp)
-            ) {
+        modifier =
+            Modifier
+                .fillMaxSize()
+                .verticalScroll(
+                    rememberScrollState()
+                )
+                .padding(
+                    horizontal = 12.dp,
+                    bottom = 28.dp
+                ),
+        verticalArrangement =
+            Arrangement.spacedBy(8.dp)
+    ) {
                 customers.forEach { customer ->
                     OutlinedButton(
                         onClick = {
@@ -5406,9 +5747,8 @@ private fun DealerCollectionDialog(
                     modifier =
                         Modifier.fillMaxWidth()
                 )
-            }
-        },
-        confirmButton = {
+
+
             TextButton(
                 onClick = {
                     val id = customerId
@@ -5442,8 +5782,8 @@ private fun DealerCollectionDialog(
                     )
                 )
             }
-        },
-        dismissButton = {
+
+
             TextButton(
                 onClick = onDismiss
             ) {
@@ -5454,12 +5794,13 @@ private fun DealerCollectionDialog(
                     )
                 )
             }
-        }
-    )
+
+}
+
 }
 
 @Composable
-private fun DealerSupplierPaymentDialog(
+private fun DealerSupplierPaymentForm(
     initial: DealerSupplierPaymentEntity?,
     companies: List<DealerCompanyEntity>,
     onDismiss: () -> Unit,
@@ -5498,32 +5839,21 @@ private fun DealerSupplierPaymentDialog(
         )
     }
 
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        title = {
-            Text(
-                if (initial == null) {
-                    v15Text(
-                        "সাপ্লায়ার পেমেন্ট",
-                        "Supplier payment"
-                    )
-                } else {
-                    v15Text(
-                        "পেমেন্ট সংশোধন",
-                        "Correct payment"
-                    )
-                }
-            )
-        },
-        text = {
+
             Column(
-                modifier =
-                    Modifier.verticalScroll(
-                        rememberScrollState()
-                    ),
-                verticalArrangement =
-                    Arrangement.spacedBy(7.dp)
-            ) {
+        modifier =
+            Modifier
+                .fillMaxSize()
+                .verticalScroll(
+                    rememberScrollState()
+                )
+                .padding(
+                    horizontal = 12.dp,
+                    bottom = 28.dp
+                ),
+        verticalArrangement =
+            Arrangement.spacedBy(8.dp)
+    ) {
                 companies.forEach { company ->
                     OutlinedButton(
                         onClick = {
@@ -5590,9 +5920,8 @@ private fun DealerSupplierPaymentDialog(
                     modifier =
                         Modifier.fillMaxWidth()
                 )
-            }
-        },
-        confirmButton = {
+
+
             TextButton(
                 onClick = {
                     val id = companyId
@@ -5626,8 +5955,8 @@ private fun DealerSupplierPaymentDialog(
                     )
                 )
             }
-        },
-        dismissButton = {
+
+
             TextButton(
                 onClick = onDismiss
             ) {
@@ -5638,12 +5967,13 @@ private fun DealerSupplierPaymentDialog(
                     )
                 )
             }
-        }
-    )
+
+}
+
 }
 
 @Composable
-private fun DealerExpenseDialog(
+private fun DealerExpenseForm(
     initial: DealerExpenseEntity?,
     onDismiss: () -> Unit,
     onSave: (
@@ -5673,28 +6003,21 @@ private fun DealerExpenseDialog(
         )
     }
 
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        title = {
-            Text(
-                if (initial == null) {
-                    v15Text(
-                        "ব্যবসার খরচ",
-                        "Business expense"
-                    )
-                } else {
-                    v15Text(
-                        "খরচ সম্পাদনা",
-                        "Edit expense"
-                    )
-                }
-            )
-        },
-        text = {
+
             Column(
-                verticalArrangement =
-                    Arrangement.spacedBy(7.dp)
-            ) {
+        modifier =
+            Modifier
+                .fillMaxSize()
+                .verticalScroll(
+                    rememberScrollState()
+                )
+                .padding(
+                    horizontal = 12.dp,
+                    bottom = 28.dp
+                ),
+        verticalArrangement =
+            Arrangement.spacedBy(8.dp)
+    ) {
                 OutlinedTextField(
                     category,
                     { category = it },
@@ -5739,9 +6062,8 @@ private fun DealerExpenseDialog(
                     modifier =
                         Modifier.fillMaxWidth()
                 )
-            }
-        },
-        confirmButton = {
+
+
             TextButton(
                 onClick = {
                     val value =
@@ -5768,8 +6090,8 @@ private fun DealerExpenseDialog(
                     )
                 )
             }
-        },
-        dismissButton = {
+
+
             TextButton(onClick = onDismiss) {
                 Text(
                     v15Text(
@@ -5778,12 +6100,13 @@ private fun DealerExpenseDialog(
                     )
                 )
             }
-        }
-    )
+
+}
+
 }
 
 @Composable
-private fun DealerSalesReturnDialog(
+private fun DealerSalesReturnForm(
     line: DealerSaleLineEntity,
     onDismiss: () -> Unit,
     onSave: (
@@ -5804,21 +6127,21 @@ private fun DealerSalesReturnDialog(
         mutableStateOf("")
     }
 
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        title = {
-            Text(
-                v15Text(
-                    "বিক্রয় রিটার্ন / ড্যামেজ",
-                    "Sales return / damage"
-                )
-            )
-        },
-        text = {
+
             Column(
-                verticalArrangement =
-                    Arrangement.spacedBy(7.dp)
-            ) {
+        modifier =
+            Modifier
+                .fillMaxSize()
+                .verticalScroll(
+                    rememberScrollState()
+                )
+                .padding(
+                    horizontal = 12.dp,
+                    bottom = 28.dp
+                ),
+        verticalArrangement =
+            Arrangement.spacedBy(8.dp)
+    ) {
                 Text(
                     line.productNameSnapshot,
                     fontWeight =
@@ -5920,10 +6243,9 @@ private fun DealerSalesReturnDialog(
                     modifier =
                         Modifier.fillMaxWidth()
                 )
-            }
-        },
-        confirmButton = {
-            TextButton(
+
+
+Button(
                 onClick = {
                     val value =
                         quantity
@@ -5949,9 +6271,8 @@ private fun DealerSalesReturnDialog(
                     )
                 )
             }
-        },
-        dismissButton = {
-            TextButton(onClick = onDismiss) {
+
+OutlinedButton(onClick = onDismiss) {
                 Text(
                     v15Text(
                         "বাতিল",
@@ -5959,12 +6280,12 @@ private fun DealerSalesReturnDialog(
                     )
                 )
             }
-        }
-    )
+}
+
 }
 
 @Composable
-private fun DealerPurchaseReturnDialog(
+private fun DealerPurchaseReturnForm(
     line: DealerPurchaseLineEntity,
     onDismiss: () -> Unit,
     onSave: (
@@ -5980,21 +6301,21 @@ private fun DealerPurchaseReturnDialog(
         mutableStateOf("")
     }
 
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        title = {
-            Text(
-                v15Text(
-                    "সাপ্লায়ারকে রিটার্ন",
-                    "Return to supplier"
-                )
-            )
-        },
-        text = {
+
             Column(
-                verticalArrangement =
-                    Arrangement.spacedBy(7.dp)
-            ) {
+        modifier =
+            Modifier
+                .fillMaxSize()
+                .verticalScroll(
+                    rememberScrollState()
+                )
+                .padding(
+                    horizontal = 12.dp,
+                    bottom = 28.dp
+                ),
+        verticalArrangement =
+            Arrangement.spacedBy(8.dp)
+    ) {
                 Text(
                     line.productNameSnapshot,
                     fontWeight =
@@ -6037,10 +6358,9 @@ private fun DealerPurchaseReturnDialog(
                     modifier =
                         Modifier.fillMaxWidth()
                 )
-            }
-        },
-        confirmButton = {
-            TextButton(
+
+
+Button(
                 onClick = {
                     val value =
                         quantity
@@ -6065,9 +6385,8 @@ private fun DealerPurchaseReturnDialog(
                     )
                 )
             }
-        },
-        dismissButton = {
-            TextButton(onClick = onDismiss) {
+
+OutlinedButton(onClick = onDismiss) {
                 Text(
                     v15Text(
                         "বাতিল",
@@ -6075,8 +6394,8 @@ private fun DealerPurchaseReturnDialog(
                     )
                 )
             }
-        }
-    )
+}
+
 }
 
 
@@ -6309,7 +6628,7 @@ private fun DealerReturnMetaDialog(
 }
 
 @Composable
-private fun DealerDeliverySaleDialog(
+private fun DealerDeliverySaleForm(
     challan: DealerDeliveryChallanEntity,
     customers:
         List<DealerCustomerEntity>,
@@ -6395,32 +6714,21 @@ private fun DealerDeliverySaleDialog(
         loading = false
     }
 
-    AlertDialog(
-        onDismissRequest =
-            onDismiss,
-        title = {
-            Text(
-                v15Text(
-                    "ডেলিভারি বিক্রি / বাকি",
-                    "Delivery sale / due"
-                )
-            )
-        },
-        text = {
+
             Column(
-                modifier =
-                    Modifier
-                        .heightIn(
-                            max = 600.dp
-                        )
-                        .verticalScroll(
-                            rememberScrollState()
-                        ),
-                verticalArrangement =
-                    Arrangement.spacedBy(
-                        8.dp
-                    )
-            ) {
+        modifier =
+            Modifier
+                .fillMaxSize()
+                .verticalScroll(
+                    rememberScrollState()
+                )
+                .padding(
+                    horizontal = 12.dp,
+                    bottom = 28.dp
+                ),
+        verticalArrangement =
+            Arrangement.spacedBy(8.dp)
+    ) {
                 Text(
                     v15Text(
                         "চালান: ${challan.challanNo}",
@@ -6671,10 +6979,9 @@ private fun DealerDeliverySaleDialog(
                     modifier =
                         Modifier.fillMaxWidth()
                 )
-            }
-        },
-        confirmButton = {
-            TextButton(
+
+
+TextButton(
                 onClick = {
                     val selectedCustomer =
                         customerId
@@ -6817,9 +7124,8 @@ private fun DealerDeliverySaleDialog(
                     )
                 )
             }
-        },
-        dismissButton = {
-            TextButton(
+
+TextButton(
                 onClick =
                     onDismiss
             ) {
@@ -6830,13 +7136,13 @@ private fun DealerDeliverySaleDialog(
                     )
                 )
             }
-        }
-    )
+}
+
 }
 
 
 @Composable
-private fun DealerDeliverySettlementDialog(
+private fun DealerDeliverySettlementForm(
     challan:
         DealerDeliveryChallanEntity,
     viewModel:
@@ -6918,32 +7224,21 @@ private fun DealerDeliverySettlementDialog(
         loading = false
     }
 
-    AlertDialog(
-        onDismissRequest =
-            onDismiss,
-        title = {
-            Text(
-                v15Text(
-                    "রাতে মাল বুঝে নেওয়া",
-                    "Night settlement"
-                )
-            )
-        },
-        text = {
+
             Column(
-                modifier =
-                    Modifier
-                        .heightIn(
-                            max = 620.dp
-                        )
-                        .verticalScroll(
-                            rememberScrollState()
-                        ),
-                verticalArrangement =
-                    Arrangement.spacedBy(
-                        8.dp
-                    )
-            ) {
+        modifier =
+            Modifier
+                .fillMaxSize()
+                .verticalScroll(
+                    rememberScrollState()
+                )
+                .padding(
+                    horizontal = 12.dp,
+                    bottom = 28.dp
+                ),
+        verticalArrangement =
+            Arrangement.spacedBy(8.dp)
+    ) {
                 Text(
                     v15Text(
                         "চালান: ${challan.challanNo}",
@@ -7196,10 +7491,9 @@ private fun DealerDeliverySettlementDialog(
                     modifier =
                         Modifier.fillMaxWidth()
                 )
-            }
-        },
-        confirmButton = {
-            TextButton(
+
+
+TextButton(
                 onClick = {
                     if (
                         statuses.isEmpty() ||
@@ -7307,9 +7601,8 @@ private fun DealerDeliverySettlementDialog(
                     )
                 )
             }
-        },
-        dismissButton = {
-            TextButton(
+
+TextButton(
                 onClick =
                     onDismiss
             ) {
@@ -7320,13 +7613,13 @@ private fun DealerDeliverySettlementDialog(
                     )
                 )
             }
-        }
-    )
+}
+
 }
 
 
 @Composable
-private fun DealerDeliveryChallanDialog(
+private fun DealerDeliveryChallanForm(
     viewModel:
         DealerBusinessViewModel,
     deliveryPeople:
@@ -7378,32 +7671,21 @@ private fun DealerDeliveryChallanDialog(
         )
     }
 
-    AlertDialog(
-        onDismissRequest =
-            onDismiss,
-        title = {
-            Text(
-                v15Text(
-                    "মাল দেওয়ার চালান",
-                    "Issue delivery challan"
-                )
-            )
-        },
-        text = {
+
             Column(
-                modifier =
-                    Modifier
-                        .heightIn(
-                            max = 560.dp
-                        )
-                        .verticalScroll(
-                            rememberScrollState()
-                        ),
-                verticalArrangement =
-                    Arrangement.spacedBy(
-                        7.dp
-                    )
-            ) {
+        modifier =
+            Modifier
+                .fillMaxSize()
+                .verticalScroll(
+                    rememberScrollState()
+                )
+                .padding(
+                    horizontal = 12.dp,
+                    bottom = 28.dp
+                ),
+        verticalArrangement =
+            Arrangement.spacedBy(8.dp)
+    ) {
                 Text(
                     v15Text(
                         "ডেলিভারি ম্যান নির্বাচন",
@@ -7927,9 +8209,8 @@ private fun DealerDeliveryChallanDialog(
                     modifier =
                         Modifier.fillMaxWidth()
                 )
-            }
-        },
-        confirmButton = {
+
+
             TextButton(
                 onClick = {
                     val personId =
@@ -7955,8 +8236,8 @@ private fun DealerDeliveryChallanDialog(
                     )
                 )
             }
-        },
-        dismissButton = {
+
+
             TextButton(
                 onClick =
                     onDismiss
@@ -7968,13 +8249,14 @@ private fun DealerDeliveryChallanDialog(
                     )
                 )
             }
-        }
-    )
+
+}
+
 }
 
 
 @Composable
-private fun DealerWarehouseDamageDialog(
+private fun DealerWarehouseDamageForm(
     products:
         List<com.familykhata.app.data.ProductEntity>,
     viewModel:
@@ -8007,30 +8289,21 @@ private fun DealerWarehouseDamageDialog(
         mutableStateOf("")
     }
 
-    AlertDialog(
-        onDismissRequest =
-            onDismiss,
-        title = {
-            Text(
-                v15Text(
-                    "ড্যামেজ হিসাব",
-                    "Record damage"
-                )
-            )
-        },
-        text = {
+
             Column(
-                modifier =
-                    Modifier
-                        .heightIn(
-                            max = 560.dp
-                        )
-                        .verticalScroll(
-                            rememberScrollState()
-                        ),
-                verticalArrangement =
-                    Arrangement.spacedBy(7.dp)
-            ) {
+        modifier =
+            Modifier
+                .fillMaxSize()
+                .verticalScroll(
+                    rememberScrollState()
+                )
+                .padding(
+                    horizontal = 12.dp,
+                    bottom = 28.dp
+                ),
+        verticalArrangement =
+            Arrangement.spacedBy(8.dp)
+    ) {
                 Text(
                     v15Text(
                         "পণ্য নির্বাচন",
@@ -8211,10 +8484,9 @@ private fun DealerWarehouseDamageDialog(
                     modifier =
                         Modifier.fillMaxWidth()
                 )
-            }
-        },
-        confirmButton = {
-            TextButton(
+
+
+TextButton(
                 onClick = {
                     val selectedBatch =
                         batchId
@@ -8242,9 +8514,8 @@ private fun DealerWarehouseDamageDialog(
                     )
                 )
             }
-        },
-        dismissButton = {
-            TextButton(
+
+TextButton(
                 onClick =
                     onDismiss
             ) {
@@ -8255,13 +8526,13 @@ private fun DealerWarehouseDamageDialog(
                     )
                 )
             }
-        }
-    )
+}
+
 }
 
 
 @Composable
-private fun DealerDeliveryChallanMetaDialog(
+private fun DealerDeliveryChallanMetaForm(
     initial: DealerDeliveryChallanEntity,
     deliveryPeople:
         List<DealerDeliveryPersonEntity>,
@@ -8299,29 +8570,21 @@ private fun DealerDeliveryChallanMetaDialog(
         )
     }
 
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        title = {
-            Text(
-                v15Text(
-                    "চালান তথ্য সম্পাদনা",
-                    "Edit challan information"
-                )
-            )
-        },
-        text = {
+
             Column(
-                modifier =
-                    Modifier
-                        .heightIn(
-                            max = 560.dp
-                        )
-                        .verticalScroll(
-                            rememberScrollState()
-                        ),
-                verticalArrangement =
-                    Arrangement.spacedBy(7.dp)
-            ) {
+        modifier =
+            Modifier
+                .fillMaxSize()
+                .verticalScroll(
+                    rememberScrollState()
+                )
+                .padding(
+                    horizontal = 12.dp,
+                    bottom = 28.dp
+                ),
+        verticalArrangement =
+            Arrangement.spacedBy(8.dp)
+    ) {
                 Text(
                     v15Text(
                         "ডেলিভারি ম্যান",
@@ -8405,10 +8668,9 @@ private fun DealerDeliveryChallanMetaDialog(
                     modifier =
                         Modifier.fillMaxWidth()
                 )
-            }
-        },
-        confirmButton = {
-            TextButton(
+
+
+TextButton(
                 onClick = {
                     val selectedPerson =
                         personId
@@ -8434,9 +8696,8 @@ private fun DealerDeliveryChallanMetaDialog(
                     )
                 )
             }
-        },
-        dismissButton = {
-            TextButton(
+
+TextButton(
                 onClick = onDismiss
             ) {
                 Text(
@@ -8446,13 +8707,13 @@ private fun DealerDeliveryChallanMetaDialog(
                     )
                 )
             }
-        }
-    )
+}
+
 }
 
 
 @Composable
-private fun DealerDeliverySettlementMetaDialog(
+private fun DealerDeliverySettlementMetaForm(
     challan: DealerDeliveryChallanEntity,
     viewModel: DealerBusinessViewModel,
     onDismiss: () -> Unit,
@@ -8516,21 +8777,21 @@ private fun DealerDeliverySettlementMetaDialog(
         loading = false
     }
 
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        title = {
-            Text(
-                v15Text(
-                    "সেটেলমেন্ট সম্পাদনা",
-                    "Edit settlement"
-                )
-            )
-        },
-        text = {
+
             Column(
-                verticalArrangement =
-                    Arrangement.spacedBy(7.dp)
-            ) {
+        modifier =
+            Modifier
+                .fillMaxSize()
+                .verticalScroll(
+                    rememberScrollState()
+                )
+                .padding(
+                    horizontal = 12.dp,
+                    bottom = 28.dp
+                ),
+        verticalArrangement =
+            Arrangement.spacedBy(8.dp)
+    ) {
                 if (loading) {
                     Text(
                         v15Text(
@@ -8610,10 +8871,9 @@ private fun DealerDeliverySettlementMetaDialog(
                                 .bodySmall
                     )
                 }
-            }
-        },
-        confirmButton = {
-            TextButton(
+
+
+TextButton(
                 onClick = {
                     val current =
                         settlement
@@ -8654,9 +8914,8 @@ private fun DealerDeliverySettlementMetaDialog(
                     )
                 )
             }
-        },
-        dismissButton = {
-            TextButton(
+
+TextButton(
                 onClick = onDismiss
             ) {
                 Text(
@@ -8666,13 +8925,13 @@ private fun DealerDeliverySettlementMetaDialog(
                     )
                 )
             }
-        }
-    )
+}
+
 }
 
 
 @Composable
-private fun DealerWarehouseDamageEditDialog(
+private fun DealerWarehouseDamageEditForm(
     initial: DealerDamageEntity,
     onDismiss: () -> Unit,
     onSave: (
@@ -8695,21 +8954,21 @@ private fun DealerWarehouseDamageEditDialog(
         mutableStateOf(initial.note)
     }
 
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        title = {
-            Text(
-                v15Text(
-                    "ড্যামেজ এন্ট্রি সম্পাদনা",
-                    "Edit damage entry"
-                )
-            )
-        },
-        text = {
+
             Column(
-                verticalArrangement =
-                    Arrangement.spacedBy(7.dp)
-            ) {
+        modifier =
+            Modifier
+                .fillMaxSize()
+                .verticalScroll(
+                    rememberScrollState()
+                )
+                .padding(
+                    horizontal = 12.dp,
+                    bottom = 28.dp
+                ),
+        verticalArrangement =
+            Arrangement.spacedBy(8.dp)
+    ) {
                 Text(
                     initial.productNameSnapshot,
                     fontWeight =
@@ -8773,10 +9032,9 @@ private fun DealerWarehouseDamageEditDialog(
                     modifier =
                         Modifier.fillMaxWidth()
                 )
-            }
-        },
-        confirmButton = {
-            TextButton(
+
+
+TextButton(
                 onClick = {
                     val qty =
                         quantity
@@ -8801,9 +9059,8 @@ private fun DealerWarehouseDamageEditDialog(
                     )
                 )
             }
-        },
-        dismissButton = {
-            TextButton(
+
+TextButton(
                 onClick = onDismiss
             ) {
                 Text(
@@ -8813,13 +9070,13 @@ private fun DealerWarehouseDamageEditDialog(
                     )
                 )
             }
-        }
-    )
+}
+
 }
 
 
 @Composable
-private fun DealerPackSetupDialog(
+private fun DealerPackSetupForm(
     products:
         List<com.familykhata.app.data.ProductEntity>,
     packs:
@@ -8872,25 +9129,21 @@ private fun DealerPackSetupDialog(
                 .orEmpty()
     }
 
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        title = {
-            Text(
-                v15Text(
-                    "বক্স / পাতা সেটআপ",
-                    "Box / sheet setup"
-                )
-            )
-        },
-        text = {
+
             Column(
-                modifier =
-                    Modifier.verticalScroll(
-                        rememberScrollState()
-                    ),
-                verticalArrangement =
-                    Arrangement.spacedBy(7.dp)
-            ) {
+        modifier =
+            Modifier
+                .fillMaxSize()
+                .verticalScroll(
+                    rememberScrollState()
+                )
+                .padding(
+                    horizontal = 12.dp,
+                    bottom = 28.dp
+                ),
+        verticalArrangement =
+            Arrangement.spacedBy(8.dp)
+    ) {
                 Text(
                     v15Text(
                         "পণ্য নির্বাচন",
@@ -8983,10 +9236,9 @@ private fun DealerPackSetupDialog(
                         )
                     }
                 }
-            }
-        },
-        confirmButton = {
-            TextButton(
+
+
+TextButton(
                 onClick = {
                     val id =
                         productId
@@ -9021,9 +9273,8 @@ private fun DealerPackSetupDialog(
                     )
                 )
             }
-        },
-        dismissButton = {
-            TextButton(
+
+TextButton(
                 onClick = onDismiss
             ) {
                 Text(
@@ -9033,13 +9284,13 @@ private fun DealerPackSetupDialog(
                     )
                 )
             }
-        }
-    )
+}
+
 }
 
 
 @Composable
-private fun DealerDeliveryPersonDialog(
+private fun DealerDeliveryPersonForm(
     initial:
         DealerDeliveryPersonEntity?,
     onDismiss: () -> Unit,
@@ -9067,29 +9318,20 @@ private fun DealerDeliveryPersonDialog(
         )
     }
 
-    AlertDialog(
-        onDismissRequest =
-            onDismiss,
-        title = {
-            Text(
-                if (initial == null) {
-                    v15Text(
-                        "ডেলিভারি ম্যান যোগ করুন",
-                        "Add delivery man"
-                    )
-                } else {
-                    v15Text(
-                        "ডেলিভারি ম্যান সম্পাদনা",
-                        "Edit delivery man"
-                    )
-                }
-            )
-        },
-        text = {
-            Column(
-                verticalArrangement =
-                    Arrangement.spacedBy(7.dp)
-            ) {
+    Column(
+        modifier =
+            Modifier
+                .fillMaxSize()
+                .verticalScroll(
+                    rememberScrollState()
+                )
+                .padding(
+                    horizontal = 12.dp,
+                    bottom = 28.dp
+                ),
+        verticalArrangement =
+            Arrangement.spacedBy(7.dp)
+    ) {
                 OutlinedTextField(
                     value = name,
                     onValueChange = {
@@ -9140,10 +9382,9 @@ private fun DealerDeliveryPersonDialog(
                     modifier =
                         Modifier.fillMaxWidth()
                 )
-            }
-        },
-        confirmButton = {
-            TextButton(
+
+
+TextButton(
                 onClick = {
                     if (
                         name.isNotBlank()
@@ -9163,8 +9404,7 @@ private fun DealerDeliveryPersonDialog(
                     )
                 )
             }
-        },
-        dismissButton = {
+
             TextButton(
                 onClick =
                     onDismiss
@@ -9176,11 +9416,8 @@ private fun DealerDeliveryPersonDialog(
                     )
                 )
             }
-        }
-    )
 }
-
-
+}
 @Composable
 private fun DealerBusinessMetric(
     title: String,
@@ -9214,7 +9451,7 @@ private fun DealerBusinessMetric(
 }
 
 @Composable
-private fun DealerCompanyDialog(
+private fun DealerCompanyForm(
     initial: DealerCompanyEntity?,
     onDismiss: () -> Unit,
     onSave: (
@@ -9252,28 +9489,20 @@ private fun DealerCompanyDialog(
         mutableStateOf(initial?.note.orEmpty())
     }
 
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        title = {
-            Text(
-                if (initial == null) {
-                    v15Text(
-                        "কোম্পানি যোগ করুন",
-                        "Add company"
-                    )
-                } else {
-                    v15Text(
-                        "কোম্পানি সম্পাদনা",
-                        "Edit company"
-                    )
-                }
-            )
-        },
-        text = {
-            Column(
-                verticalArrangement =
-                    Arrangement.spacedBy(7.dp)
-            ) {
+    Column(
+        modifier =
+            Modifier
+                .fillMaxSize()
+                .verticalScroll(
+                    rememberScrollState()
+                )
+                .padding(
+                    horizontal = 12.dp,
+                    bottom = 28.dp
+                ),
+        verticalArrangement =
+            Arrangement.spacedBy(7.dp)
+    ) {
                 OutlinedTextField(
                     name,
                     { name = it },
@@ -9363,10 +9592,9 @@ private fun DealerCompanyDialog(
                     modifier =
                         Modifier.fillMaxWidth()
                 )
-            }
-        },
-        confirmButton = {
-            TextButton(
+
+
+TextButton(
                 onClick = {
                     if (name.isNotBlank()) {
                         onSave(
@@ -9387,8 +9615,7 @@ private fun DealerCompanyDialog(
                     )
                 )
             }
-        },
-        dismissButton = {
+
             TextButton(
                 onClick = onDismiss
             ) {
@@ -9399,12 +9626,10 @@ private fun DealerCompanyDialog(
                     )
                 )
             }
-        }
-    )
 }
-
+}
 @Composable
-private fun DealerAreaDialog(
+private fun DealerAreaForm(
     initial: DealerAreaEntity?,
     onDismiss: () -> Unit,
     onSave: (
@@ -9425,28 +9650,20 @@ private fun DealerAreaDialog(
         mutableStateOf(initial?.note.orEmpty())
     }
 
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        title = {
-            Text(
-                if (initial == null) {
-                    v15Text(
-                        "এরিয়া যোগ করুন",
-                        "Add area"
-                    )
-                } else {
-                    v15Text(
-                        "এরিয়া সম্পাদনা",
-                        "Edit area"
-                    )
-                }
-            )
-        },
-        text = {
-            Column(
-                verticalArrangement =
-                    Arrangement.spacedBy(7.dp)
-            ) {
+    Column(
+        modifier =
+            Modifier
+                .fillMaxSize()
+                .verticalScroll(
+                    rememberScrollState()
+                )
+                .padding(
+                    horizontal = 12.dp,
+                    bottom = 28.dp
+                ),
+        verticalArrangement =
+            Arrangement.spacedBy(7.dp)
+    ) {
                 OutlinedTextField(
                     name,
                     { name = it },
@@ -9491,10 +9708,9 @@ private fun DealerAreaDialog(
                     modifier =
                         Modifier.fillMaxWidth()
                 )
-            }
-        },
-        confirmButton = {
-            TextButton(
+
+
+TextButton(
                 onClick = {
                     if (name.isNotBlank()) {
                         onSave(
@@ -9512,8 +9728,7 @@ private fun DealerAreaDialog(
                     )
                 )
             }
-        },
-        dismissButton = {
+
             TextButton(onClick = onDismiss) {
                 Text(
                     v15Text(
@@ -9522,12 +9737,10 @@ private fun DealerAreaDialog(
                     )
                 )
             }
-        }
-    )
 }
-
+}
 @Composable
-private fun DealerCustomerDialog(
+private fun DealerCustomerForm(
     initial: DealerCustomerEntity?,
     areas: List<DealerAreaEntity>,
     onDismiss: () -> Unit,
@@ -9577,32 +9790,20 @@ private fun DealerCustomerDialog(
         mutableStateOf(initial?.note.orEmpty())
     }
 
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        title = {
-            Text(
-                if (initial == null) {
-                    v15Text(
-                        "রিটেইলার যোগ করুন",
-                        "Add retailer"
-                    )
-                } else {
-                    v15Text(
-                        "রিটেইলার সম্পাদনা",
-                        "Edit retailer"
-                    )
-                }
-            )
-        },
-        text = {
-            Column(
-                modifier =
-                    Modifier.verticalScroll(
-                        rememberScrollState()
-                    ),
-                verticalArrangement =
-                    Arrangement.spacedBy(7.dp)
-            ) {
+    Column(
+        modifier =
+            Modifier
+                .fillMaxSize()
+                .verticalScroll(
+                    rememberScrollState()
+                )
+                .padding(
+                    horizontal = 12.dp,
+                    bottom = 28.dp
+                ),
+        verticalArrangement =
+            Arrangement.spacedBy(7.dp)
+    ) {
                 Text(
                     v15Text(
                         "এরিয়া নির্বাচন",
@@ -9741,10 +9942,9 @@ private fun DealerCustomerDialog(
                     modifier =
                         Modifier.fillMaxWidth()
                 )
-            }
-        },
-        confirmButton = {
-            TextButton(
+
+
+TextButton(
                 onClick = {
                     val creditValue =
                         credit
@@ -9776,8 +9976,7 @@ private fun DealerCustomerDialog(
                     )
                 )
             }
-        },
-        dismissButton = {
+
             TextButton(onClick = onDismiss) {
                 Text(
                     v15Text(
@@ -9786,6 +9985,5 @@ private fun DealerCustomerDialog(
                     )
                 )
             }
-        }
-    )
+}
 }

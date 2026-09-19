@@ -145,15 +145,111 @@ internal fun V16RetailSalesScreen(
         )
     }
 
-    BackHandler {
-        if (selectedSale != null) {
-            selectedSaleId = null
-        } else {
-            onExit()
+    BackHandler(
+        enabled = showNewSale
+    ) {
+        if (!saving) {
+            showNewSale = false
         }
     }
 
-    if (selectedSale != null) {
+    BackHandler(
+        enabled =
+            !showNewSale &&
+                selectedSale != null
+    ) {
+        selectedSaleId = null
+    }
+
+    BackHandler(
+        enabled =
+            !showNewSale &&
+                selectedSale == null
+    ) {
+        onExit()
+    }
+
+    if (showNewSale) {
+        V15DeepScreenContainer(
+            title =
+                v15Text(
+                    "নতুন বিক্রি",
+                    "New sale"
+                ),
+            onBack = {
+                if (!saving) {
+                    showNewSale = false
+                }
+            }
+        ) {
+            RetailSaleForm(
+                viewModel = vm,
+                bakiPeople = bakiPeople,
+                products =
+                    products.filter {
+                        it.totalStock > 0
+                    },
+                saving = saving,
+                onDismiss = {
+                    if (!saving) {
+                        showNewSale = false
+                    }
+                },
+                onSave = { draft ->
+                    if (saving) {
+                        return@RetailSaleForm
+                    }
+
+                    saving = true
+
+                    vm.createRetailSale(
+                        invoiceNo =
+                            draft.invoiceNo,
+                        lines =
+                            draft.lines,
+                        discount =
+                            draft.discount,
+                        paid =
+                            draft.paid,
+                        paymentMethod =
+                            draft.paymentMethod,
+                        bakiPersonId =
+                            draft.bakiPersonId,
+                        customerName =
+                            draft.customerName,
+                        customerPhone =
+                            draft.customerPhone,
+                        note =
+                            draft.note
+                    ) { saleId ->
+                        saving = false
+
+                        if (saleId != null) {
+                            showNewSale = false
+
+                            Toast.makeText(
+                                context,
+                                v15Text(
+                                    "বিক্রি সংরক্ষণ হয়েছে",
+                                    "Sale saved"
+                                ),
+                                Toast.LENGTH_SHORT
+                            ).show()
+                        } else {
+                            Toast.makeText(
+                                context,
+                                v15Text(
+                                    "বিক্রি সংরক্ষণ করা যায়নি। স্টক ও তথ্য যাচাই করুন।",
+                                    "Could not save sale. Check stock and entered values."
+                                ),
+                                Toast.LENGTH_LONG
+                            ).show()
+                        }
+                    }
+                }
+            )
+        }
+    } else if (selectedSale != null) {
         RetailSaleDetailScreen(
             sale = selectedSale,
             viewModel = vm,
@@ -608,74 +704,6 @@ internal fun V16RetailSalesScreen(
         )
     }
 
-    if (showNewSale) {
-        RetailSaleDialog(
-            viewModel = vm,
-            bakiPeople = bakiPeople,
-            products =
-                products.filter {
-                    it.totalStock > 0
-                },
-            saving = saving,
-            onDismiss = {
-                if (!saving) {
-                    showNewSale = false
-                }
-            },
-            onSave = { draft ->
-                if (saving) {
-                    return@RetailSaleDialog
-                }
-
-                saving = true
-
-                vm.createRetailSale(
-                    invoiceNo =
-                        draft.invoiceNo,
-                    lines =
-                        draft.lines,
-                    discount =
-                        draft.discount,
-                    paid =
-                        draft.paid,
-                    paymentMethod =
-                        draft.paymentMethod,
-                    bakiPersonId =
-                        draft.bakiPersonId,
-                    customerName =
-                        draft.customerName,
-                    customerPhone =
-                        draft.customerPhone,
-                    note =
-                        draft.note
-                ) { saleId ->
-                    saving = false
-
-                    if (saleId != null) {
-                        showNewSale = false
-
-                        Toast.makeText(
-                            context,
-                            v15Text(
-                                "বিক্রি সংরক্ষণ হয়েছে",
-                                "Sale saved"
-                            ),
-                            Toast.LENGTH_SHORT
-                        ).show()
-                    } else {
-                        Toast.makeText(
-                            context,
-                            v15Text(
-                                "বিক্রি সংরক্ষণ করা যায়নি। স্টক ও তথ্য যাচাই করুন।",
-                                "Could not save sale. Check stock and entered values."
-                            ),
-                            Toast.LENGTH_LONG
-                        ).show()
-                    }
-                }
-            }
-        )
-    }
 }
 
 @Composable
@@ -1355,7 +1383,7 @@ private fun RetailSaleCard(
 }
 
 @Composable
-private fun RetailSaleDialog(
+private fun RetailSaleForm(
     viewModel: InventoryViewModel,
     bakiPeople: List<BakiPersonSummary>,
     products: List<ProductStockSummary>,
@@ -1482,29 +1510,20 @@ private fun RetailSaleDialog(
                     .coerceAtLeast(0.0)
         ).coerceAtLeast(0.0)
 
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        title = {
-            Text(
-                v15Text(
-                    "নতুন বিক্রি",
-                    "New sale"
+    Column(
+        modifier =
+            Modifier
+                .fillMaxWidth()
+                .verticalScroll(
+                    rememberScrollState()
                 )
-            )
-        },
-        text = {
-            Column(
-                modifier =
-                    Modifier
-                        .heightIn(
-                            max = 560.dp
-                        )
-                        .verticalScroll(
-                            rememberScrollState()
-                        ),
-                verticalArrangement =
-                    Arrangement.spacedBy(8.dp)
-            ) {
+                .padding(
+                    horizontal = 12.dp,
+                    bottom = 28.dp
+                ),
+        verticalArrangement =
+            Arrangement.spacedBy(8.dp)
+    ) {
                 OutlinedTextField(
                     value = invoiceNo,
                     onValueChange = {
@@ -2299,11 +2318,10 @@ private fun RetailSaleDialog(
                                 .error
                     )
                 }
-            }
-        },
-        confirmButton = {
-            Button(
-                onClick = {
+        Button(
+            modifier =
+                Modifier.fillMaxWidth(),
+            onClick = {
                     val lineInputs =
                         mutableListOf<RetailSaleLineInput>()
 
@@ -2461,38 +2479,38 @@ private fun RetailSaleDialog(
                             )
                         }
                     }
-                },
-                enabled = !saving
-            ) {
-                Text(
-                    if (saving) {
-                        v15Text(
-                            "সংরক্ষণ হচ্ছে…",
-                            "Saving…"
-                        )
-                    } else {
-                        v15Text(
-                            "বিক্রি সংরক্ষণ",
-                            "Save sale"
-                        )
-                    }
-                )
-            }
-        },
-        dismissButton = {
-            TextButton(
-                onClick = onDismiss,
-                enabled = !saving
-            ) {
-                Text(
+            },
+            enabled = !saving
+        ) {
+            Text(
+                if (saving) {
                     v15Text(
-                        "বাতিল",
-                        "Cancel"
+                        "সংরক্ষণ হচ্ছে…",
+                        "Saving…"
                     )
-                )
-            }
+                } else {
+                    v15Text(
+                        "বিক্রি সংরক্ষণ",
+                        "Save sale"
+                    )
+                }
+            )
         }
-    )
+
+        OutlinedButton(
+            onClick = onDismiss,
+            enabled = !saving,
+            modifier =
+                Modifier.fillMaxWidth()
+        ) {
+            Text(
+                v15Text(
+                    "বাতিল",
+                    "Cancel"
+                )
+            )
+        }
+    }
 }
 
 @Composable

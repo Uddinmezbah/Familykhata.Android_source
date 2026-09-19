@@ -292,32 +292,6 @@ fun FamilyKhataApp(viewModel: FamilyKhataViewModel) {
                             showSettingsMenu = true
                         }
 
-                        homeLogoFile?.let { logoFile ->
-                            AsyncImage(
-                                model = logoFile,
-                                contentDescription =
-                                    v15Text(
-                                        "দোকানের লোগো",
-                                        "Business logo"
-                                    ),
-                                modifier =
-                                    Modifier
-                                        .size(40.dp)
-                                        .clip(
-                                            RoundedCornerShape(
-                                                12.dp
-                                            )
-                                        ),
-                                contentScale =
-                                    ContentScale.Crop
-                            )
-                        }
-
-                        Spacer(
-                            modifier =
-                                Modifier.weight(1f)
-                        )
-
                         Box {
                             TextButton(
                                 onClick = {
@@ -400,6 +374,62 @@ fun FamilyKhataApp(viewModel: FamilyKhataViewModel) {
                                     }
                                 )
                             }
+                        }
+
+                        homeLogoFile?.let { logoFile ->
+                            AsyncImage(
+                                model = logoFile,
+                                contentDescription =
+                                    v15Text(
+                                        "দোকানের লোগো",
+                                        "Business logo"
+                                    ),
+                                modifier =
+                                    Modifier
+                                        .size(22.dp)
+                                        .clip(
+                                            RoundedCornerShape(
+                                                12.dp
+                                            )
+                                        ),
+                                contentScale =
+                                    ContentScale.Crop
+                            )
+                        }
+
+                        Spacer(
+                            modifier =
+                                Modifier.weight(1f)
+                        )
+
+                        Button(
+                            onClick = {
+                                appRefreshToken =
+                                    appRefreshToken + 1L
+
+                                viewModel.refreshTrialStatus()
+                            },
+                            modifier =
+                                Modifier.height(42.dp),
+                            colors =
+                                androidx.compose.material3.ButtonDefaults
+                                    .buttonColors(
+                                        containerColor =
+                                            workspaceAccent(
+                                                workspace
+                                            ),
+                                        contentColor =
+                                            Color.White
+                                    )
+                        ) {
+                            Text(
+                                v15Text(
+                                    "Γå╗ αª░αª┐αª½αºìαª░αºçαª╢",
+                                    "Γå╗ Refresh"
+                                ),
+                                fontWeight =
+                                    FontWeight.ExtraBold
+                            )
                         }
                     }
 
@@ -817,12 +847,10 @@ private fun WorkspaceSwitcher(
                 WorkspaceCard(
                     symbol = "▦",
                     label =
-                        businessName.ifBlank {
-                            v15Text(
-                                "দোকান/\nপ্রতিষ্ঠান",
-                                "Business"
-                            )
-                        },
+                        v15Text(
+                            "দোকান/\nপ্রতিষ্ঠান",
+                            "Business"
+                        ),
                     value = "SHOP",
                     selected = selected,
                     modifier = Modifier.weight(1f),

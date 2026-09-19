@@ -292,6 +292,27 @@ fun FamilyKhataApp(viewModel: FamilyKhataViewModel) {
                             showSettingsMenu = true
                         }
 
+                        homeLogoFile?.let { logoFile ->
+                            AsyncImage(
+                                model = logoFile,
+                                contentDescription =
+                                    v15Text(
+                                        "দোকানের লোগো",
+                                        "Business logo"
+                                    ),
+                                modifier =
+                                    Modifier
+                                        .size(22.dp)
+                                        .clip(
+                                            RoundedCornerShape(
+                                                12.dp
+                                            )
+                                        ),
+                                contentScale =
+                                    ContentScale.Crop
+                            )
+                        }
+
                         Box {
                             TextButton(
                                 onClick = {
@@ -300,7 +321,7 @@ fun FamilyKhataApp(viewModel: FamilyKhataViewModel) {
                                 }
                             ) {
                                 Text(
-                                    "👤 ${
+                                    "${
                                         homeProfileName
                                             .ifBlank {
                                                 v15Text(
@@ -308,7 +329,7 @@ fun FamilyKhataApp(viewModel: FamilyKhataViewModel) {
                                                     "Profile"
                                                 )
                                             }
-                                    }  ▾",
+                                    } ▾",
                                     fontWeight =
                                         FontWeight.Bold,
                                     maxLines = 1,
@@ -357,10 +378,7 @@ fun FamilyKhataApp(viewModel: FamilyKhataViewModel) {
                                 DropdownMenuItem(
                                     text = {
                                         Text(
-                                            v15Text(
-                                                "↻ রিফ্রেশ",
-                                                "↻ Refresh"
-                                            )
+                                            v15Text("↻ রিফ্রেশ", "↻ Refresh")
                                         )
                                     },
                                     onClick = {
@@ -374,27 +392,6 @@ fun FamilyKhataApp(viewModel: FamilyKhataViewModel) {
                                     }
                                 )
                             }
-                        }
-
-                        homeLogoFile?.let { logoFile ->
-                            AsyncImage(
-                                model = logoFile,
-                                contentDescription =
-                                    v15Text(
-                                        "দোকানের লোগো",
-                                        "Business logo"
-                                    ),
-                                modifier =
-                                    Modifier
-                                        .size(22.dp)
-                                        .clip(
-                                            RoundedCornerShape(
-                                                12.dp
-                                            )
-                                        ),
-                                contentScale =
-                                    ContentScale.Crop
-                            )
                         }
 
                         Spacer(
@@ -423,10 +420,7 @@ fun FamilyKhataApp(viewModel: FamilyKhataViewModel) {
                                     )
                         ) {
                             Text(
-                                v15Text(
-                                    "Γå╗ αª░αª┐αª½αºìαª░αºçαª╢",
-                                    "Γå╗ Refresh"
-                                ),
+                                v15Text("↻ রিফ্রেশ", "↻ Refresh"),
                                 fontWeight =
                                     FontWeight.ExtraBold
                             )

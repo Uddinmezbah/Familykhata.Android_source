@@ -927,6 +927,56 @@ internal fun V15PremiumDialog(
                             .onSurfaceVariant
                 )
 
+                if (!billingState.active) {
+                    Text(
+                        v15Text(
+                            "Promo code থাকলে Google Play-এ redeem করে Premium সক্রিয় করতে পারবেন।",
+                            "If you have a promo code, redeem it on Google Play to activate Premium."
+                        ),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+
+                    OutlinedButton(
+                        onClick = {
+                            runCatching {
+                                context.startActivity(
+                                    Intent(
+                                        Intent.ACTION_VIEW,
+                                        Uri.parse("https://play.google.com/redeem")
+                                    )
+                                )
+                            }.onFailure {
+                                Toast.makeText(
+                                    context,
+                                    v15Text(
+                                        "Google Play redeem page খো�&�া যায়নি",
+                                        "Unable to open Google Play redeem page"
+                                    ),
+                                    Toast.LENGTH_SHORT
+                                ).show()
+                            }
+                        },
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Text(
+                            v15Text(
+                                "Promo Code Redeem করুন",
+                                "Redeem Promo Code"
+                            )
+                        )
+                    }
+
+                    Text(
+                        v15Text(
+                            "Code redeem করার পর ফিরে এসে Restore Purchases চাপুন।",
+                            "After redeeming the code, return here and tap Restore Purchases."
+                        ),
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+
                 billingState.message
                     ?.takeIf { it.isNotBlank() }
                     ?.let { message ->

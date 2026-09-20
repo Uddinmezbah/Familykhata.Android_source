@@ -3304,7 +3304,7 @@ private fun MoreScreen(viewModel: FamilyKhataViewModel) {
                     }
 
                     val version = root.optInt("version")
-                    require(version in 1..14) {
+                    require(version in 1..15) {
                         v15Text(
                             "এই ব্যাকআপ ভার্সনটি সমর্থিত নয়",
                             "This backup version is not supported"
@@ -3543,6 +3543,32 @@ private fun MoreScreen(viewModel: FamilyKhataViewModel) {
                 "inventoryRetailSalePayments"
             )?.length() ?: 0
 
+        val previewPurchaseData =
+            previewRoot.optJSONObject(
+                "purchaseData"
+            )
+
+        val previewSuppliers =
+            previewPurchaseData
+                ?.optJSONArray(
+                    "suppliers"
+                )
+                ?.length() ?: 0
+
+        val previewPurchases =
+            previewPurchaseData
+                ?.optJSONArray(
+                    "bills"
+                )
+                ?.length() ?: 0
+
+        val previewPurchasePayments =
+            previewPurchaseData
+                ?.optJSONArray(
+                    "payments"
+                )
+                ?.length() ?: 0
+
         val hasBusinessData =
             previewRoot.optJSONObject("businessData") != null
 
@@ -3582,6 +3608,17 @@ private fun MoreScreen(viewModel: FamilyKhataViewModel) {
                             "Products: $previewProducts • Stock batches: $previewBatches"
                         )
                     )
+
+                    if (
+                        previewVersion >= 15
+                    ) {
+                        Text(
+                            v15Text(
+                                "সাপ্লায়ার: $previewSuppliers • ক্রয়: $previewPurchases • ক্রয় পেমেন্ট: $previewPurchasePayments",
+                                "Suppliers: $previewSuppliers • Purchases: $previewPurchases • Purchase payments: $previewPurchasePayments"
+                            )
+                        )
+                    }
 
                     if (hasBusinessData) {
                         Text(

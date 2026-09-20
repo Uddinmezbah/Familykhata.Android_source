@@ -340,7 +340,7 @@ class FamilyKhataViewModel(application: Application) : AndroidViewModel(applicat
                     businessId = cleanId,
                     name = cleanName,
                     businessType =
-                        cleanBusinessType,
+                        businessType.trim(),
                     phone = phone.trim(),
                     address = address.trim(),
                     logoPath = logoPath.trim(),

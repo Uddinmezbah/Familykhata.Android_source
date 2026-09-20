@@ -3304,7 +3304,7 @@ private fun MoreScreen(viewModel: FamilyKhataViewModel) {
                     }
 
                     val version = root.optInt("version")
-                    require(version in 1..12) {
+                    require(version in 1..14) {
                         v15Text(
                             "এই ব্যাকআপ ভার্সনটি সমর্থিত নয়",
                             "This backup version is not supported"

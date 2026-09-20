@@ -709,6 +709,7 @@ internal fun V15InventoryScreen(
     onExit: () -> Unit
 ) {
     val vm: InventoryViewModel = viewModel()
+    val securityViewModel: FamilyKhataViewModel = viewModel()
     val products by vm.products.collectAsState()
     var selectedId by remember {
         mutableStateOf<Long?>(null)

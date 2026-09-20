@@ -222,6 +222,29 @@ class InventoryViewModel(application: Application) : AndroidViewModel(applicatio
         if (workspace.value != value) workspace.value = value
     }
 
+    private fun ledgerBusinessIdForInventoryContext(
+        workspaceValue: String,
+        inventoryBusinessKeyValue: String
+    ): String {
+        if (workspaceValue != "SHOP") {
+            return ""
+        }
+
+        val cleanKey =
+            inventoryBusinessKeyValue.trim()
+
+        if (
+            cleanKey.isBlank() ||
+            cleanKey == "__NO_BUSINESS__"
+        ) {
+            return ""
+        }
+
+        return cleanKey
+            .substringBefore("::")
+            .trim()
+    }
+
     fun observeBatches(productId: Long): Flow<List<StockBatchEntity>> =
         dao.observeBatches(productId)
 
@@ -1011,7 +1034,10 @@ class InventoryViewModel(application: Application) : AndroidViewModel(applicatio
                         entry.workspace ==
                             sale.workspace &&
                         entry.businessId ==
-                            sale.businessKey &&
+                            ledgerBusinessIdForInventoryContext(
+                                sale.workspace,
+                                sale.businessKey
+                            ) &&
                         kotlin.math.abs(
                             entry.balanceDelta -
                                 payment.amount
@@ -1111,7 +1137,11 @@ class InventoryViewModel(application: Application) : AndroidViewModel(applicatio
                 require(
                     account.workspace ==
                         sale.workspace &&
-                        (sale.workspace != "SHOP" || account.businessId == sale.businessKey)
+                        (sale.workspace != "SHOP" || account.businessId ==
+                                        ledgerBusinessIdForInventoryContext(
+                                            sale.workspace,
+                                            sale.businessKey
+                                        ))
                 ) {
                     "Retail payment account workspace mismatch"
                 }
@@ -1148,7 +1178,10 @@ class InventoryViewModel(application: Application) : AndroidViewModel(applicatio
                         existing.workspace ==
                             sale.workspace &&
                         existing.businessId ==
-                            sale.businessKey
+                            ledgerBusinessIdForInventoryContext(
+                                sale.workspace,
+                                sale.businessKey
+                            )
 
                 if (!matches) {
                     if (existing != null) {
@@ -1234,7 +1267,11 @@ class InventoryViewModel(application: Application) : AndroidViewModel(applicatio
                 bakiDao.getStatementPerson(
                     personId = personId,
                     workspace = sale.workspace,
-                    businessId = sale.businessKey
+                    businessId =
+                        ledgerBusinessIdForInventoryContext(
+                            sale.workspace,
+                            sale.businessKey
+                        )
                 )
             ) {
                 "Baki person not found"
@@ -1463,7 +1500,10 @@ class InventoryViewModel(application: Application) : AndroidViewModel(applicatio
                                 workspace =
                                     currentWorkspace,
                                 businessId =
-                                    currentBusinessKey
+                                    ledgerBusinessIdForInventoryContext(
+                                        currentWorkspace,
+                                        currentBusinessKey
+                                    )
                             )
                         ) {
                             "Baki person not found"
@@ -1491,7 +1531,11 @@ class InventoryViewModel(application: Application) : AndroidViewModel(applicatio
                                             currentWorkspace &&
                                             (
                                                 currentWorkspace != "SHOP" ||
-                                                    account.businessId == currentBusinessKey
+                                                    account.businessId ==
+                                                    ledgerBusinessIdForInventoryContext(
+                                                        currentWorkspace,
+                                                        currentBusinessKey
+                                                    )
                                             ) &&
                                             account.isActive
                                     ) {
@@ -2059,7 +2103,11 @@ class InventoryViewModel(application: Application) : AndroidViewModel(applicatio
                                             currentWorkspace &&
                                             (
                                                 currentWorkspace != "SHOP" ||
-                                                    account.businessId == currentBusinessKey
+                                                    account.businessId ==
+                                                    ledgerBusinessIdForInventoryContext(
+                                                        currentWorkspace,
+                                                        currentBusinessKey
+                                                    )
                                             ) &&
                                             account.isActive
                                     ) {

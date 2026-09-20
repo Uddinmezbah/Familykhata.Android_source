@@ -600,6 +600,21 @@ class FamilyKhataViewModel(application: Application) : AndroidViewModel(applicat
             ""
         }
 
+    private fun matchesCurrentScope(
+        workspace: String,
+        businessId: String
+    ): Boolean {
+        val currentWorkspace =
+            _selectedWorkspace.value
+
+        if (workspace != currentWorkspace) {
+            return false
+        }
+
+        return workspace != "SHOP" ||
+            businessId == _selectedBusinessId.value
+    }
+
     fun addTransaction(
         type: String,
         amount: Double,
@@ -944,9 +959,15 @@ class FamilyKhataViewModel(application: Application) : AndroidViewModel(applicat
     fun observeFinancialAccountEntries(
         accountId: Long
     ): Flow<List<FinancialAccountEntryEntity>> =
-        dao.observeFinancialAccountEntries(
-            accountId
-        )
+        activeDataScope
+            .flatMapLatest {
+                (workspace, businessId) ->
+                dao.observeFinancialAccountEntriesForScope(
+                    accountId = accountId,
+                    workspace = workspace,
+                    businessId = businessId
+                )
+            }
 
     fun recordAgentCashOut(
         cashAccountId: Long,
@@ -1340,6 +1361,10 @@ class FamilyKhataViewModel(application: Application) : AndroidViewModel(applicat
     fun deleteTransaction(item: TransactionEntity) {
         if (
             !canWriteNow() ||
+            !matchesCurrentScope(
+                item.workspace,
+                item.businessId
+            ) ||
             item.sourceKey
                 ?.startsWith(
                     "DIGITAL_SERVICE:"
@@ -1349,18 +1374,41 @@ class FamilyKhataViewModel(application: Application) : AndroidViewModel(applicat
         }
 
         viewModelScope.launch {
-            database.withTransaction {
-                if (
-                    item.financialAccountId !=
-                        null
-                ) {
-                    dao.deleteFinancialAccountEntryBySourceKey(
-                        "TRANSACTION:" +
-                            item.id
-                    )
-                }
+            runCatching {
+                database.withTransaction {
+                    val current =
+                        requireNotNull(
+                            dao.getTransactionOnce(
+                                item.id
+                            )
+                        )
 
-                dao.deleteTransaction(item)
+                    require(
+                        matchesCurrentScope(
+                            current.workspace,
+                            current.businessId
+                        )
+                    )
+
+                    require(
+                        current.sourceKey
+                            ?.startsWith(
+                                "DIGITAL_SERVICE:"
+                            ) != true
+                    )
+
+                    if (
+                        current.financialAccountId !=
+                            null
+                    ) {
+                        dao.deleteFinancialAccountEntryBySourceKey(
+                            "TRANSACTION:" +
+                                current.id
+                        )
+                    }
+
+                    dao.deleteTransaction(current)
+                }
             }
         }
     }
@@ -1378,10 +1426,17 @@ class FamilyKhataViewModel(application: Application) : AndroidViewModel(applicat
         val cleanType =
             type.trim().uppercase(Locale.US)
 
-        val businessId = businessIdForWorkspace(item.workspace)
+        val workspace =
+            _selectedWorkspace.value
+        val businessId =
+            businessIdForWorkspace(workspace)
 
         if (
             !canWriteNow() ||
+            !matchesCurrentScope(
+                item.workspace,
+                item.businessId
+            ) ||
             item.sourceKey
                 ?.startsWith(
                     "DIGITAL_SERVICE:"
@@ -1405,6 +1460,27 @@ class FamilyKhataViewModel(application: Application) : AndroidViewModel(applicat
             val success =
                 runCatching {
                     database.withTransaction {
+                        val current =
+                            requireNotNull(
+                                dao.getTransactionOnce(
+                                    item.id
+                                )
+                            )
+
+                        require(
+                            matchesCurrentScope(
+                                current.workspace,
+                                current.businessId
+                            )
+                        )
+
+                        require(
+                            current.sourceKey
+                                ?.startsWith(
+                                    "DIGITAL_SERVICE:"
+                                ) != true
+                        )
+
                         val entryKey =
                             "TRANSACTION:" +
                                 item.id
@@ -1416,7 +1492,7 @@ class FamilyKhataViewModel(application: Application) : AndroidViewModel(applicat
 
                         val account =
                             if (
-                                item.workspace ==
+                                current.workspace ==
                                     "SHOP"
                             ) {
                                 requireNotNull(
@@ -1425,12 +1501,12 @@ class FamilyKhataViewModel(application: Application) : AndroidViewModel(applicat
                                     )
                                 ).also {
                                     require(
-                                        it.workspace == item.workspace &&
+                                        it.workspace == current.workspace &&
                                             it.businessId == businessId &&
                                             (
                                                 it.isActive ||
                                                 it.id ==
-                                                    item.financialAccountId
+                                                    current.financialAccountId
                                             )
                                     )
                                 }
@@ -1563,10 +1639,10 @@ class FamilyKhataViewModel(application: Application) : AndroidViewModel(applicat
                                                 " • "
                                             ),
                                     workspace =
-                                        item.workspace,
+                                        current.workspace,
                                     businessId = businessId,
                                     createdAt =
-                                        item.createdAt
+                                        current.createdAt
                                 )
                             )
                         }
@@ -1595,17 +1671,57 @@ class FamilyKhataViewModel(application: Application) : AndroidViewModel(applicat
         }
     }
 
-    fun updateBakiPerson(personId: Long, name: String, phone: String) {
+    fun updateBakiPerson(
+        personId: Long,
+        name: String,
+        phone: String
+    ) {
         val cleanName = name.trim()
         if (!canWriteNow() || cleanName.isBlank()) return
+
         viewModelScope.launch {
-            dao.updatePerson(personId, cleanName, phone.trim())
+            runCatching {
+                val person =
+                    requireNotNull(
+                        dao.getPersonOnce(personId)
+                    )
+
+                require(
+                    matchesCurrentScope(
+                        person.workspace,
+                        person.businessId
+                    )
+                )
+
+                dao.updatePerson(
+                    personId,
+                    cleanName,
+                    phone.trim()
+                )
+            }
         }
     }
 
     fun deleteBakiPerson(personId: Long) {
         if (!canWriteNow()) return
-        viewModelScope.launch { dao.deletePersonById(personId) }
+
+        viewModelScope.launch {
+            runCatching {
+                val person =
+                    requireNotNull(
+                        dao.getPersonOnce(personId)
+                    )
+
+                require(
+                    matchesCurrentScope(
+                        person.workspace,
+                        person.businessId
+                    )
+                )
+
+                dao.deletePersonById(personId)
+            }
+        }
     }
 
     fun addBakiEntry(
@@ -1617,18 +1733,33 @@ class FamilyKhataViewModel(application: Application) : AndroidViewModel(applicat
     ) {
         if (!canWriteNow() || amount <= 0) return
         val delta = balanceDelta(action, amount)
-        if (delta == null) return
+            ?: return
+
         viewModelScope.launch {
-            dao.insertBakiEntry(
-                BakiEntryEntity(
-                    personId = personId,
-                    action = action,
-                    amount = amount,
-                    balanceDelta = delta,
-                    note = note.trim(),
-                    dueAt = dueAt
+            runCatching {
+                val person =
+                    requireNotNull(
+                        dao.getPersonOnce(personId)
+                    )
+
+                require(
+                    matchesCurrentScope(
+                        person.workspace,
+                        person.businessId
+                    )
                 )
-            )
+
+                dao.insertBakiEntry(
+                    BakiEntryEntity(
+                        personId = personId,
+                        action = action,
+                        amount = amount,
+                        balanceDelta = delta,
+                        note = note.trim(),
+                        dueAt = dueAt
+                    )
+                )
+            }
         }
     }
 
@@ -1639,15 +1770,6 @@ class FamilyKhataViewModel(application: Application) : AndroidViewModel(applicat
         note: String,
         dueAt: Long?
     ) {
-        if (
-            item.sourceKey
-                ?.startsWith(
-                    "RETAIL_SALE_"
-                ) == true
-        ) {
-            return
-        }
-
         if (!canWriteNow() || amount <= 0) return
 
         val delta =
@@ -1655,14 +1777,42 @@ class FamilyKhataViewModel(application: Application) : AndroidViewModel(applicat
                 ?: return
 
         viewModelScope.launch {
-            dao.updateBakiEntry(
-                entryId = item.id,
-                action = action,
-                amount = amount,
-                balanceDelta = delta,
-                note = note.trim(),
-                dueAt = dueAt
-            )
+            runCatching {
+                val current =
+                    requireNotNull(
+                        dao.getBakiEntryOnce(item.id)
+                    )
+
+                require(
+                    current.sourceKey
+                        ?.startsWith(
+                            "RETAIL_SALE_"
+                        ) != true
+                )
+
+                val person =
+                    requireNotNull(
+                        dao.getPersonOnce(
+                            current.personId
+                        )
+                    )
+
+                require(
+                    matchesCurrentScope(
+                        person.workspace,
+                        person.businessId
+                    )
+                )
+
+                dao.updateBakiEntry(
+                    entryId = current.id,
+                    action = action,
+                    amount = amount,
+                    balanceDelta = delta,
+                    note = note.trim(),
+                    dueAt = dueAt
+                )
+            }
         }
     }
 
@@ -1675,23 +1825,53 @@ class FamilyKhataViewModel(application: Application) : AndroidViewModel(applicat
     }
 
     fun deleteBakiEntry(item: BakiEntryEntity) {
-        if (
-            !canWriteNow() ||
-            item.sourceKey
-                ?.startsWith(
-                    "RETAIL_SALE_"
-                ) == true
-        ) {
-            return
-        }
+        if (!canWriteNow()) return
 
         viewModelScope.launch {
-            dao.deleteBakiEntry(item)
+            runCatching {
+                val current =
+                    requireNotNull(
+                        dao.getBakiEntryOnce(item.id)
+                    )
+
+                require(
+                    current.sourceKey
+                        ?.startsWith(
+                            "RETAIL_SALE_"
+                        ) != true
+                )
+
+                val person =
+                    requireNotNull(
+                        dao.getPersonOnce(
+                            current.personId
+                        )
+                    )
+
+                require(
+                    matchesCurrentScope(
+                        person.workspace,
+                        person.businessId
+                    )
+                )
+
+                dao.deleteBakiEntry(current)
+            }
         }
     }
 
-    fun observeBakiEntries(personId: Long): Flow<List<BakiEntryEntity>> =
-        dao.observeBakiEntries(personId)
+    fun observeBakiEntries(
+        personId: Long
+    ): Flow<List<BakiEntryEntity>> =
+        activeDataScope
+            .flatMapLatest {
+                (workspace, businessId) ->
+                dao.observeBakiEntriesForScope(
+                    personId = personId,
+                    workspace = workspace,
+                    businessId = businessId
+                )
+            }
 
     suspend fun loadLedgerStatement(
         personId: Long,

@@ -86,6 +86,18 @@ interface FamilyKhataDao {
         financialAccountId: Long?
     )
 
+    @Query(
+        """
+        SELECT *
+        FROM transactions
+        WHERE id = :transactionId
+        LIMIT 1
+        """
+    )
+    suspend fun getTransactionOnce(
+        transactionId: Long
+    ): TransactionEntity?
+
     @Query("SELECT * FROM transactions WHERE workspace = :workspace AND (workspace != 'SHOP' OR businessId = :businessId) ORDER BY createdAt DESC")
     fun observeTransactions(workspace: String, businessId: String): Flow<List<TransactionEntity>>
 
@@ -110,6 +122,18 @@ interface FamilyKhataDao {
     @Query("DELETE FROM baki_people WHERE id = :personId")
     suspend fun deletePersonById(personId: Long)
 
+    @Query(
+        """
+        SELECT *
+        FROM baki_people
+        WHERE id = :personId
+        LIMIT 1
+        """
+    )
+    suspend fun getPersonOnce(
+        personId: Long
+    ): BakiPersonEntity?
+
     @Query("SELECT * FROM baki_people WHERE workspace = :workspace AND (workspace != 'SHOP' OR businessId = :businessId) ORDER BY name COLLATE NOCASE ASC")
     fun observePeople(workspace: String, businessId: String): Flow<List<BakiPersonEntity>>
 
@@ -131,6 +155,18 @@ interface FamilyKhataDao {
     )
     suspend fun getBakiEntryBySourceKey(
         sourceKey: String
+    ): BakiEntryEntity?
+
+    @Query(
+        """
+        SELECT *
+        FROM baki_entries
+        WHERE id = :entryId
+        LIMIT 1
+        """
+    )
+    suspend fun getBakiEntryOnce(
+        entryId: Long
     ): BakiEntryEntity?
 
     @Query(
@@ -182,6 +218,27 @@ interface FamilyKhataDao {
 
     @Query("SELECT * FROM baki_entries WHERE personId = :personId ORDER BY createdAt DESC")
     fun observeBakiEntries(personId: Long): Flow<List<BakiEntryEntity>>
+
+    @Query(
+        """
+        SELECT e.*
+        FROM baki_entries e
+        INNER JOIN baki_people p
+            ON p.id = e.personId
+        WHERE e.personId = :personId
+          AND p.workspace = :workspace
+          AND (
+              p.workspace != 'SHOP' OR
+              p.businessId = :businessId
+          )
+        ORDER BY e.createdAt DESC
+        """
+    )
+    fun observeBakiEntriesForScope(
+        personId: Long,
+        workspace: String,
+        businessId: String
+    ): Flow<List<BakiEntryEntity>>
 
     @Query("SELECT * FROM baki_people WHERE id = :personId AND workspace = :workspace AND (workspace != 'SHOP' OR businessId = :businessId) LIMIT 1")
     suspend fun getStatementPerson(personId: Long, workspace: String, businessId: String): BakiPersonEntity?
@@ -282,6 +339,27 @@ interface FamilyKhataDao {
     )
     fun observeFinancialAccountEntries(
         accountId: Long
+    ): Flow<List<FinancialAccountEntryEntity>>
+
+    @Query(
+        """
+        SELECT e.*
+        FROM financial_account_entries e
+        INNER JOIN financial_accounts a
+            ON a.id = e.accountId
+        WHERE e.accountId = :accountId
+          AND a.workspace = :workspace
+          AND (
+              a.workspace != 'SHOP' OR
+              a.businessId = :businessId
+          )
+        ORDER BY e.createdAt DESC, e.id DESC
+        """
+    )
+    fun observeFinancialAccountEntriesForScope(
+        accountId: Long,
+        workspace: String,
+        businessId: String
     ): Flow<List<FinancialAccountEntryEntity>>
 
     @Query(

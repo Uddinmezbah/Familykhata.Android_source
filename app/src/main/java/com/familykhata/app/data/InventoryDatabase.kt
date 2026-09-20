@@ -124,9 +124,14 @@ import com.familykhata.app.production.ProductionItemRoleEntity
         RetailSaleLineEntity::class,
         RetailSaleStockAllocationEntity::class,
         RetailSalePaymentEntity::class,
+        PurchaseSupplierEntity::class,
+        PurchaseBillEntity::class,
+        PurchaseBillLineEntity::class,
+        PurchasePaymentEntity::class,
+        PurchaseReturnEntity::class,
         ProductUnitConversionEntity::class
     ],
-    version = 17,
+    version = 18,
     exportSchema = false
 )
 abstract class InventoryDatabase : RoomDatabase() {
@@ -2628,6 +2633,192 @@ abstract class InventoryDatabase : RoomDatabase() {
                 }
             }
 
+        private val MIGRATION_17_18 =
+            object : Migration(
+                17,
+                18
+            ) {
+                override fun migrate(
+                    db: SupportSQLiteDatabase
+                ) {
+                    db.execSQL(
+                        """
+                        CREATE TABLE IF NOT EXISTS `purchase_suppliers` (
+                            `id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+                            `name` TEXT NOT NULL,
+                            `phone` TEXT NOT NULL,
+                            `address` TEXT NOT NULL,
+                            `note` TEXT NOT NULL,
+                            `workspace` TEXT NOT NULL,
+                            `businessKey` TEXT NOT NULL,
+                            `isActive` INTEGER NOT NULL,
+                            `createdAt` INTEGER NOT NULL
+                        )
+                        """.trimIndent()
+                    )
+
+                    db.execSQL(
+                        """
+                        CREATE INDEX IF NOT EXISTS
+                        `index_purchase_suppliers_workspace_businessKey_name`
+                        ON `purchase_suppliers`
+                        (`workspace`, `businessKey`, `name`)
+                        """.trimIndent()
+                    )
+
+                    db.execSQL(
+                        """
+                        CREATE TABLE IF NOT EXISTS `purchase_bills` (
+                            `id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+                            `purchaseNo` TEXT NOT NULL,
+                            `supplierId` INTEGER NOT NULL,
+                            `subtotal` REAL NOT NULL,
+                            `discount` REAL NOT NULL,
+                            `total` REAL NOT NULL,
+                            `status` TEXT NOT NULL,
+                            `note` TEXT NOT NULL,
+                            `workspace` TEXT NOT NULL,
+                            `businessKey` TEXT NOT NULL,
+                            `purchasedAt` INTEGER NOT NULL,
+                            `createdAt` INTEGER NOT NULL,
+                            FOREIGN KEY(`supplierId`)
+                                REFERENCES `purchase_suppliers`(`id`)
+                                ON UPDATE NO ACTION
+                                ON DELETE NO ACTION
+                        )
+                        """.trimIndent()
+                    )
+
+                    db.execSQL(
+                        """
+                        CREATE INDEX IF NOT EXISTS
+                        `index_purchase_bills_supplierId`
+                        ON `purchase_bills` (`supplierId`)
+                        """.trimIndent()
+                    )
+
+                    db.execSQL(
+                        """
+                        CREATE INDEX IF NOT EXISTS
+                        `index_purchase_bills_workspace_businessKey_purchasedAt`
+                        ON `purchase_bills`
+                        (`workspace`, `businessKey`, `purchasedAt`)
+                        """.trimIndent()
+                    )
+
+                    db.execSQL(
+                        """
+                        CREATE UNIQUE INDEX IF NOT EXISTS
+                        `index_purchase_bills_workspace_businessKey_purchaseNo`
+                        ON `purchase_bills`
+                        (`workspace`, `businessKey`, `purchaseNo`)
+                        """.trimIndent()
+                    )
+
+                    db.execSQL(
+                        """
+                        CREATE TABLE IF NOT EXISTS `purchase_bill_lines` (
+                            `id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+                            `billId` INTEGER NOT NULL,
+                            `productId` INTEGER NOT NULL,
+                            `stockBatchId` INTEGER,
+                            `productNameSnapshot` TEXT NOT NULL,
+                            `skuSnapshot` TEXT NOT NULL,
+                            `unitSnapshot` TEXT NOT NULL,
+                            `unitFactor` INTEGER NOT NULL,
+                            `quantity` INTEGER NOT NULL,
+                            `baseQuantity` INTEGER NOT NULL,
+                            `unitCost` REAL NOT NULL,
+                            `lineTotal` REAL NOT NULL,
+                            `batchNo` TEXT NOT NULL,
+                            `expiryDate` INTEGER,
+                            `createdAt` INTEGER NOT NULL,
+                            FOREIGN KEY(`billId`)
+                                REFERENCES `purchase_bills`(`id`)
+                                ON UPDATE NO ACTION
+                                ON DELETE CASCADE
+                        )
+                        """.trimIndent()
+                    )
+
+                    db.execSQL(
+                        "CREATE INDEX IF NOT EXISTS `index_purchase_bill_lines_billId` ON `purchase_bill_lines` (`billId`)"
+                    )
+                    db.execSQL(
+                        "CREATE INDEX IF NOT EXISTS `index_purchase_bill_lines_productId` ON `purchase_bill_lines` (`productId`)"
+                    )
+                    db.execSQL(
+                        "CREATE INDEX IF NOT EXISTS `index_purchase_bill_lines_stockBatchId` ON `purchase_bill_lines` (`stockBatchId`)"
+                    )
+
+                    db.execSQL(
+                        """
+                        CREATE TABLE IF NOT EXISTS `purchase_payments` (
+                            `id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+                            `eventKey` TEXT NOT NULL,
+                            `billId` INTEGER NOT NULL,
+                            `financialAccountId` INTEGER NOT NULL,
+                            `amount` REAL NOT NULL,
+                            `paymentMethod` TEXT NOT NULL,
+                            `note` TEXT NOT NULL,
+                            `paidAt` INTEGER NOT NULL,
+                            `createdAt` INTEGER NOT NULL,
+                            FOREIGN KEY(`billId`)
+                                REFERENCES `purchase_bills`(`id`)
+                                ON UPDATE NO ACTION
+                                ON DELETE CASCADE
+                        )
+                        """.trimIndent()
+                    )
+
+                    db.execSQL(
+                        "CREATE INDEX IF NOT EXISTS `index_purchase_payments_billId` ON `purchase_payments` (`billId`)"
+                    )
+                    db.execSQL(
+                        "CREATE INDEX IF NOT EXISTS `index_purchase_payments_financialAccountId` ON `purchase_payments` (`financialAccountId`)"
+                    )
+                    db.execSQL(
+                        "CREATE UNIQUE INDEX IF NOT EXISTS `index_purchase_payments_eventKey` ON `purchase_payments` (`eventKey`)"
+                    )
+
+                    db.execSQL(
+                        """
+                        CREATE TABLE IF NOT EXISTS `purchase_returns` (
+                            `id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+                            `eventKey` TEXT NOT NULL,
+                            `billId` INTEGER NOT NULL,
+                            `purchaseLineId` INTEGER NOT NULL,
+                            `productId` INTEGER NOT NULL,
+                            `stockBatchId` INTEGER,
+                            `baseQuantity` INTEGER NOT NULL,
+                            `amount` REAL NOT NULL,
+                            `note` TEXT NOT NULL,
+                            `returnedAt` INTEGER NOT NULL,
+                            `createdAt` INTEGER NOT NULL,
+                            FOREIGN KEY(`billId`)
+                                REFERENCES `purchase_bills`(`id`)
+                                ON UPDATE NO ACTION
+                                ON DELETE CASCADE,
+                            FOREIGN KEY(`purchaseLineId`)
+                                REFERENCES `purchase_bill_lines`(`id`)
+                                ON UPDATE NO ACTION
+                                ON DELETE CASCADE
+                        )
+                        """.trimIndent()
+                    )
+
+                    db.execSQL(
+                        "CREATE INDEX IF NOT EXISTS `index_purchase_returns_billId` ON `purchase_returns` (`billId`)"
+                    )
+                    db.execSQL(
+                        "CREATE INDEX IF NOT EXISTS `index_purchase_returns_purchaseLineId` ON `purchase_returns` (`purchaseLineId`)"
+                    )
+                    db.execSQL(
+                        "CREATE UNIQUE INDEX IF NOT EXISTS `index_purchase_returns_eventKey` ON `purchase_returns` (`eventKey`)"
+                    )
+                }
+            }
+
         fun get(context: Context): InventoryDatabase = INSTANCE ?: synchronized(this) {
             INSTANCE ?: Room.databaseBuilder(
                 context.applicationContext,
@@ -2650,7 +2841,8 @@ abstract class InventoryDatabase : RoomDatabase() {
                     MIGRATION_13_14,
                     MIGRATION_14_15,
                     MIGRATION_15_16,
-                    MIGRATION_16_17
+                    MIGRATION_16_17,
+                    MIGRATION_17_18
                 )
                 .build()
                 .also { INSTANCE = it }

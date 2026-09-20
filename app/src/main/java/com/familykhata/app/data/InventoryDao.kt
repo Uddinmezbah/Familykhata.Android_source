@@ -522,6 +522,252 @@ interface InventoryDao {
     ): Int
 
 
+    // Purchase + supplier
+    @Insert(onConflict = OnConflictStrategy.ABORT)
+    suspend fun insertPurchaseSupplier(
+        item: PurchaseSupplierEntity
+    ): Long
+
+    @Query(
+        """
+        UPDATE purchase_suppliers
+        SET name = :name,
+            phone = :phone,
+            address = :address,
+            note = :note,
+            isActive = :isActive
+        WHERE id = :supplierId
+        """
+    )
+    suspend fun updatePurchaseSupplier(
+        supplierId: Long,
+        name: String,
+        phone: String,
+        address: String,
+        note: String,
+        isActive: Boolean
+    ): Int
+
+    @Query(
+        """
+        SELECT *
+        FROM purchase_suppliers
+        WHERE id = :supplierId
+        LIMIT 1
+        """
+    )
+    suspend fun getPurchaseSupplierOnce(
+        supplierId: Long
+    ): PurchaseSupplierEntity?
+
+    @Query(
+        """
+        SELECT
+            s.id AS id,
+            s.name AS name,
+            s.phone AS phone,
+            s.address AS address,
+            s.note AS note,
+            s.isActive AS isActive,
+            COUNT(DISTINCT b.id) AS purchaseCount,
+            COALESCE(
+                SUM(
+                    CASE
+                        WHEN b.status != 'CANCELLED'
+                        THEN b.total
+                        ELSE 0
+                    END
+                ),
+                0
+            ) AS totalPurchase,
+            COALESCE(
+                (
+                    SELECT SUM(p.amount)
+                    FROM purchase_payments p
+                    INNER JOIN purchase_bills pb
+                        ON pb.id = p.billId
+                    WHERE pb.supplierId = s.id
+                      AND pb.status != 'CANCELLED'
+                ),
+                0
+            ) AS paid,
+            MAX(
+                0,
+                COALESCE(
+                    SUM(
+                        CASE
+                            WHEN b.status != 'CANCELLED'
+                            THEN b.total
+                            ELSE 0
+                        END
+                    ),
+                    0
+                ) -
+                COALESCE(
+                    (
+                        SELECT SUM(p.amount)
+                        FROM purchase_payments p
+                        INNER JOIN purchase_bills pb
+                            ON pb.id = p.billId
+                        WHERE pb.supplierId = s.id
+                          AND pb.status != 'CANCELLED'
+                    ),
+                    0
+                )
+            ) AS due
+        FROM purchase_suppliers s
+        LEFT JOIN purchase_bills b
+            ON b.supplierId = s.id
+        WHERE s.workspace = :workspace
+          AND s.businessKey = :businessKey
+        GROUP BY s.id
+        ORDER BY s.isActive DESC,
+                 s.name COLLATE NOCASE ASC
+        """
+    )
+    fun observePurchaseSupplierSummaries(
+        workspace: String,
+        businessKey: String
+    ): Flow<List<PurchaseSupplierSummary>>
+
+    @Insert(onConflict = OnConflictStrategy.ABORT)
+    suspend fun insertPurchaseBill(
+        item: PurchaseBillEntity
+    ): Long
+
+    @Insert(onConflict = OnConflictStrategy.ABORT)
+    suspend fun insertPurchaseBillLine(
+        item: PurchaseBillLineEntity
+    ): Long
+
+    @Insert(onConflict = OnConflictStrategy.ABORT)
+    suspend fun insertPurchasePayment(
+        item: PurchasePaymentEntity
+    ): Long
+
+    @Insert(onConflict = OnConflictStrategy.ABORT)
+    suspend fun insertPurchaseReturn(
+        item: PurchaseReturnEntity
+    ): Long
+
+    @Query(
+        """
+        SELECT *
+        FROM purchase_bills
+        WHERE id = :billId
+        LIMIT 1
+        """
+    )
+    suspend fun getPurchaseBillOnce(
+        billId: Long
+    ): PurchaseBillEntity?
+
+    @Query(
+        """
+        SELECT *
+        FROM purchase_bill_lines
+        WHERE billId = :billId
+        ORDER BY id ASC
+        """
+    )
+    suspend fun getPurchaseBillLinesOnce(
+        billId: Long
+    ): List<PurchaseBillLineEntity>
+
+    @Query(
+        """
+        SELECT *
+        FROM purchase_payments
+        WHERE billId = :billId
+        ORDER BY paidAt ASC, id ASC
+        """
+    )
+    suspend fun getPurchasePaymentsOnce(
+        billId: Long
+    ): List<PurchasePaymentEntity>
+
+    @Query(
+        """
+        SELECT *
+        FROM purchase_returns
+        WHERE billId = :billId
+        ORDER BY returnedAt ASC, id ASC
+        """
+    )
+    suspend fun getPurchaseReturnsOnce(
+        billId: Long
+    ): List<PurchaseReturnEntity>
+
+    @Query(
+        """
+        SELECT
+            b.id AS id,
+            b.purchaseNo AS purchaseNo,
+            b.supplierId AS supplierId,
+            s.name AS supplierName,
+            b.subtotal AS subtotal,
+            b.discount AS discount,
+            b.total AS total,
+            COALESCE(SUM(p.amount), 0) AS paid,
+            MAX(
+                0,
+                b.total - COALESCE(SUM(p.amount), 0)
+            ) AS due,
+            b.status AS status,
+            b.note AS note,
+            b.purchasedAt AS purchasedAt
+        FROM purchase_bills b
+        INNER JOIN purchase_suppliers s
+            ON s.id = b.supplierId
+        LEFT JOIN purchase_payments p
+            ON p.billId = b.id
+        WHERE b.workspace = :workspace
+          AND b.businessKey = :businessKey
+        GROUP BY b.id
+        ORDER BY b.purchasedAt DESC,
+                 b.id DESC
+        """
+    )
+    fun observePurchaseBillSummaries(
+        workspace: String,
+        businessKey: String
+    ): Flow<List<PurchaseBillSummary>>
+
+    @Query("SELECT * FROM purchase_suppliers ORDER BY id ASC")
+    suspend fun getAllPurchaseSuppliers():
+        List<PurchaseSupplierEntity>
+
+    @Query("SELECT * FROM purchase_bills ORDER BY id ASC")
+    suspend fun getAllPurchaseBills():
+        List<PurchaseBillEntity>
+
+    @Query("SELECT * FROM purchase_bill_lines ORDER BY id ASC")
+    suspend fun getAllPurchaseBillLines():
+        List<PurchaseBillLineEntity>
+
+    @Query("SELECT * FROM purchase_payments ORDER BY id ASC")
+    suspend fun getAllPurchasePayments():
+        List<PurchasePaymentEntity>
+
+    @Query("SELECT * FROM purchase_returns ORDER BY id ASC")
+    suspend fun getAllPurchaseReturns():
+        List<PurchaseReturnEntity>
+
+    @Query("DELETE FROM purchase_returns")
+    suspend fun clearPurchaseReturns()
+
+    @Query("DELETE FROM purchase_payments")
+    suspend fun clearPurchasePayments()
+
+    @Query("DELETE FROM purchase_bill_lines")
+    suspend fun clearPurchaseBillLines()
+
+    @Query("DELETE FROM purchase_bills")
+    suspend fun clearPurchaseBills()
+
+    @Query("DELETE FROM purchase_suppliers")
+    suspend fun clearPurchaseSuppliers()
+
     // Retail backup / restore
     @Query("SELECT * FROM retail_sales ORDER BY id ASC")
     suspend fun getAllRetailSales(): List<RetailSaleEntity>

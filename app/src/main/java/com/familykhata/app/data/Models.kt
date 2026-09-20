@@ -73,6 +73,24 @@ data class BakiEntryEntity(
 )
 
 @Entity(
+    tableName = "business_profiles",
+    indices = [
+        Index(value = ["name"])
+    ]
+)
+data class BusinessProfileEntity(
+    @PrimaryKey
+    val businessId: String,
+    val name: String,
+    val businessType: String = "",
+    val phone: String = "",
+    val address: String = "",
+    val logoPath: String = "",
+    val isActive: Boolean = true,
+    val createdAt: Long = System.currentTimeMillis()
+)
+
+@Entity(
     tableName = "financial_accounts",
     indices = [
         Index(value = ["workspace", "name"]),

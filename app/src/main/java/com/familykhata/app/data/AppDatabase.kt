@@ -14,9 +14,10 @@ import androidx.sqlite.db.SupportSQLiteDatabase
         BakiEntryEntity::class,
         FinancialAccountEntity::class,
         FinancialAccountEntryEntity::class,
-        DigitalServiceTransactionEntity::class
+        DigitalServiceTransactionEntity::class,
+        BusinessProfileEntity::class
     ],
-    version = 7,
+    version = 8,
     exportSchema = false
 )
 abstract class AppDatabase : RoomDatabase() {
@@ -269,6 +270,37 @@ abstract class AppDatabase : RoomDatabase() {
                 }
             }
 
+
+        private val MIGRATION_7_8 =
+            object : Migration(7, 8) {
+                override fun migrate(
+                    db: SupportSQLiteDatabase
+                ) {
+                    db.execSQL(
+                        """
+                        CREATE TABLE IF NOT EXISTS `business_profiles` (
+                            `businessId` TEXT NOT NULL,
+                            `name` TEXT NOT NULL,
+                            `businessType` TEXT NOT NULL,
+                            `phone` TEXT NOT NULL,
+                            `address` TEXT NOT NULL,
+                            `logoPath` TEXT NOT NULL,
+                            `isActive` INTEGER NOT NULL,
+                            `createdAt` INTEGER NOT NULL,
+                            PRIMARY KEY(`businessId`)
+                        )
+                        """.trimIndent()
+                    )
+
+                    db.execSQL(
+                        """
+                        CREATE INDEX IF NOT EXISTS
+                        `index_business_profiles_name`
+                        ON `business_profiles` (`name`)
+                        """.trimIndent()
+                    )
+                }
+            }
         fun get(context: Context): AppDatabase = INSTANCE ?: synchronized(this) {
             INSTANCE ?: Room.databaseBuilder(
                 context.applicationContext,
@@ -281,7 +313,8 @@ abstract class AppDatabase : RoomDatabase() {
                     MIGRATION_3_4,
                     MIGRATION_4_5,
                     MIGRATION_5_6,
-                    MIGRATION_6_7
+                    MIGRATION_6_7,
+                    MIGRATION_7_8
                 )
                 .build()
                 .also { INSTANCE = it }

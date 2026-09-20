@@ -10,6 +10,34 @@ import kotlinx.coroutines.flow.Flow
 @Dao
 interface FamilyKhataDao {
     @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun upsertBusinessProfile(
+        item: BusinessProfileEntity
+    )
+
+    @Query(
+        """
+        SELECT *
+        FROM business_profiles
+        WHERE isActive = 1
+        ORDER BY createdAt ASC
+        """
+    )
+    fun observeBusinessProfiles():
+        Flow<List<BusinessProfileEntity>>
+
+    @Query(
+        """
+        SELECT *
+        FROM business_profiles
+        WHERE businessId = :businessId
+        LIMIT 1
+        """
+    )
+    suspend fun getBusinessProfile(
+        businessId: String
+    ): BusinessProfileEntity?
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertTransaction(
         item: TransactionEntity
     ): Long

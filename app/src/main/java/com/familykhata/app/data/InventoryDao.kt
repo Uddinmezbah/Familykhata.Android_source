@@ -753,6 +753,16 @@ interface InventoryDao {
     suspend fun getAllPurchaseReturns():
         List<PurchaseReturnEntity>
 
+    @Query(
+        """
+        DELETE FROM purchase_payments
+        WHERE eventKey = :eventKey
+        """
+    )
+    suspend fun deletePurchasePaymentByEventKey(
+        eventKey: String
+    ): Int
+
     @Query("DELETE FROM purchase_returns")
     suspend fun clearPurchaseReturns()
 

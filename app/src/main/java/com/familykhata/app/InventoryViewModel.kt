@@ -14,6 +14,12 @@ import com.familykhata.app.data.FinancialAccountSummary
 import com.familykhata.app.data.ProductEntity
 import com.familykhata.app.data.ProductUnitConversionEntity
 import com.familykhata.app.data.ProductStockSummary
+import com.familykhata.app.data.PurchaseBillEntity
+import com.familykhata.app.data.PurchaseBillLineEntity
+import com.familykhata.app.data.PurchaseBillSummary
+import com.familykhata.app.data.PurchasePaymentEntity
+import com.familykhata.app.data.PurchaseSupplierEntity
+import com.familykhata.app.data.PurchaseSupplierSummary
 import com.familykhata.app.data.RetailSaleEntity
 import com.familykhata.app.data.RetailSaleLineEntity
 import com.familykhata.app.data.RetailSalePaymentEntity
@@ -43,6 +49,26 @@ data class RetailSaleLineInput(
     val unitPrice: Double,
     val unitName: String = "",
     val unitFactor: Int = 1
+)
+
+data class PurchaseLineInput(
+    val productId: Long,
+    val quantity: Int,
+    val unitCost: Double,
+    val unitName: String = "",
+    val unitFactor: Int = 1,
+    val batchNo: String = "",
+    val expiryDate: Long? = null
+)
+
+private data class ResolvedPurchaseLine(
+    val input: PurchaseLineInput,
+    val product: ProductEntity,
+    val unitName: String,
+    val unitFactor: Int,
+    val baseQuantity: Int,
+    val basePurchasePrice: Double,
+    val lineTotal: Double
 )
 
 @OptIn(ExperimentalCoroutinesApi::class)
@@ -93,6 +119,36 @@ class InventoryViewModel(application: Application) : AndroidViewModel(applicatio
         inventoryContext
             .flatMapLatest { context ->
                 dao.observeRetailSales(
+                    workspace = context.first,
+                    businessKey = context.second
+                )
+            }
+            .stateIn(
+                viewModelScope,
+                SharingStarted.WhileSubscribed(5_000),
+                emptyList()
+            )
+
+    val purchaseSuppliers:
+        StateFlow<List<PurchaseSupplierSummary>> =
+        inventoryContext
+            .flatMapLatest { context ->
+                dao.observePurchaseSupplierSummaries(
+                    workspace = context.first,
+                    businessKey = context.second
+                )
+            }
+            .stateIn(
+                viewModelScope,
+                SharingStarted.WhileSubscribed(5_000),
+                emptyList()
+            )
+
+    val purchaseBills:
+        StateFlow<List<PurchaseBillSummary>> =
+        inventoryContext
+            .flatMapLatest { context ->
+                dao.observePurchaseBillSummaries(
                     workspace = context.first,
                     businessKey = context.second
                 )
@@ -2534,6 +2590,815 @@ class InventoryViewModel(application: Application) : AndroidViewModel(applicatio
                     }
                 }
             }
+
+            onDone(result)
+        }
+    }
+
+    fun addPurchaseSupplier(
+        name: String,
+        phone: String = "",
+        address: String = "",
+        note: String = "",
+        onDone: (Long?) -> Unit = {}
+    ) {
+        val cleanName = name.trim()
+
+        if (cleanName.isBlank()) {
+            onDone(null)
+            return
+        }
+
+        val currentWorkspace =
+            workspace.value
+
+        val currentBusinessKey =
+            businessKey.value
+
+        if (
+            currentWorkspace == "SHOP" &&
+            currentBusinessKey ==
+                "__NO_BUSINESS__"
+        ) {
+            onDone(null)
+            return
+        }
+
+        viewModelScope.launch {
+            val supplierId =
+                runCatching {
+                    dao.insertPurchaseSupplier(
+                        PurchaseSupplierEntity(
+                            name = cleanName,
+                            phone = phone.trim(),
+                            address =
+                                address.trim(),
+                            note = note.trim(),
+                            workspace =
+                                currentWorkspace,
+                            businessKey =
+                                currentBusinessKey
+                        )
+                    )
+                }.getOrNull()
+
+            onDone(
+                supplierId?.takeIf {
+                    it > 0L
+                }
+            )
+        }
+    }
+
+    private fun purchaseAccountSourceKey(
+        eventKey: String
+    ): String =
+        "PURCHASE_ACCOUNT:$eventKey"
+
+    private suspend fun reconcilePurchasePaymentAccount(
+        bill: PurchaseBillEntity,
+        payment: PurchasePaymentEntity
+    ) {
+        require(
+            payment.billId == bill.id &&
+                payment.amount.isFinite() &&
+                payment.amount > 0.0001
+        ) {
+            "Invalid purchase payment"
+        }
+
+        val ledgerBusinessId =
+            ledgerBusinessIdForInventoryContext(
+                bill.workspace,
+                bill.businessKey
+            )
+
+        bakiDatabase.withTransaction {
+            val account =
+                requireNotNull(
+                    bakiDao.getFinancialAccountOnce(
+                        payment.financialAccountId
+                    )
+                ) {
+                    "Purchase payment account not found"
+                }
+
+            require(
+                account.workspace ==
+                    bill.workspace &&
+                    (
+                        bill.workspace != "SHOP" ||
+                            account.businessId ==
+                                ledgerBusinessId
+                    )
+            ) {
+                "Purchase payment account scope mismatch"
+            }
+
+            val sourceKey =
+                purchaseAccountSourceKey(
+                    payment.eventKey
+                )
+
+            val existing =
+                bakiDao
+                    .getFinancialAccountEntryBySourceKey(
+                        sourceKey
+                    )
+
+            if (existing != null) {
+                require(
+                    existing.accountId ==
+                        account.id &&
+                        existing.entryType ==
+                            "PURCHASE_OUT" &&
+                        kotlin.math.abs(
+                            existing.amount -
+                                payment.amount
+                        ) < 0.0001 &&
+                        kotlin.math.abs(
+                            existing.balanceDelta +
+                                payment.amount
+                        ) < 0.0001 &&
+                        existing.workspace ==
+                            bill.workspace &&
+                        existing.businessId ==
+                            ledgerBusinessId
+                ) {
+                    "Purchase account projection mismatch"
+                }
+
+                return@withTransaction
+            }
+
+            val balance =
+                requireNotNull(
+                    bakiDao
+                        .getFinancialAccountBalanceOnce(
+                            account.id
+                        )
+                ) {
+                    "Financial account balance unavailable"
+                }
+
+            require(
+                balance - payment.amount >=
+                    -0.0001
+            ) {
+                "Insufficient account balance"
+            }
+
+            val inserted =
+                bakiDao.insertFinancialAccountEntry(
+                    FinancialAccountEntryEntity(
+                        accountId =
+                            account.id,
+                        entryType =
+                            "PURCHASE_OUT",
+                        amount =
+                            payment.amount,
+                        balanceDelta =
+                            -payment.amount,
+                        sourceKey =
+                            sourceKey,
+                        note =
+                            "Purchase ${bill.purchaseNo} • ${payment.paymentMethod}",
+                        workspace =
+                            bill.workspace,
+                        businessId =
+                            ledgerBusinessId,
+                        createdAt =
+                            payment.paidAt
+                    )
+                )
+
+            require(inserted > 0L)
+        }
+    }
+
+    fun createPurchase(
+        purchaseNo: String = "",
+        supplierId: Long,
+        lines: List<PurchaseLineInput>,
+        discount: Double = 0.0,
+        initialPaid: Double = 0.0,
+        financialAccountId: Long? = null,
+        note: String = "",
+        purchasedAt: Long =
+            System.currentTimeMillis(),
+        onDone: (Long?) -> Unit = {}
+    ) {
+        if (
+            supplierId <= 0L ||
+            lines.isEmpty() ||
+            lines.any {
+                it.productId <= 0L ||
+                    it.quantity <= 0 ||
+                    it.unitFactor <= 0 ||
+                    !it.unitCost.isFinite() ||
+                    it.unitCost < 0.0
+            } ||
+            !discount.isFinite() ||
+            discount < 0.0 ||
+            !initialPaid.isFinite() ||
+            initialPaid < 0.0 ||
+            purchasedAt <= 0L
+        ) {
+            onDone(null)
+            return
+        }
+
+        val currentWorkspace =
+            workspace.value
+
+        val currentBusinessKey =
+            businessKey.value
+
+        val currentLedgerBusinessId =
+            ledgerBusinessIdForInventoryContext(
+                currentWorkspace,
+                currentBusinessKey
+            )
+
+        if (
+            currentWorkspace == "SHOP" &&
+            currentLedgerBusinessId.isBlank()
+        ) {
+            onDone(null)
+            return
+        }
+
+        viewModelScope.launch {
+            val created =
+                runCatching {
+                    val supplier =
+                        requireNotNull(
+                            dao.getPurchaseSupplierOnce(
+                                supplierId
+                            )
+                        ) {
+                            "Supplier not found"
+                        }
+
+                    require(
+                        supplier.workspace ==
+                            currentWorkspace &&
+                            supplier.businessKey ==
+                                currentBusinessKey &&
+                            supplier.isActive
+                    ) {
+                        "Supplier scope mismatch"
+                    }
+
+                    val paymentAccount =
+                        if (
+                            initialPaid >
+                            0.0001
+                        ) {
+                            requireNotNull(
+                                financialAccountId
+                                    ?.takeIf {
+                                        it > 0L
+                                    }
+                                    ?.let {
+                                            bakiDao
+                                                .getFinancialAccountOnce(
+                                                    it
+                                                )
+                                        }
+                            ) {
+                                "Financial account required"
+                            }.also {
+                                    account ->
+
+                                require(
+                                    account.workspace ==
+                                        currentWorkspace &&
+                                        (
+                                            currentWorkspace !=
+                                                "SHOP" ||
+                                                account.businessId ==
+                                                    currentLedgerBusinessId
+                                        ) &&
+                                        account.isActive
+                                ) {
+                                    "Invalid purchase payment account"
+                                }
+
+                                val balance =
+                                    requireNotNull(
+                                        bakiDao
+                                            .getFinancialAccountBalanceOnce(
+                                                account.id
+                                            )
+                                    )
+
+                                require(
+                                    balance -
+                                        initialPaid >=
+                                        -0.0001
+                                ) {
+                                    "Insufficient account balance"
+                                }
+                            }
+                        } else {
+                            null
+                        }
+
+                    database.withTransaction {
+                        val freshSupplier =
+                            requireNotNull(
+                                dao.getPurchaseSupplierOnce(
+                                    supplierId
+                                )
+                            )
+
+                        require(
+                            freshSupplier.workspace ==
+                                currentWorkspace &&
+                                freshSupplier.businessKey ==
+                                    currentBusinessKey &&
+                                freshSupplier.isActive
+                        )
+
+                        val resolvedLines =
+                            lines.map { input ->
+                                val product =
+                                    requireNotNull(
+                                        dao.getProductOnce(
+                                            input.productId
+                                        )
+                                    ) {
+                                        "Product not found"
+                                    }
+
+                                require(
+                                    product.workspace ==
+                                        currentWorkspace &&
+                                        product.businessKey ==
+                                            currentBusinessKey
+                                ) {
+                                    "Product scope mismatch"
+                                }
+
+                                val resolvedUnit =
+                                    resolveExistingProductUnit(
+                                        product =
+                                            product,
+                                        requestedUnitName =
+                                            input.unitName,
+                                        requestedUnitFactor =
+                                            input.unitFactor
+                                    )
+
+                                val factor =
+                                    resolvedUnit.second
+
+                                val baseQuantityLong =
+                                    input.quantity.toLong() *
+                                        factor.toLong()
+
+                                require(
+                                    baseQuantityLong in
+                                        1L..
+                                        Int.MAX_VALUE
+                                            .toLong()
+                                )
+
+                                val lineTotal =
+                                    input.quantity
+                                        .toDouble() *
+                                        input.unitCost
+
+                                require(
+                                    lineTotal.isFinite() &&
+                                        lineTotal >= 0.0
+                                )
+
+                                val basePurchasePrice =
+                                    input.unitCost /
+                                        factor.toDouble()
+
+                                require(
+                                    basePurchasePrice
+                                        .isFinite() &&
+                                        basePurchasePrice >=
+                                            0.0
+                                )
+
+                                ResolvedPurchaseLine(
+                                    input = input,
+                                    product =
+                                        product,
+                                    unitName =
+                                        resolvedUnit.first,
+                                    unitFactor =
+                                        factor,
+                                    baseQuantity =
+                                        baseQuantityLong
+                                            .toInt(),
+                                    basePurchasePrice =
+                                        basePurchasePrice,
+                                    lineTotal =
+                                        lineTotal
+                                )
+                            }
+
+                        val subtotal =
+                            resolvedLines.sumOf {
+                                it.lineTotal
+                            }
+
+                        require(
+                            subtotal.isFinite() &&
+                                subtotal >= 0.0
+                        )
+
+                        require(
+                            discount <=
+                                subtotal + 0.0001
+                        ) {
+                            "Discount exceeds subtotal"
+                        }
+
+                        val total =
+                            (
+                                subtotal -
+                                    discount
+                            ).coerceAtLeast(
+                                0.0
+                            )
+
+                        require(
+                            initialPaid <=
+                                total + 0.0001
+                        ) {
+                            "Payment exceeds purchase total"
+                        }
+
+                        val cleanPurchaseNo =
+                            purchaseNo.trim()
+                                .ifBlank {
+                                    "PUR-${System.currentTimeMillis()}-${UUID.randomUUID().toString().take(4).uppercase(Locale.ROOT)}"
+                                }
+
+                        val bill =
+                            PurchaseBillEntity(
+                                purchaseNo =
+                                    cleanPurchaseNo,
+                                supplierId =
+                                    freshSupplier.id,
+                                subtotal =
+                                    subtotal,
+                                discount =
+                                    discount,
+                                total =
+                                    total,
+                                note =
+                                    note.trim(),
+                                workspace =
+                                    currentWorkspace,
+                                businessKey =
+                                    currentBusinessKey,
+                                purchasedAt =
+                                    purchasedAt
+                            )
+
+                        val billId =
+                            dao.insertPurchaseBill(
+                                bill
+                            )
+
+                        require(billId > 0L)
+
+                        resolvedLines.forEach {
+                                line ->
+
+                            val batchId =
+                                dao.insertBatch(
+                                    StockBatchEntity(
+                                        productId =
+                                            line.product.id,
+                                        batchNo =
+                                            line.input
+                                                .batchNo
+                                                .trim(),
+                                        quantity =
+                                            line.baseQuantity,
+                                        purchasePrice =
+                                            line.basePurchasePrice,
+                                        purchaseDate =
+                                            purchasedAt,
+                                        expiryDate =
+                                            line.input
+                                                .expiryDate
+                                    )
+                                )
+
+                            require(batchId > 0L)
+
+                            val lineId =
+                                dao.insertPurchaseBillLine(
+                                    PurchaseBillLineEntity(
+                                        billId =
+                                            billId,
+                                        productId =
+                                            line.product.id,
+                                        stockBatchId =
+                                            batchId,
+                                        productNameSnapshot =
+                                            line.product.name,
+                                        skuSnapshot =
+                                            line.product.sku,
+                                        unitSnapshot =
+                                            line.unitName,
+                                        unitFactor =
+                                            line.unitFactor,
+                                        quantity =
+                                            line.input
+                                                .quantity,
+                                        baseQuantity =
+                                            line.baseQuantity,
+                                        unitCost =
+                                            line.input
+                                                .unitCost,
+                                        lineTotal =
+                                            line.lineTotal,
+                                        batchNo =
+                                            line.input
+                                                .batchNo
+                                                .trim(),
+                                        expiryDate =
+                                            line.input
+                                                .expiryDate
+                                    )
+                                )
+
+                            require(lineId > 0L)
+                        }
+
+                        var payment:
+                            PurchasePaymentEntity? =
+                            null
+
+                        if (
+                            initialPaid >
+                            0.0001
+                        ) {
+                            val account =
+                                requireNotNull(
+                                    paymentAccount
+                                )
+
+                            val eventKey =
+                                "PURCHASE_PAYMENT:${UUID.randomUUID()}"
+
+                            val pendingPayment =
+                                PurchasePaymentEntity(
+                                    eventKey =
+                                        eventKey,
+                                    billId =
+                                        billId,
+                                    financialAccountId =
+                                        account.id,
+                                    amount =
+                                        initialPaid,
+                                    paymentMethod =
+                                        retailPaymentMethodForAccount(
+                                            account
+                                        ),
+                                    note =
+                                        "Initial purchase payment",
+                                    paidAt =
+                                        purchasedAt
+                                )
+
+                            val paymentId =
+                                dao.insertPurchasePayment(
+                                    pendingPayment
+                                )
+
+                            require(paymentId > 0L)
+
+                            payment =
+                                pendingPayment.copy(
+                                    id =
+                                        paymentId
+                                )
+                        }
+
+                        bill.copy(
+                            id = billId
+                        ) to payment
+                    }
+                }.getOrNull()
+
+            if (created == null) {
+                onDone(null)
+                return@launch
+            }
+
+            val bill =
+                created.first
+
+            val payment =
+                created.second
+
+            if (payment != null) {
+                val projected =
+                    runCatching {
+                        reconcilePurchasePaymentAccount(
+                            bill = bill,
+                            payment = payment
+                        )
+                    }.isSuccess
+
+                if (!projected) {
+                    runCatching {
+                        dao.deletePurchasePaymentByEventKey(
+                            payment.eventKey
+                        )
+                    }
+                }
+            }
+
+            onDone(bill.id)
+        }
+    }
+
+    fun addPurchasePayment(
+        billId: Long,
+        amount: Double,
+        financialAccountId: Long,
+        note: String = "",
+        paidAt: Long =
+            System.currentTimeMillis(),
+        onDone: (Boolean) -> Unit = {}
+    ) {
+        if (
+            billId <= 0L ||
+            financialAccountId <= 0L ||
+            !amount.isFinite() ||
+            amount <= 0.0001 ||
+            paidAt <= 0L
+        ) {
+            onDone(false)
+            return
+        }
+
+        val currentWorkspace =
+            workspace.value
+
+        val currentBusinessKey =
+            businessKey.value
+
+        val currentLedgerBusinessId =
+            ledgerBusinessIdForInventoryContext(
+                currentWorkspace,
+                currentBusinessKey
+            )
+
+        viewModelScope.launch {
+            val result =
+                runCatching {
+                    val bill =
+                        requireNotNull(
+                            dao.getPurchaseBillOnce(
+                                billId
+                            )
+                        ) {
+                            "Purchase not found"
+                        }
+
+                    require(
+                        bill.workspace ==
+                            currentWorkspace &&
+                            bill.businessKey ==
+                                currentBusinessKey &&
+                            bill.status !=
+                                "CANCELLED"
+                    ) {
+                        "Purchase scope mismatch"
+                    }
+
+                    val payments =
+                        dao.getPurchasePaymentsOnce(
+                            bill.id
+                        )
+
+                    val alreadyPaid =
+                        payments.sumOf {
+                            it.amount
+                        }
+
+                    val due =
+                        (
+                            bill.total -
+                                alreadyPaid
+                        ).coerceAtLeast(
+                            0.0
+                        )
+
+                    require(
+                        amount <=
+                            due + 0.0001
+                    ) {
+                        "Payment exceeds due"
+                    }
+
+                    val account =
+                        requireNotNull(
+                            bakiDao
+                                .getFinancialAccountOnce(
+                                    financialAccountId
+                                )
+                        ) {
+                            "Financial account not found"
+                        }
+
+                    require(
+                        account.workspace ==
+                            currentWorkspace &&
+                            (
+                                currentWorkspace !=
+                                    "SHOP" ||
+                                    account.businessId ==
+                                        currentLedgerBusinessId
+                            ) &&
+                            account.isActive
+                    ) {
+                        "Invalid payment account"
+                    }
+
+                    val balance =
+                        requireNotNull(
+                            bakiDao
+                                .getFinancialAccountBalanceOnce(
+                                    account.id
+                                )
+                        )
+
+                    require(
+                        balance -
+                            amount >=
+                            -0.0001
+                    ) {
+                        "Insufficient account balance"
+                    }
+
+                    val payment =
+                        PurchasePaymentEntity(
+                            eventKey =
+                                "PURCHASE_PAYMENT:${UUID.randomUUID()}",
+                            billId =
+                                bill.id,
+                            financialAccountId =
+                                account.id,
+                            amount =
+                                amount,
+                            paymentMethod =
+                                retailPaymentMethodForAccount(
+                                    account
+                                ),
+                            note =
+                                note.trim(),
+                            paidAt =
+                                paidAt
+                        )
+
+                    val paymentId =
+                        dao.insertPurchasePayment(
+                            payment
+                        )
+
+                    require(paymentId > 0L)
+
+                    val insertedPayment =
+                        payment.copy(
+                            id =
+                                paymentId
+                        )
+
+                    val projected =
+                        runCatching {
+                            reconcilePurchasePaymentAccount(
+                                bill =
+                                    bill,
+                                payment =
+                                    insertedPayment
+                            )
+                        }.isSuccess
+
+                    if (!projected) {
+                        dao.deletePurchasePaymentByEventKey(
+                            payment.eventKey
+                        )
+                    }
+
+                    require(projected)
+
+                    true
+                }.getOrDefault(false)
 
             onDone(result)
         }

@@ -51,6 +51,10 @@ class InventoryViewModel(application: Application) : AndroidViewModel(applicatio
     private val dao = database.dao()
     private val bakiDatabase = AppDatabase.get(application)
     private val bakiDao = bakiDatabase.dao()
+    private val appPreferences = application.getSharedPreferences(
+        "hisabi_khata_preferences",
+        android.content.Context.MODE_PRIVATE
+    )
     private val workspace =
         MutableStateFlow("SHOP")
 
@@ -116,54 +120,62 @@ class InventoryViewModel(application: Application) : AndroidViewModel(applicatio
         shopType: String,
         businessIdValue: String
     ) {
-        val key =
+        val legacyBusinessKey =
             businessDataKey(shopType)
+        val targetBusinessId =
+            businessIdValue.trim().ifBlank {
+                legacyBusinessKey
+            }
 
-        if (
-            workspace.value !=
-            workspaceValue
-        ) {
-            workspace.value =
-                workspaceValue
+        if (workspace.value != workspaceValue) {
+            workspace.value = workspaceValue
         }
 
-        if (
-            businessKey.value !=
-            key
-        ) {
-            businessKey.value =
-                key
+        if (businessId.value != targetBusinessId) {
+            businessId.value = targetBusinessId
         }
 
-        if (businessId.value != businessIdValue) {
-            businessId.value = businessIdValue
+        if (businessKey.value != targetBusinessId) {
+            businessKey.value = targetBusinessId
         }
 
         viewModelScope.launch {
-            dao.claimLegacyProducts(
-                workspace = workspaceValue,
-                businessKey = key
-            )
+            val originalBusinessId =
+                appPreferences.getString(
+                    "legacy_business_id",
+                    ""
+                ).orEmpty()
+
+            if (
+                workspaceValue == "SHOP" &&
+                targetBusinessId == originalBusinessId
+            ) {
+                dao.claimExistingBusinessProducts(
+                    workspace = workspaceValue,
+                    legacyBusinessKey = legacyBusinessKey,
+                    targetBusinessId = targetBusinessId
+                )
+                dao.claimExistingBusinessRetailSales(
+                    workspace = workspaceValue,
+                    legacyBusinessKey = legacyBusinessKey,
+                    targetBusinessId = targetBusinessId
+                )
+            }
 
             dao.getRetailSalesOnce(
                 workspace = workspaceValue,
-                businessKey = key
+                businessKey = targetBusinessId
             ).forEach { sale ->
                 runCatching {
-                    reconcileRetailSaleBaki(
-                        sale
-                    )
+                    reconcileRetailSaleBaki(sale)
                 }
 
                 runCatching {
-                    reconcileRetailSaleAccounts(
-                        sale
-                    )
+                    reconcileRetailSaleAccounts(sale)
                 }
             }
         }
     }
-
     fun setWorkspace(value: String) {
         if (workspace.value != value) workspace.value = value
     }
@@ -956,6 +968,8 @@ class InventoryViewModel(application: Application) : AndroidViewModel(applicatio
                             "RETAIL_SALE_IN" &&
                         entry.workspace ==
                             sale.workspace &&
+                        entry.businessId ==
+                            sale.businessKey &&
                         kotlin.math.abs(
                             entry.balanceDelta -
                                 payment.amount
@@ -1055,7 +1069,7 @@ class InventoryViewModel(application: Application) : AndroidViewModel(applicatio
                 require(
                     account.workspace ==
                         sale.workspace &&
-                        (sale.workspace != "SHOP" || account.businessId == businessId.value)
+                        (sale.workspace != "SHOP" || account.businessId == sale.businessKey)
                 ) {
                     "Retail payment account workspace mismatch"
                 }
@@ -1090,7 +1104,9 @@ class InventoryViewModel(application: Application) : AndroidViewModel(applicatio
                         existing.transferGroupId ==
                             null &&
                         existing.workspace ==
-                            sale.workspace
+                            sale.workspace &&
+                        existing.businessId ==
+                            sale.businessKey
 
                 if (!matches) {
                     if (existing != null) {
@@ -1176,7 +1192,7 @@ class InventoryViewModel(application: Application) : AndroidViewModel(applicatio
                 bakiDao.getStatementPerson(
                     personId = personId,
                     workspace = sale.workspace,
-                    businessId = businessId.value
+                    businessId = sale.businessKey
                 )
             ) {
                 "Baki person not found"
@@ -1405,7 +1421,7 @@ class InventoryViewModel(application: Application) : AndroidViewModel(applicatio
                                 workspace =
                                     currentWorkspace,
                                 businessId =
-                                    businessId.value
+                                    currentBusinessKey
                             )
                         ) {
                             "Baki person not found"
@@ -1431,6 +1447,10 @@ class InventoryViewModel(application: Application) : AndroidViewModel(applicatio
                                     require(
                                         account.workspace ==
                                             currentWorkspace &&
+                                            (
+                                                currentWorkspace != "SHOP" ||
+                                                    account.businessId == currentBusinessKey
+                                            ) &&
                                             account.isActive
                                     ) {
                                         "Invalid retail payment account"
@@ -1995,6 +2015,10 @@ class InventoryViewModel(application: Application) : AndroidViewModel(applicatio
                                     require(
                                         account.workspace ==
                                             currentWorkspace &&
+                                            (
+                                                currentWorkspace != "SHOP" ||
+                                                    account.businessId == currentBusinessKey
+                                            ) &&
                                             account.isActive
                                     ) {
                                         "Invalid retail payment account"

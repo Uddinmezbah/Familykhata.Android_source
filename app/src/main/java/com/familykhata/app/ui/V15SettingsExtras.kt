@@ -136,6 +136,8 @@ internal fun V15BusinessProfileDialog(
     initialBusinessType: String,
     initialAddress: String,
     initialLogoPath: String,
+    logoStorageKey: String = "current",
+    confirmLabel: String? = null,
     onDismiss: () -> Unit,
     onSave: (
         String,
@@ -164,7 +166,20 @@ internal fun V15BusinessProfileDialog(
         ) { uri ->
             if (uri != null) {
                 runCatching {
-                    val file = File(context.filesDir, "hisabi_shop_logo.img")
+                    val safeLogoKey =
+                        logoStorageKey
+                            .filter {
+                                it.isLetterOrDigit() ||
+                                    it == '-' ||
+                                    it == '_'
+                            }
+                            .take(80)
+                            .ifBlank { "current" }
+
+                    val file = File(
+                        context.filesDir,
+                        "hisabi_shop_logo_${safeLogoKey}.img"
+                    )
 
                     context.contentResolver
                         .openInputStream(uri)
@@ -331,7 +346,10 @@ internal fun V15BusinessProfileDialog(
                     )
                 }
             ) {
-                Text(v15Text("আপডেট করুন", "Update"))
+                Text(
+                    confirmLabel
+                        ?: v15Text("আপডেট করুন", "Update")
+                )
             }
         },
         dismissButton = {

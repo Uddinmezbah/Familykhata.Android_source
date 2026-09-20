@@ -74,6 +74,7 @@ import java.io.File
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
+import java.util.UUID
 import kotlinx.coroutines.delay
 
 private const val APP_PACKAGE = "com.familykhata.app"
@@ -157,6 +158,12 @@ fun FamilyKhataApp(viewModel: FamilyKhataViewModel) {
             mutableStateOf(false)
         }
 
+    var showNewBusinessDialog by
+        remember { mutableStateOf(false) }
+
+    var newBusinessId by
+        remember { mutableStateOf("") }
+
     val premiumBillingManager =
         remember(appContext) {
             PremiumBillingManager.get(
@@ -224,6 +231,46 @@ fun FamilyKhataApp(viewModel: FamilyKhataViewModel) {
     LaunchedEffect(Unit) { V14DisplayState.initialize(appContext) }
 
     HisabiKhataTheme {
+        if (showNewBusinessDialog) {
+            V15BusinessProfileDialog(
+                viewModel = viewModel,
+                initialName = homeProfileName,
+                initialBusiness = "",
+                initialPhone = "",
+                initialBusinessType = "",
+                initialAddress = "",
+                initialLogoPath = "",
+                logoStorageKey = newBusinessId,
+                confirmLabel =
+                    v15Text(
+                        "দোকান তৈরি করুন",
+                        "Create shop"
+                    ),
+                onDismiss = {
+                    showNewBusinessDialog = false
+                }
+            ) { name, business, phone, type, address, logo ->
+                if (business.isNotBlank()) {
+                    homePreferences.edit()
+                        .putString("profile_name", name)
+                        .apply()
+
+                    viewModel.createBusinessProfile(
+                        businessId = newBusinessId,
+                        businessName = business,
+                        businessType = type,
+                        phone = phone,
+                        address = address,
+                        logoPath = logo
+                    )
+
+                    V15DeepNavigationState.clear()
+                    tab = Tab.DASHBOARD
+                    showNewBusinessDialog = false
+                }
+            }
+        }
+
         if (V15LanguageState.languageCode == null) {
             LanguageOnboardingScreen()
         } else if (!isPinConfigured) {
@@ -421,6 +468,36 @@ fun FamilyKhataApp(viewModel: FamilyKhataViewModel) {
                                     }
                                 )
 
+                                businessProfiles.forEach { profile ->
+                                    DropdownMenuItem(
+                                        text = {
+                                            Text(
+                                                (
+                                                    if (
+                                                        profile.businessId ==
+                                                            selectedBusinessId
+                                                    ) {
+                                                        "✓ "
+                                                    } else {
+                                                        ""
+                                                    }
+                                                ) + profile.name
+                                            )
+                                        },
+                                        onClick = {
+                                            showHomeProfileMenu = false
+                                            V15DeepNavigationState.clear()
+                                            tab = Tab.DASHBOARD
+                                            viewModel.selectBusiness(
+                                                profile.businessId
+                                            )
+                                            viewModel.selectWorkspace(
+                                                "SHOP"
+                                            )
+                                        }
+                                    )
+                                }
+
                                 DropdownMenuItem(
                                     text = {
                                         Text(
@@ -430,8 +507,13 @@ fun FamilyKhataApp(viewModel: FamilyKhataViewModel) {
                                             )
                                         )
                                     },
-                                    onClick = {},
-                                    enabled = false
+                                    onClick = {
+                                        newBusinessId =
+                                            UUID.randomUUID()
+                                                .toString()
+                                        showHomeProfileMenu = false
+                                        showNewBusinessDialog = true
+                                    }
                                 )
                             }
                         }

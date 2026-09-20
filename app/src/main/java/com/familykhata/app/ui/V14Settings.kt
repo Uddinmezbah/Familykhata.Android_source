@@ -237,6 +237,7 @@ internal fun V14SettingsScreen(
             initialBusinessType = businessType,
             initialAddress = businessAddress,
             initialLogoPath = businessLogoPath,
+            logoStorageKey = viewModel.selectedBusinessId.value,
             onDismiss = { showProfile = false }
         ) { name, business, phone, type, address, logo ->
             profileName = name

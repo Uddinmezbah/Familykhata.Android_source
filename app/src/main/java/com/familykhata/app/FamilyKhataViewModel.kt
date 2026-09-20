@@ -270,6 +270,71 @@ class FamilyKhataViewModel(application: Application) : AndroidViewModel(applicat
         }
     }
 
+    private fun activateBusinessProfile(
+        profile: BusinessProfileEntity
+    ) {
+        businessProfilePreferences.edit()
+            .putString("business_name", profile.name)
+            .putString("business_type", profile.businessType)
+            .putString("profile_phone", profile.phone)
+            .putString("business_address", profile.address)
+            .putString("business_logo_path", profile.logoPath)
+            .apply()
+
+        _selectedBusinessId.value =
+            profile.businessId
+
+        preferences.edit()
+            .putString(
+                "selected_business_id",
+                profile.businessId
+            )
+            .apply()
+    }
+
+    fun createBusinessProfile(
+        businessId: String,
+        businessName: String,
+        businessType: String,
+        phone: String,
+        address: String,
+        logoPath: String
+    ) {
+        val cleanId = businessId.trim()
+        val cleanName = businessName.trim()
+
+        if (
+            cleanId.isBlank() ||
+            cleanName.isBlank()
+        ) {
+            return
+        }
+
+        viewModelScope.launch {
+            if (
+                dao.getBusinessProfile(cleanId) != null
+            ) {
+                return@launch
+            }
+
+            val profile =
+                BusinessProfileEntity(
+                    businessId = cleanId,
+                    name = cleanName,
+                    businessType =
+                        businessType.trim(),
+                    phone = phone.trim(),
+                    address = address.trim(),
+                    logoPath = logoPath.trim(),
+                    isActive = true
+                )
+
+            dao.upsertBusinessProfile(profile)
+            activateBusinessProfile(profile)
+            selectWorkspace("SHOP")
+        }
+    }
+
     fun selectBusiness(
         businessId: String
     ) {
@@ -290,15 +355,7 @@ class FamilyKhataViewModel(application: Application) : AndroidViewModel(applicat
                 return@launch
             }
 
-            _selectedBusinessId.value =
-                cleanId
-
-            preferences.edit()
-                .putString(
-                    "selected_business_id",
-                    cleanId
-                )
-                .apply()
+            activateBusinessProfile(profile)
         }
     }
 

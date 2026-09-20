@@ -1,4 +1,5 @@
 package com.familykhata.app.ui
+import com.familykhata.app.baseWorkspaceKey
 
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.clickable
@@ -88,7 +89,7 @@ internal fun V15ProductionScreen(
 
     if (showInventory) {
         V15InventoryScreen(
-            workspace = workspace,
+            workspace = baseWorkspaceKey(workspace),
             shopType = shopType,
             canWrite = canWrite,
             nestedEntry = true,

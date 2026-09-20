@@ -195,3 +195,33 @@ fun businessDataKey(
         "default"
     }
 }
+
+fun businessWorkspaceKey(
+    workspace: String,
+    businessId: String
+): String {
+    val cleanBusinessId = businessId.trim()
+    return if (workspace == "SHOP" && cleanBusinessId.isNotBlank()) {
+        "SHOP::$cleanBusinessId"
+    } else {
+        workspace
+    }
+}
+
+fun baseWorkspaceKey(
+    workspace: String
+): String =
+    if (workspace.startsWith("SHOP::")) {
+        "SHOP"
+    } else {
+        workspace
+    }
+
+fun businessIdFromWorkspaceKey(
+    workspace: String
+): String? =
+    workspace
+        .takeIf { it.startsWith("SHOP::") }
+        ?.substringAfter("SHOP::")
+        ?.trim()
+        ?.takeIf { it.isNotBlank() }

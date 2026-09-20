@@ -63,6 +63,7 @@ import com.familykhata.app.FamilyKhataViewModel
 import com.familykhata.app.PremiumBillingManager
 import com.familykhata.app.BusinessMode
 import com.familykhata.app.detectBusinessMode
+import com.familykhata.app.businessWorkspaceKey
 import com.familykhata.app.data.BakiEntryEntity
 import com.familykhata.app.data.BakiPersonSummary
 import com.familykhata.app.data.FinancialAccountSummary
@@ -107,6 +108,12 @@ fun FamilyKhataApp(viewModel: FamilyKhataViewModel) {
     var bakiFilterPreset by remember { mutableStateOf("ALL") }
     var historyFilterPreset by remember { mutableStateOf("ALL") }
     val workspace by viewModel.selectedWorkspace.collectAsState()
+    val selectedBusinessId by viewModel.selectedBusinessId.collectAsState()
+    val businessProfiles by viewModel.businessProfiles.collectAsState()
+    val selectedBusinessProfile =
+        businessProfiles.firstOrNull {
+            it.businessId == selectedBusinessId
+        }
     val trialStatus by viewModel.trialStatus.collectAsState()
     val isPinConfigured by viewModel.isPinConfigured.collectAsState()
     val appContext = LocalContext.current
@@ -126,16 +133,21 @@ fun FamilyKhataApp(viewModel: FamilyKhataViewModel) {
             .trim()
 
     val homeBusinessName =
-        homePreferences
-            .getString("business_name", "")
-            .orEmpty()
-            .trim()
+        selectedBusinessProfile?.name
+            ?.trim()
+            ?.takeIf { it.isNotBlank() }
+            ?: homePreferences
+                .getString("business_name", "")
+                .orEmpty()
+                .trim()
 
     val homeLogoFile =
-        homePreferences
-            .getString("business_logo_path", "")
-            .orEmpty()
-            .trim()
+        selectedBusinessProfile?.logoPath
+            ?.takeIf { it.isNotBlank() }
+            ?: homePreferences
+                .getString("business_logo_path", "")
+                .orEmpty()
+                .trim()
             .takeIf { it.isNotBlank() }
             ?.let(::File)
             ?.takeIf { it.exists() }
@@ -180,13 +192,15 @@ fun FamilyKhataApp(viewModel: FamilyKhataViewModel) {
     val refreshDependency = appRefreshToken
 
     val businessType =
-        appContext.getSharedPreferences(
-            "hisabi_khata_v14_settings",
-            Context.MODE_PRIVATE
-        ).getString(
-            "business_type",
-            ""
-        ).orEmpty()
+        selectedBusinessProfile?.businessType
+            ?.takeIf { it.isNotBlank() }
+            ?: appContext.getSharedPreferences(
+                "hisabi_khata_v14_settings",
+                Context.MODE_PRIVATE
+            ).getString(
+                "business_type",
+                ""
+            ).orEmpty()
 
     val businessMode =
         if (workspace == "SHOP") {
@@ -194,6 +208,12 @@ fun FamilyKhataApp(viewModel: FamilyKhataViewModel) {
         } else {
             BusinessMode.RETAIL
         }
+
+    val specializedWorkspace =
+        businessWorkspaceKey(
+            workspace,
+            selectedBusinessId
+        )
 
     V15LanguageState.ensureInitialized(appContext)
     var showSettingsMenu by remember { mutableStateOf(false) }
@@ -648,7 +668,7 @@ fun FamilyKhataApp(viewModel: FamilyKhataViewModel) {
                             when (businessMode) {
                                 BusinessMode.COACHING ->
                                     V15CoachingScreen(
-                                        workspace = workspace,
+                                        workspace = specializedWorkspace,
                                         canWrite = !trialStatus.expired,
                                         onExit = {
                                             tab = Tab.DASHBOARD
@@ -657,7 +677,7 @@ fun FamilyKhataApp(viewModel: FamilyKhataViewModel) {
 
                                 BusinessMode.DIGITAL_AGENCY ->
                                     V15AgencyScreen(
-                                        workspace = workspace,
+                                        workspace = specializedWorkspace,
                                         canWrite = !trialStatus.expired,
                                         onExit = {
                                             tab = Tab.DASHBOARD
@@ -666,7 +686,7 @@ fun FamilyKhataApp(viewModel: FamilyKhataViewModel) {
 
                                 BusinessMode.FOOD_SERVICE ->
                                     V15FoodServiceScreen(
-                                        workspace = workspace,
+                                        workspace = specializedWorkspace,
                                         shopType = businessType,
                                         canWrite = !trialStatus.expired,
                                         onExit = {
@@ -676,7 +696,7 @@ fun FamilyKhataApp(viewModel: FamilyKhataViewModel) {
 
                                 BusinessMode.AGRO ->
                                     V15AgroScreen(
-                                        workspace = workspace,
+                                        workspace = specializedWorkspace,
                                         shopType = businessType,
                                         canWrite = !trialStatus.expired,
                                         onExit = {
@@ -686,7 +706,7 @@ fun FamilyKhataApp(viewModel: FamilyKhataViewModel) {
 
                                 BusinessMode.PRODUCTION ->
                                     V15ProductionScreen(
-                                        workspace = workspace,
+                                        workspace = specializedWorkspace,
                                         shopType = businessType,
                                         canWrite = !trialStatus.expired,
                                         onExit = {
@@ -696,7 +716,7 @@ fun FamilyKhataApp(viewModel: FamilyKhataViewModel) {
 
                                 BusinessMode.DEALERSHIP ->
                                     V15DealershipScreen(
-                                        workspace = workspace,
+                                        workspace = specializedWorkspace,
                                         shopType = businessType,
                                         canWrite = !trialStatus.expired,
                                         onExit = {
@@ -706,7 +726,7 @@ fun FamilyKhataApp(viewModel: FamilyKhataViewModel) {
 
                                 BusinessMode.DEALER_BUSINESS ->
                                     V16DealerBusinessScreen(
-                                        workspace = workspace,
+                                        workspace = specializedWorkspace,
                                         shopType = businessType,
                                         canWrite = !trialStatus.expired,
                                         onExit = {
@@ -716,7 +736,7 @@ fun FamilyKhataApp(viewModel: FamilyKhataViewModel) {
 
                                 BusinessMode.SERVICE_JOB ->
                                     V15ServiceJobScreen(
-                                        workspace = workspace,
+                                        workspace = specializedWorkspace,
                                         shopType = businessType,
                                         canWrite = !trialStatus.expired,
                                         onExit = {
@@ -726,7 +746,7 @@ fun FamilyKhataApp(viewModel: FamilyKhataViewModel) {
 
                                 BusinessMode.MEMBERSHIP_SERVICE ->
                                     V15MembershipScreen(
-                                        workspace = workspace,
+                                        workspace = specializedWorkspace,
                                         canWrite = !trialStatus.expired,
                                         onExit = {
                                             tab = Tab.DASHBOARD
@@ -735,7 +755,7 @@ fun FamilyKhataApp(viewModel: FamilyKhataViewModel) {
 
                                 BusinessMode.BOOKING_RENTAL ->
                                     V15BookingScreen(
-                                        workspace = workspace,
+                                        workspace = specializedWorkspace,
                                         shopType = businessType,
                                         canWrite = !trialStatus.expired,
                                         onExit = {

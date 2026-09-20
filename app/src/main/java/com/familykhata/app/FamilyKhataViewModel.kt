@@ -128,6 +128,8 @@ class FamilyKhataViewModel(application: Application) : AndroidViewModel(applicat
         }
         ensureLegacyBusinessProfile()
         backfillLegacyBusinessScope()
+        scopeLegacyInventoryData()
+        scopeLegacyBusinessModules()
     }
 
     private fun ensureLegacyBusinessProfile() {
@@ -204,6 +206,69 @@ class FamilyKhataViewModel(application: Application) : AndroidViewModel(applicat
             }
         }
     }
+    private fun scopeLegacyInventoryData() {
+        viewModelScope.launch {
+            val legacyKey =
+                businessDataKey(
+                    businessProfilePreferences
+                        .getString(
+                            "business_type",
+                            ""
+                        )
+                        .orEmpty()
+                )
+
+            val inventoryDao =
+                InventoryDatabase
+                    .get(getApplication())
+                    .dao()
+
+            inventoryDao.claimExistingBusinessProducts(
+                workspace = "SHOP",
+                legacyBusinessKey = legacyKey,
+                targetBusinessId = legacyBusinessId
+            )
+
+            inventoryDao.claimExistingBusinessRetailSales(
+                workspace = "SHOP",
+                legacyBusinessKey = legacyKey,
+                targetBusinessId = legacyBusinessId
+            )
+        }
+    }
+
+    private fun scopeLegacyBusinessModules() {
+        if (
+            preferences.getBoolean(
+                "specialized_business_scope_v1",
+                false
+            )
+        ) {
+            return
+        }
+
+        viewModelScope.launch {
+            runCatching {
+                V15BusinessBackupBridge
+                    .scopeLegacyShopWorkspace(
+                        context = getApplication(),
+                        scopedWorkspace =
+                            businessWorkspaceKey(
+                                "SHOP",
+                                legacyBusinessId
+                            )
+                    )
+            }.onSuccess {
+                preferences.edit()
+                    .putBoolean(
+                        "specialized_business_scope_v1",
+                        true
+                    )
+                    .apply()
+            }
+        }
+    }
+
     fun selectBusiness(
         businessId: String
     ) {
@@ -3685,6 +3750,49 @@ class FamilyKhataViewModel(application: Application) : AndroidViewModel(applicat
                         } else {
                             null
                         }
+                    )
+
+                val restoredLegacyBusinessKey =
+                    businessDataKey(
+                        root.optJSONObject("settings")
+                            ?.optString(
+                                "businessType",
+                                ""
+                            )
+                            .orEmpty()
+                    )
+
+                val restoredInventoryDao =
+                    InventoryDatabase
+                        .get(getApplication())
+                        .dao()
+
+                restoredInventoryDao
+                    .claimExistingBusinessProducts(
+                        workspace = "SHOP",
+                        legacyBusinessKey =
+                            restoredLegacyBusinessKey,
+                        targetBusinessId =
+                            restoredSelectedBusinessId
+                    )
+
+                restoredInventoryDao
+                    .claimExistingBusinessRetailSales(
+                        workspace = "SHOP",
+                        legacyBusinessKey =
+                            restoredLegacyBusinessKey,
+                        targetBusinessId =
+                            restoredSelectedBusinessId
+                    )
+
+                V15BusinessBackupBridge
+                    .scopeLegacyShopWorkspace(
+                        context = getApplication(),
+                        scopedWorkspace =
+                            businessWorkspaceKey(
+                                "SHOP",
+                                restoredSelectedBusinessId
+                            )
                     )
 
                 if (backupVersion >= 4) {

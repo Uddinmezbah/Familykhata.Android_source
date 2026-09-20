@@ -5,6 +5,8 @@ import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import androidx.room.withTransaction
 import com.familykhata.app.businessDataKey
+import com.familykhata.app.baseWorkspaceKey
+import com.familykhata.app.businessIdFromWorkspaceKey
 import com.familykhata.app.data.InventoryDatabase
 import com.familykhata.app.data.ProductEntity
 import com.familykhata.app.data.ProductUnitConversionEntity
@@ -243,7 +245,7 @@ class DealerBusinessViewModel(
         workspace
             .flatMapLatest { workspaceValue ->
                 inventoryDao.observeProductsForBusiness(
-                    workspace = workspaceValue,
+                    workspace = baseWorkspaceKey(workspaceValue),
                     businessKey = businessKey.value
                 )
             }
@@ -257,16 +259,24 @@ class DealerBusinessViewModel(
         workspaceValue: String,
         shopType: String
     ) {
+        val legacyKey =
+            businessDataKey(shopType)
+        val key =
+            businessIdFromWorkspaceKey(
+                workspaceValue
+            ) ?: legacyKey
+
         workspace.value = workspaceValue
+        businessKey.value = key
 
-        val key = businessDataKey(shopType)
-
-        businessKey.value =
-            if (key == "dealer_business") {
-                key
-            } else {
-                "dealer_business"
-            }
+        viewModelScope.launch {
+            inventoryDao.claimExistingBusinessProducts(
+                workspace =
+                    baseWorkspaceKey(workspaceValue),
+                legacyBusinessKey = legacyKey,
+                targetBusinessId = key
+            )
+        }
     }
 
     fun observeProductBatches(
@@ -414,8 +424,7 @@ class DealerBusinessViewModel(
                             )
 
                         require(
-                            product.workspace ==
-                                currentWorkspace
+                            product.workspace == baseWorkspaceKey(currentWorkspace)
                         )
 
                         require(
@@ -609,8 +618,7 @@ class DealerBusinessViewModel(
                                 )
 
                             require(
-                                product.workspace ==
-                                    currentWorkspace
+                                product.workspace == baseWorkspaceKey(currentWorkspace)
                             )
 
                             require(
@@ -1195,8 +1203,7 @@ class DealerBusinessViewModel(
                                     )
 
                                 require(
-                                    product.workspace ==
-                                        currentWorkspace
+                                    product.workspace == baseWorkspaceKey(currentWorkspace)
                                 )
 
                                 require(
@@ -2228,8 +2235,7 @@ class DealerBusinessViewModel(
                             )
 
                         require(
-                            product.workspace ==
-                                currentWorkspace
+                            product.workspace == baseWorkspaceKey(currentWorkspace)
                         )
 
                         require(
@@ -4209,8 +4215,7 @@ class DealerBusinessViewModel(
                                     )
 
                                 require(
-                                    product.workspace ==
-                                        currentWorkspace
+                                    product.workspace == baseWorkspaceKey(currentWorkspace)
                                 )
 
                                 require(
@@ -4444,8 +4449,7 @@ class DealerBusinessViewModel(
                                     )
 
                                 require(
-                                    product.workspace ==
-                                        currentWorkspace
+                                    product.workspace == baseWorkspaceKey(currentWorkspace)
                                 )
 
                                 require(

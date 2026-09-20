@@ -170,6 +170,62 @@ object V15BusinessBackupBridge {
             )
         )
 
+    suspend fun scopeLegacyShopWorkspace(
+        context: Context,
+        scopedWorkspace: String
+    ): Int =
+        withContext(Dispatchers.IO) {
+            var updatedRows = 0
+
+            groups(context).forEach { group ->
+                group.database.withTransaction {
+                    val db =
+                        group.database.openHelper.writableDatabase
+
+                    group.tables.forEach { table ->
+                        val hasWorkspace =
+                            db.query(
+                                "PRAGMA table_info(`$table`)"
+                            ).use { cursor ->
+                                val nameIndex =
+                                    cursor.getColumnIndex("name")
+                                var found = false
+
+                                while (
+                                    nameIndex >= 0 &&
+                                    cursor.moveToNext()
+                                ) {
+                                    if (
+                                        cursor.getString(nameIndex) ==
+                                        "workspace"
+                                    ) {
+                                        found = true
+                                        break
+                                    }
+                                }
+
+                                found
+                            }
+
+                        if (hasWorkspace) {
+                            val statement =
+                                db.compileStatement(
+                                    "UPDATE `$table` SET `workspace` = ? WHERE `workspace` = 'SHOP'"
+                                )
+                            statement.bindString(
+                                1,
+                                scopedWorkspace
+                            )
+                            updatedRows +=
+                                statement.executeUpdateDelete()
+                        }
+                    }
+                }
+            }
+
+            updatedRows
+        }
+
     suspend fun export(
         context: Context
     ): JSONObject =

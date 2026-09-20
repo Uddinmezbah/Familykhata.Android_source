@@ -5,6 +5,8 @@ import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import androidx.room.withTransaction
 import com.familykhata.app.businessDataKey
+import com.familykhata.app.baseWorkspaceKey
+import com.familykhata.app.businessIdFromWorkspaceKey
 import com.familykhata.app.data.InventoryDatabase
 import com.familykhata.app.data.ProductEntity
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -56,7 +58,7 @@ class FoodServiceViewModel(
         StateFlow<List<ProductEntity>> =
         productContext.flatMapLatest { context ->
             inventoryDao.observeProductsForBusiness(
-                workspace = context.first,
+                workspace = baseWorkspaceKey(context.first),
                 businessKey = context.second
             )
         }.stateIn(
@@ -89,29 +91,27 @@ class FoodServiceViewModel(
         workspaceValue: String,
         shopType: String
     ) {
-        val key =
+        val legacyKey =
             businessDataKey(shopType)
-
-        if (
-            workspace.value !=
-            workspaceValue
-        ) {
-            workspace.value =
+        val key =
+            businessIdFromWorkspaceKey(
                 workspaceValue
+            ) ?: legacyKey
+
+        if (workspace.value != workspaceValue) {
+            workspace.value = workspaceValue
         }
 
-        if (
-            businessKey.value !=
-            key
-        ) {
-            businessKey.value =
-                key
+        if (businessKey.value != key) {
+            businessKey.value = key
         }
 
         viewModelScope.launch {
-            inventoryDao.claimLegacyProducts(
-                workspace = workspaceValue,
-                businessKey = key
+            inventoryDao.claimExistingBusinessProducts(
+                workspace =
+                    baseWorkspaceKey(workspaceValue),
+                legacyBusinessKey = legacyKey,
+                targetBusinessId = key
             )
         }
     }
@@ -215,8 +215,7 @@ class FoodServiceViewModel(
                                 )
 
                         require(
-                            product.workspace ==
-                                currentWorkspace
+                            product.workspace == baseWorkspaceKey(currentWorkspace)
                         )
 
                         require(
@@ -577,8 +576,7 @@ class FoodServiceViewModel(
                                         )
 
                                 require(
-                                    product.workspace ==
-                                        currentWorkspace
+                                    product.workspace == baseWorkspaceKey(currentWorkspace)
                                 )
 
                                 val requiredLong =

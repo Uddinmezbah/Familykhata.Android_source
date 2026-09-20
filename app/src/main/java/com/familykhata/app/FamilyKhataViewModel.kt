@@ -377,6 +377,57 @@ class FamilyKhataViewModel(application: Application) : AndroidViewModel(applicat
         }
     }
 
+    fun removeCurrentBusinessProfile(
+        onDone: (Boolean) -> Unit = {}
+    ) {
+        val currentId =
+            _selectedBusinessId.value
+
+        viewModelScope.launch {
+            val activeProfiles =
+                dao.getAllBusinessProfiles()
+                    .filter { it.isActive }
+
+            if (activeProfiles.size <= 1) {
+                onDone(false)
+                return@launch
+            }
+
+            val current =
+                activeProfiles.firstOrNull {
+                    it.businessId == currentId
+                }
+
+            if (current == null) {
+                onDone(false)
+                return@launch
+            }
+
+            val replacement =
+                activeProfiles.firstOrNull {
+                    it.businessId != currentId
+                }
+
+            if (replacement == null) {
+                onDone(false)
+                return@launch
+            }
+
+            dao.upsertBusinessProfile(
+                current.copy(
+                    isActive = false
+                )
+            )
+
+            activateBusinessProfile(
+                replacement
+            )
+
+            selectWorkspace("SHOP")
+            onDone(true)
+        }
+    }
+
     fun syncCurrentBusinessProfile(
         businessName: String,
         businessType: String,

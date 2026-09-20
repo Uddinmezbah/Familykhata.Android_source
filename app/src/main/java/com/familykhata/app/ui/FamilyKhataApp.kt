@@ -161,6 +161,9 @@ fun FamilyKhataApp(viewModel: FamilyKhataViewModel) {
     var showNewBusinessDialog by
         remember { mutableStateOf(false) }
 
+    var showDeleteBusinessDialog by
+        remember { mutableStateOf(false) }
+
     var newBusinessId by
         remember { mutableStateOf("") }
 
@@ -231,6 +234,48 @@ fun FamilyKhataApp(viewModel: FamilyKhataViewModel) {
     LaunchedEffect(Unit) { V14DisplayState.initialize(appContext) }
 
     HisabiKhataTheme {
+        if (showDeleteBusinessDialog) {
+            ProtectedDeleteDialog(
+                viewModel = viewModel,
+                title =
+                    v15Text(
+                        "দোকান মুছবেন?",
+                        "Delete shop?"
+                    ),
+                message =
+                    v15Text(
+                        "এই দোকানটি সক্রিয় তালিকা থেকে সরানো হবে। এর হিসাব ও অন্যান্য ডাটা recovery/backup-এর জন্য নিরাপদে রাখা থাকবে।",
+                        "This shop will be removed from the active list. Its data will be kept safely for recovery and backup."
+                    ),
+                confirmLabel =
+                    v15Text(
+                        "দোকান মুছুন",
+                        "Delete shop"
+                    ),
+                onDismiss = {
+                    showDeleteBusinessDialog = false
+                },
+                onConfirmed = {
+                    viewModel.removeCurrentBusinessProfile { success ->
+                        if (!success) {
+                            Toast.makeText(
+                                appContext,
+                                v15Text(
+                                    "শেষ দোকানটি মুছতে পারবেন না",
+                                    "The last shop cannot be deleted"
+                                ),
+                                Toast.LENGTH_SHORT
+                            ).show()
+                        }
+                    }
+
+                    V15DeepNavigationState.clear()
+                    tab = Tab.DASHBOARD
+                    showDeleteBusinessDialog = false
+                }
+            )
+        }
+
         if (showNewBusinessDialog) {
             V15BusinessProfileDialog(
                 viewModel = viewModel,
@@ -505,6 +550,23 @@ fun FamilyKhataApp(viewModel: FamilyKhataViewModel) {
                                                 "＋ নতুন দোকান যোগ করুন",
                                                 "＋ Add new shop"
                                             )
+
+                                DropdownMenuItem(
+                                    text = {
+                                        Text(
+                                            v15Text(
+                                                "🗑 বর্তমান দোকান মুছুন",
+                                                "🗑 Delete current shop"
+                                            )
+                                        )
+                                    },
+                                    enabled =
+                                        businessProfiles.size > 1,
+                                    onClick = {
+                                        showHomeProfileMenu = false
+                                        showDeleteBusinessDialog = true
+                                    }
+                                )
                                         )
                                     },
                                     onClick = {

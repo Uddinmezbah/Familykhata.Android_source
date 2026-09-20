@@ -702,14 +702,13 @@ private fun productNameLabel(mode: ProductFormMode): String = when (mode) {
 @Composable
 internal fun V15InventoryScreen(
     workspace: String,
+    businessId: String,
     shopType: String,
     canWrite: Boolean,
     nestedEntry: Boolean = false,
     onExit: () -> Unit
 ) {
     val vm: InventoryViewModel = viewModel()
-    val securityViewModel: FamilyKhataViewModel = viewModel()
-    val selectedBusinessId by securityViewModel.selectedBusinessId.collectAsState()
     val products by vm.products.collectAsState()
     var selectedId by remember {
         mutableStateOf<Long?>(null)
@@ -737,12 +736,12 @@ internal fun V15InventoryScreen(
     LaunchedEffect(
         workspace,
         shopType,
-        selectedBusinessId
+        businessId
     ) {
         vm.setContext(
             workspaceValue = workspace,
             shopType = shopType,
-            businessIdValue = selectedBusinessId
+            businessIdValue = businessId
         )
     }
     TrackV15DeepScreen(

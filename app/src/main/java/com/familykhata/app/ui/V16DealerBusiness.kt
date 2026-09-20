@@ -1,5 +1,6 @@
 package com.familykhata.app.ui
 import com.familykhata.app.baseWorkspaceKey
+import com.familykhata.app.businessIdFromWorkspaceKey
 
 import android.content.ClipData
 import android.content.Intent
@@ -496,6 +497,7 @@ internal fun V16DealerBusinessScreen(
     if (showInventory) {
         V15InventoryScreen(
             workspace = baseWorkspaceKey(workspace),
+            businessId = businessIdFromWorkspaceKey(workspace).orEmpty(),
             shopType = "dealer_business",
             canWrite = canWrite,
             nestedEntry = true,

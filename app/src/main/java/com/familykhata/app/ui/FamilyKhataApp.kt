@@ -910,6 +910,7 @@ fun FamilyKhataApp(viewModel: FamilyKhataViewModel) {
                                 else ->
                                     V15InventoryScreen(
                                         workspace = workspace,
+                                        businessId = selectedBusinessId,
                                         shopType = businessType,
                                         canWrite = !trialStatus.expired,
                                         onExit = {

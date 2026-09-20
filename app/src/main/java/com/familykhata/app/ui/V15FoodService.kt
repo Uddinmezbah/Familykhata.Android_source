@@ -1,5 +1,6 @@
 package com.familykhata.app.ui
 import com.familykhata.app.baseWorkspaceKey
+import com.familykhata.app.businessIdFromWorkspaceKey
 
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.clickable
@@ -107,6 +108,7 @@ internal fun V15FoodServiceScreen(
     if (showInventory) {
         V15InventoryScreen(
             workspace = baseWorkspaceKey(workspace),
+            businessId = businessIdFromWorkspaceKey(workspace).orEmpty(),
             shopType = shopType,
             canWrite = canWrite,
             nestedEntry = true,

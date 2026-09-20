@@ -55,14 +55,23 @@ class InventoryViewModel(application: Application) : AndroidViewModel(applicatio
         "hisabi_khata_preferences",
         android.content.Context.MODE_PRIVATE
     )
+    private val initialBusinessId =
+        appPreferences.getString(
+            "selected_business_id",
+            ""
+        ).orEmpty().trim()
     private val workspace =
         MutableStateFlow("SHOP")
 
     private val businessKey =
-        MutableStateFlow("legacy")
+        MutableStateFlow(
+            initialBusinessId.ifBlank {
+                "__NO_BUSINESS__"
+            }
+        )
 
     private val businessId =
-        MutableStateFlow("")
+        MutableStateFlow(initialBusinessId)
 
     private val inventoryContext =
         combine(
@@ -122,14 +131,26 @@ class InventoryViewModel(application: Application) : AndroidViewModel(applicatio
     ) {
         val legacyBusinessKey =
             businessDataKey(shopType)
-        val targetBusinessId =
-            businessIdValue.trim().ifBlank {
-                legacyBusinessKey
-            }
+        val cleanBusinessId =
+            businessIdValue.trim()
 
         if (workspace.value != workspaceValue) {
             workspace.value = workspaceValue
         }
+
+        if (
+            workspaceValue == "SHOP" &&
+            cleanBusinessId.isBlank()
+        ) {
+            businessId.value = ""
+            businessKey.value = "__NO_BUSINESS__"
+            return
+        }
+
+        val targetBusinessId =
+            cleanBusinessId.ifBlank {
+                legacyBusinessKey
+            }
 
         if (businessId.value != targetBusinessId) {
             businessId.value = targetBusinessId

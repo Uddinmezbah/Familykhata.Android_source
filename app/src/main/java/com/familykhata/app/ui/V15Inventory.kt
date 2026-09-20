@@ -709,6 +709,7 @@ internal fun V15InventoryScreen(
 ) {
     val vm: InventoryViewModel = viewModel()
     val securityViewModel: FamilyKhataViewModel = viewModel()
+    val selectedBusinessId by securityViewModel.selectedBusinessId.collectAsState()
     val products by vm.products.collectAsState()
     var selectedId by remember {
         mutableStateOf<Long?>(null)
@@ -735,11 +736,13 @@ internal fun V15InventoryScreen(
 
     LaunchedEffect(
         workspace,
-        shopType
+        shopType,
+        selectedBusinessId
     ) {
         vm.setContext(
             workspaceValue = workspace,
-            shopType = shopType
+            shopType = shopType,
+            businessIdValue = selectedBusinessId
         )
     }
     TrackV15DeepScreen(

@@ -57,6 +57,9 @@ class InventoryViewModel(application: Application) : AndroidViewModel(applicatio
     private val businessKey =
         MutableStateFlow("legacy")
 
+    private val businessId =
+        MutableStateFlow("")
+
     private val inventoryContext =
         combine(
             workspace,
@@ -89,38 +92,29 @@ class InventoryViewModel(application: Application) : AndroidViewModel(applicatio
                 emptyList()
             )
 
-    val bakiPeople: StateFlow<List<BakiPersonSummary>> =
-        workspace
-            .flatMapLatest { workspaceValue ->
-                bakiDao.observeBakiSummaries(
-                    workspaceValue
-                )
-            }
-            .stateIn(
-                viewModelScope,
-                SharingStarted.WhileSubscribed(5_000),
-                emptyList()
-            )
+    private val ledgerContext =
+        combine(workspace, businessId) { workspaceValue, businessIdValue ->
+            workspaceValue to businessIdValue
+        }
 
-    val financialAccounts:
-        StateFlow<List<FinancialAccountSummary>> =
-        workspace
-            .flatMapLatest { workspaceValue ->
-                bakiDao.observeFinancialAccounts(
-                    workspaceValue
-                )
+    val bakiPeople: StateFlow<List<BakiPersonSummary>> =
+        ledgerContext
+            .flatMapLatest { context ->
+                bakiDao.observeBakiSummaries(context.first, context.second)
             }
-            .stateIn(
-                viewModelScope,
-                SharingStarted.WhileSubscribed(
-                    5_000
-                ),
-                emptyList()
-            )
+            .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
+
+    val financialAccounts: StateFlow<List<FinancialAccountSummary>> =
+        ledgerContext
+            .flatMapLatest { context ->
+                bakiDao.observeFinancialAccounts(context.first, context.second)
+            }
+            .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
 
     fun setContext(
         workspaceValue: String,
-        shopType: String
+        shopType: String,
+        businessIdValue: String
     ) {
         val key =
             businessDataKey(shopType)
@@ -139,6 +133,10 @@ class InventoryViewModel(application: Application) : AndroidViewModel(applicatio
         ) {
             businessKey.value =
                 key
+        }
+
+        if (businessId.value != businessIdValue) {
+            businessId.value = businessIdValue
         }
 
         viewModelScope.launch {
@@ -1056,7 +1054,8 @@ class InventoryViewModel(application: Application) : AndroidViewModel(applicatio
 
                 require(
                     account.workspace ==
-                        sale.workspace
+                        sale.workspace &&
+                        (sale.workspace != "SHOP" || account.businessId == businessId.value)
                 ) {
                     "Retail payment account workspace mismatch"
                 }
@@ -1119,6 +1118,7 @@ class InventoryViewModel(application: Application) : AndroidViewModel(applicatio
                                         "Retail sale ${sale.invoiceNo} • ${payment.paymentMethod}",
                                     workspace =
                                         sale.workspace,
+                                    businessId = account.businessId,
                                     createdAt =
                                         payment.paidAt
                                 )

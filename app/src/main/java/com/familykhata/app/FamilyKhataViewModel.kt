@@ -300,55 +300,36 @@ class FamilyKhataViewModel(application: Application) : AndroidViewModel(applicat
 
     val selectedWorkspace: StateFlow<String> = _selectedWorkspace.asStateFlow()
 
-    val transactions: StateFlow<List<TransactionEntity>> = _selectedWorkspace
-        .flatMapLatest { workspace -> dao.observeTransactions(workspace) }
+    private val activeDataScope =
+        combine(_selectedWorkspace, _selectedBusinessId) { workspace, businessId ->
+            workspace to businessId
+        }
+
+    val transactions: StateFlow<List<TransactionEntity>> = activeDataScope
+        .flatMapLatest { (workspace, businessId) -> dao.observeTransactions(workspace, businessId) }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
 
-    val totals: StateFlow<DashboardTotals> = _selectedWorkspace
-        .flatMapLatest { workspace -> dao.observeDashboardTotals(workspace) }
-        .stateIn(
-            viewModelScope,
-            SharingStarted.WhileSubscribed(5_000),
-            DashboardTotals(0.0, 0.0)
-        )
+    val totals: StateFlow<DashboardTotals> = activeDataScope
+        .flatMapLatest { (workspace, businessId) -> dao.observeDashboardTotals(workspace, businessId) }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), DashboardTotals(0.0, 0.0))
 
-    val digitalServiceTransactions:
-        StateFlow<List<DigitalServiceTransactionEntity>> =
-        _selectedWorkspace
-            .flatMapLatest { workspace ->
-                dao.observeDigitalServiceTransactions(
-                    workspace
-                )
-            }
-            .stateIn(
-                viewModelScope,
-                SharingStarted.WhileSubscribed(
-                    5_000
-                ),
-                emptyList()
-            )
-
-    val financialAccounts:
-        StateFlow<List<FinancialAccountSummary>> =
-        _selectedWorkspace
-            .flatMapLatest { workspace ->
-                dao.observeFinancialAccounts(workspace)
-            }
-            .stateIn(
-                viewModelScope,
-                SharingStarted.WhileSubscribed(5_000),
-                emptyList()
-            )
-
-    val bakiPeople: StateFlow<List<BakiPersonSummary>> = _selectedWorkspace
-        .flatMapLatest { workspace -> dao.observeBakiSummaries(workspace) }
+    val digitalServiceTransactions: StateFlow<List<DigitalServiceTransactionEntity>> = activeDataScope
+        .flatMapLatest { (workspace, businessId) -> dao.observeDigitalServiceTransactions(workspace, businessId) }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
 
-    private val workspacePeople = _selectedWorkspace
-        .flatMapLatest { workspace -> dao.observePeople(workspace) }
+    val financialAccounts: StateFlow<List<FinancialAccountSummary>> = activeDataScope
+        .flatMapLatest { (workspace, businessId) -> dao.observeFinancialAccounts(workspace, businessId) }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
 
-    private val workspaceBakiEntries = _selectedWorkspace
-        .flatMapLatest { workspace -> dao.observeWorkspaceBakiEntries(workspace) }
+    val bakiPeople: StateFlow<List<BakiPersonSummary>> = activeDataScope
+        .flatMapLatest { (workspace, businessId) -> dao.observeBakiSummaries(workspace, businessId) }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
+
+    private val workspacePeople = activeDataScope
+        .flatMapLatest { (workspace, businessId) -> dao.observePeople(workspace, businessId) }
+
+    private val workspaceBakiEntries = activeDataScope
+        .flatMapLatest { (workspace, businessId) -> dao.observeWorkspaceBakiEntries(workspace, businessId) }
 
     val dueReceivables: StateFlow<List<DueReceivableItem>> = combine(
         workspacePeople,
@@ -362,6 +343,13 @@ class FamilyKhataViewModel(application: Application) : AndroidViewModel(applicat
         _selectedWorkspace.value = workspace
         preferences.edit().putString("selected_workspace", workspace).apply()
     }
+
+    private fun businessIdForWorkspace(workspace: String): String =
+        if (workspace == "SHOP") {
+            _selectedBusinessId.value
+        } else {
+            ""
+        }
 
     fun addTransaction(
         type: String,
@@ -389,6 +377,7 @@ class FamilyKhataViewModel(application: Application) : AndroidViewModel(applicat
 
         val workspace =
             _selectedWorkspace.value
+        val businessId = businessIdForWorkspace(workspace)
 
         if (
             workspace == "SHOP" &&
@@ -412,8 +401,8 @@ class FamilyKhataViewModel(application: Application) : AndroidViewModel(applicat
                                     )
                                 ).also {
                                     require(
-                                        it.workspace ==
-                                            workspace &&
+                                        it.workspace == workspace &&
+                                            it.businessId == businessId &&
                                             it.isActive
                                     )
                                 }
@@ -459,6 +448,7 @@ class FamilyKhataViewModel(application: Application) : AndroidViewModel(applicat
                                         note.trim(),
                                     workspace =
                                         workspace,
+                                    businessId = businessId,
                                     financialAccountId =
                                         account?.id,
                                     createdAt =
@@ -511,6 +501,7 @@ class FamilyKhataViewModel(application: Application) : AndroidViewModel(applicat
                                             ),
                                     workspace =
                                         workspace,
+                                    businessId = businessId,
                                     createdAt =
                                         now
                                 )
@@ -558,6 +549,7 @@ class FamilyKhataViewModel(application: Application) : AndroidViewModel(applicat
 
         val workspace =
             _selectedWorkspace.value
+        val businessId = businessIdForWorkspace(workspace)
 
         viewModelScope.launch {
             val success =
@@ -569,7 +561,8 @@ class FamilyKhataViewModel(application: Application) : AndroidViewModel(applicat
                             provider = provider.trim(),
                             openingBalance =
                                 openingBalance,
-                            workspace = workspace
+                            workspace = workspace,
+                            businessId = businessId
                         )
                     ) > 0L
                 }.getOrDefault(false)
@@ -599,6 +592,7 @@ class FamilyKhataViewModel(application: Application) : AndroidViewModel(applicat
 
         val workspace =
             _selectedWorkspace.value
+        val businessId = businessIdForWorkspace(workspace)
 
         viewModelScope.launch {
             val success =
@@ -620,7 +614,14 @@ class FamilyKhataViewModel(application: Application) : AndroidViewModel(applicat
 
                         require(
                             from.workspace == workspace &&
-                                to.workspace == workspace
+                                to.workspace == workspace &&
+                                (
+                                    workspace != "SHOP" ||
+                                        (
+                                            from.businessId == businessId &&
+                                                to.businessId == businessId
+                                        )
+                                )
                         )
 
                         require(
@@ -660,6 +661,7 @@ class FamilyKhataViewModel(application: Application) : AndroidViewModel(applicat
                                         "$groupId:OUT",
                                 note = note.trim(),
                                 workspace = workspace,
+                                businessId = businessId,
                                 createdAt = now
                             )
                         )
@@ -677,6 +679,7 @@ class FamilyKhataViewModel(application: Application) : AndroidViewModel(applicat
                                         "$groupId:IN",
                                 note = note.trim(),
                                 workspace = workspace,
+                                businessId = businessId,
                                 createdAt = now
                             )
                         )
@@ -865,6 +868,7 @@ class FamilyKhataViewModel(application: Application) : AndroidViewModel(applicat
 
         val workspace =
             _selectedWorkspace.value
+        val businessId = businessIdForWorkspace(workspace)
 
         viewModelScope.launch {
             val success =
@@ -885,10 +889,15 @@ class FamilyKhataViewModel(application: Application) : AndroidViewModel(applicat
                             )
 
                         require(
-                            source.workspace ==
-                                workspace &&
-                                destination.workspace ==
-                                    workspace
+                            source.workspace == workspace &&
+                                destination.workspace == workspace &&
+                                (
+                                    workspace != "SHOP" ||
+                                        (
+                                            source.businessId == businessId &&
+                                                destination.businessId == businessId
+                                        )
+                                )
                         )
 
                         require(
@@ -959,6 +968,7 @@ class FamilyKhataViewModel(application: Application) : AndroidViewModel(applicat
                                         note.trim(),
                                     workspace =
                                         workspace,
+                                    businessId = businessId,
                                     createdAt =
                                         now
                                 )
@@ -989,6 +999,7 @@ class FamilyKhataViewModel(application: Application) : AndroidViewModel(applicat
                                     note.trim(),
                                 workspace =
                                     workspace,
+                                    businessId = businessId,
                                 createdAt =
                                     now
                             )
@@ -1015,6 +1026,7 @@ class FamilyKhataViewModel(application: Application) : AndroidViewModel(applicat
                                     note.trim(),
                                 workspace =
                                     workspace,
+                                    businessId = businessId,
                                 createdAt =
                                     now
                             )
@@ -1058,6 +1070,7 @@ class FamilyKhataViewModel(application: Application) : AndroidViewModel(applicat
                                         note.trim(),
                                     workspace =
                                         workspace,
+                                    businessId = businessId,
                                     sourceKey =
                                         "DIGITAL_SERVICE:" +
                                             "$eventKey:PROFIT",
@@ -1116,6 +1129,8 @@ class FamilyKhataViewModel(application: Application) : AndroidViewModel(applicat
         val cleanType =
             type.trim().uppercase(Locale.US)
 
+        val businessId = businessIdForWorkspace(item.workspace)
+
         if (
             !canWriteNow() ||
             item.sourceKey
@@ -1161,8 +1176,8 @@ class FamilyKhataViewModel(application: Application) : AndroidViewModel(applicat
                                     )
                                 ).also {
                                     require(
-                                        it.workspace ==
-                                            item.workspace &&
+                                        it.workspace == item.workspace &&
+                                            it.businessId == businessId &&
                                             (
                                                 it.isActive ||
                                                 it.id ==
@@ -1300,6 +1315,7 @@ class FamilyKhataViewModel(application: Application) : AndroidViewModel(applicat
                                             ),
                                     workspace =
                                         item.workspace,
+                                    businessId = businessId,
                                     createdAt =
                                         item.createdAt
                                 )
@@ -1317,12 +1333,14 @@ class FamilyKhataViewModel(application: Application) : AndroidViewModel(applicat
     fun addBakiPerson(name: String, phone: String) {
         if (!canWriteNow() || name.isBlank()) return
         val workspace = _selectedWorkspace.value
+        val businessId = businessIdForWorkspace(workspace)
         viewModelScope.launch {
             dao.insertPerson(
                 BakiPersonEntity(
                     name = name.trim(),
                     phone = phone.trim(),
-                    workspace = workspace
+                    workspace = workspace,
+                    businessId = businessId
                 )
             )
         }
@@ -1436,7 +1454,7 @@ class FamilyKhataViewModel(application: Application) : AndroidViewModel(applicat
             require(workspace in allowedWorkspaces)
             // One database snapshot prevents mixing a person's details and edited ledger entries.
             database.withTransaction {
-                val person = requireNotNull(dao.getStatementPerson(personId, workspace)) {
+                val person = requireNotNull(dao.getStatementPerson(personId, workspace, businessIdForWorkspace(workspace))) {
                     "Ledger no longer exists in this workspace"
                 }
                 com.familykhata.app.report.buildLedgerStatement(
@@ -1586,14 +1604,22 @@ class FamilyKhataViewModel(application: Application) : AndroidViewModel(applicat
                 val startAt = reportStart(period, now)
                 val workspace = _selectedWorkspace.value
 
-                val people = dao.getAllPeople().filter { it.workspace == workspace }
+                val reportBusinessId = businessIdForWorkspace(workspace)
+                val people = dao.getAllPeople().filter {
+                    it.workspace == workspace &&
+                        (workspace != "SHOP" || it.businessId == reportBusinessId)
+                }
                 val personMap = people.associateBy { it.id }
                 val personIds = personMap.keys
                 val rows = mutableListOf<Pair<Long, List<String>>>()
 
                 dao.getAllTransactions()
                     .asSequence()
-                    .filter { it.workspace == workspace && it.createdAt in startAt..now }
+                    .filter {
+                        it.workspace == workspace &&
+                            (workspace != "SHOP" || it.businessId == reportBusinessId) &&
+                            it.createdAt in startAt..now
+                    }
                     .forEach { item ->
                         rows += item.createdAt to listOf(
                             formatReportDate(item.createdAt),
@@ -1681,6 +1707,7 @@ class FamilyKhataViewModel(application: Application) : AndroidViewModel(applicat
                         }
                 val digitalServiceTransactions =
                     dao.getAllDigitalServiceTransactions()
+                val businessProfiles = dao.getAllBusinessProfiles()
                 val inventory =
                     InventoryBackupBridge.export(
                         getApplication()
@@ -1692,8 +1719,22 @@ class FamilyKhataViewModel(application: Application) : AndroidViewModel(applicat
 
                 JSONObject().apply {
                     put("format", "hisabi-khata-backup")
-                    put("version", 12)
+                    put("version", 13)
                     put("createdAt", System.currentTimeMillis())
+                    put("selectedBusinessId", _selectedBusinessId.value)
+                    put("businessProfiles", JSONArray().apply {
+                        businessProfiles.forEach { profile ->
+                            put(JSONObject().apply {
+                                put("businessId", profile.businessId)
+                                put("name", profile.name)
+                                put("businessType", profile.businessType)
+                                put("phone", profile.phone)
+                                put("address", profile.address)
+                                put("isActive", profile.isActive)
+                                put("createdAt", profile.createdAt)
+                            })
+                        }
+                    })
                     put(
                         "inventoryRetailSales",
                         InventoryBackupBridge.retailSalesToJson(
@@ -1728,6 +1769,7 @@ class FamilyKhataViewModel(application: Application) : AndroidViewModel(applicat
                                 put("category", item.category)
                                 put("note", item.note)
                                 put("workspace", item.workspace)
+                                put("businessId", item.businessId)
                                 item.sourceKey?.let {
                                     put(
                                         "sourceKey",
@@ -1755,6 +1797,7 @@ class FamilyKhataViewModel(application: Application) : AndroidViewModel(applicat
                                 put("phone", person.phone)
                                 put("note", person.note)
                                 put("workspace", person.workspace)
+                                put("businessId", person.businessId)
                                 put("createdAt", person.createdAt)
                             })
                         }
@@ -1799,6 +1842,7 @@ class FamilyKhataViewModel(application: Application) : AndroidViewModel(applicat
                                             "workspace",
                                             account.workspace
                                         )
+                                        put("businessId", account.businessId)
                                         put(
                                             "isActive",
                                             account.isActive
@@ -1866,6 +1910,7 @@ class FamilyKhataViewModel(application: Application) : AndroidViewModel(applicat
                                             "workspace",
                                             entry.workspace
                                         )
+                                        put("businessId", entry.businessId)
                                         put(
                                             "createdAt",
                                             entry.createdAt
@@ -1943,6 +1988,7 @@ class FamilyKhataViewModel(application: Application) : AndroidViewModel(applicat
                                                 "workspace",
                                                 service.workspace
                                             )
+                                            put("businessId", service.businessId)
                                             put(
                                                 "createdAt",
                                                 service.createdAt
@@ -2062,7 +2108,7 @@ class FamilyKhataViewModel(application: Application) : AndroidViewModel(applicat
                     "এটি হিসাবী খাতার সঠিক ব্যাকআপ ফাইল নয়"
                 }
                 val backupVersion = root.optInt("version")
-                require(backupVersion in 1..12) {
+                require(backupVersion in 1..13) {
                     "এই ব্যাকআপ ভার্সনটি এখনো সমর্থিত নয়"
                 }
 
@@ -2092,6 +2138,54 @@ class FamilyKhataViewModel(application: Application) : AndroidViewModel(applicat
                 val inventoryUnits =
                     mutableListOf<ProductUnitConversionEntity>()
                 val actions = setOf("GAVE", "RECEIVED_BACK", "TOOK", "PAID_BACK")
+                val restoredBusinessProfiles = mutableListOf<BusinessProfileEntity>()
+                val restoredSelectedBusinessId: String
+
+                if (backupVersion >= 13) {
+                    val profileArray = root.optJSONArray("businessProfiles") ?: JSONArray()
+                    val seenBusinessIds = mutableSetOf<String>()
+
+                    for (index in 0 until profileArray.length()) {
+                        val item = profileArray.getJSONObject(index)
+                        val businessId = item.getString("businessId").trim()
+                        val name = item.getString("name").trim()
+                        require(businessId.isNotBlank() && businessId !in seenBusinessIds) { "Business ID সঠিক নয়" }
+                        require(name.isNotBlank()) { "Business name খালি হতে পারে না" }
+                        seenBusinessIds += businessId
+                        restoredBusinessProfiles += BusinessProfileEntity(
+                            businessId = businessId,
+                            name = name,
+                            businessType = item.optString("businessType", "").trim(),
+                            phone = item.optString("phone", "").trim(),
+                            address = item.optString("address", "").trim(),
+                            logoPath = "",
+                            isActive = item.optBoolean("isActive", true),
+                            createdAt = item.optLong("createdAt", System.currentTimeMillis())
+                        )
+                    }
+
+                    require(restoredBusinessProfiles.isNotEmpty()) { "Business profile পাওয়া যায়নি" }
+                    val requestedBusinessId = root.optString("selectedBusinessId", "").trim()
+                    restoredSelectedBusinessId = restoredBusinessProfiles
+                        .firstOrNull { it.businessId == requestedBusinessId && it.isActive }
+                        ?.businessId
+                        ?: restoredBusinessProfiles.firstOrNull { it.isActive }?.businessId
+                        ?: restoredBusinessProfiles.first().businessId
+                } else {
+                    val settingsJson = root.optJSONObject("settings")
+                    restoredBusinessProfiles += BusinessProfileEntity(
+                        businessId = legacyBusinessId,
+                        name = settingsJson?.optString("businessName", "")?.trim().orEmpty().ifBlank { "দোকান/প্রতিষ্ঠান" },
+                        businessType = settingsJson?.optString("businessType", "")?.trim().orEmpty(),
+                        phone = settingsJson?.optString("profilePhone", "")?.trim().orEmpty(),
+                        address = settingsJson?.optString("businessAddress", "")?.trim().orEmpty(),
+                        logoPath = "",
+                        isActive = true
+                    )
+                    restoredSelectedBusinessId = legacyBusinessId
+                }
+
+                val validBusinessIds = restoredBusinessProfiles.map { it.businessId }.toSet()
 
                 val transactionArray = root.getJSONArray("transactions")
                 for (index in 0 until transactionArray.length()) {
@@ -2110,6 +2204,13 @@ class FamilyKhataViewModel(application: Application) : AndroidViewModel(applicat
                         category = item.optString("category", "অন্যান্য"),
                         note = item.optString("note", ""),
                         workspace = workspace,
+                        businessId = if (workspace == "SHOP") {
+                            if (backupVersion >= 13) {
+                                item.optString("businessId", "").trim().also {
+                                    require(it in validBusinessIds) { "Transaction business সঠিক নয়" }
+                                }
+                            } else restoredSelectedBusinessId
+                        } else "",
                         sourceKey =
                             if (
                                 backupVersion >= 10
@@ -2172,6 +2273,13 @@ class FamilyKhataViewModel(application: Application) : AndroidViewModel(applicat
                         phone = item.optString("phone", ""),
                         note = item.optString("note", ""),
                         workspace = workspace,
+                        businessId = if (workspace == "SHOP") {
+                            if (backupVersion >= 13) {
+                                item.optString("businessId", "").trim().also {
+                                    require(it in validBusinessIds) { "Person business সঠিক নয়" }
+                                }
+                            } else restoredSelectedBusinessId
+                        } else "",
                         createdAt = item.optLong("createdAt", System.currentTimeMillis())
                     )
                 }
@@ -2339,6 +2447,13 @@ class FamilyKhataViewModel(application: Application) : AndroidViewModel(applicat
                                     openingBalance,
                                 workspace =
                                     workspace,
+                                businessId = if (workspace == "SHOP") {
+                                    if (backupVersion >= 13) {
+                                        item.optString("businessId", "").trim().also {
+                                            require(it in validBusinessIds) { "Account business সঠিক নয়" }
+                                        }
+                                    } else restoredSelectedBusinessId
+                                } else "",
                                 isActive =
                                     item.optBoolean(
                                         "isActive",
@@ -2607,6 +2722,7 @@ class FamilyKhataViewModel(application: Application) : AndroidViewModel(applicat
                                     ),
                                 workspace =
                                     workspace,
+                                businessId = account.businessId,
                                 createdAt =
                                     item.optLong(
                                         "createdAt",
@@ -2915,6 +3031,7 @@ class FamilyKhataViewModel(application: Application) : AndroidViewModel(applicat
                                     workspace &&
                                 destinationAccount.workspace ==
                                     workspace &&
+                                sourceAccount.businessId == destinationAccount.businessId &&
                                 workspace == "SHOP"
                         ) {
                             "Service account/workspace সঠিক নয়"
@@ -3038,6 +3155,7 @@ class FamilyKhataViewModel(application: Application) : AndroidViewModel(applicat
                                     ),
                                 workspace =
                                     workspace,
+                                businessId = sourceAccount.businessId,
                                 createdAt =
                                     item.optLong(
                                         "createdAt",
@@ -3425,6 +3543,8 @@ class FamilyKhataViewModel(application: Application) : AndroidViewModel(applicat
                     }
 
                 database.withTransaction {
+                    dao.clearBusinessProfiles()
+                    restoredBusinessProfiles.forEach { dao.upsertBusinessProfile(it) }
                     dao.clearDigitalServiceTransactions()
                     dao.clearFinancialAccountEntries()
                     dao.clearFinancialAccounts()
@@ -3458,6 +3578,12 @@ class FamilyKhataViewModel(application: Application) : AndroidViewModel(applicat
                         dao.insertFinancialAccountEntry(it)
                     }
                 }
+
+                _selectedBusinessId.value = restoredSelectedBusinessId
+                preferences.edit()
+                    .putString("selected_business_id", restoredSelectedBusinessId)
+                    .putString("legacy_business_id", restoredSelectedBusinessId)
+                    .apply()
 
                 if (backupVersion >= 3) {
                     InventoryBackupBridge.restore(
@@ -3535,6 +3661,7 @@ class FamilyKhataViewModel(application: Application) : AndroidViewModel(applicat
                                                 "Retail sale ${sale.invoiceNo} • ${payment.paymentMethod}",
                                             workspace =
                                                 sale.workspace,
+                                            businessId = account.businessId,
                                             createdAt =
                                                 payment.paidAt
                                         )

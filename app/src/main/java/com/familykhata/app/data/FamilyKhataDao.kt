@@ -52,6 +52,12 @@ interface FamilyKhataDao {
         businessId: String
     ): BusinessProfileEntity?
 
+    @Query("SELECT * FROM business_profiles ORDER BY createdAt ASC")
+    suspend fun getAllBusinessProfiles(): List<BusinessProfileEntity>
+
+    @Query("DELETE FROM business_profiles")
+    suspend fun clearBusinessProfiles()
+
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertTransaction(
         item: TransactionEntity
@@ -80,8 +86,8 @@ interface FamilyKhataDao {
         financialAccountId: Long?
     )
 
-    @Query("SELECT * FROM transactions WHERE workspace = :workspace ORDER BY createdAt DESC")
-    fun observeTransactions(workspace: String): Flow<List<TransactionEntity>>
+    @Query("SELECT * FROM transactions WHERE workspace = :workspace AND (workspace != 'SHOP' OR businessId = :businessId) ORDER BY createdAt DESC")
+    fun observeTransactions(workspace: String, businessId: String): Flow<List<TransactionEntity>>
 
     @Query(
         """
@@ -90,9 +96,10 @@ interface FamilyKhataDao {
             COALESCE(SUM(CASE WHEN type = 'EXPENSE' THEN amount ELSE 0 END), 0) AS expense
         FROM transactions
         WHERE workspace = :workspace
+          AND (workspace != 'SHOP' OR businessId = :businessId)
         """
     )
-    fun observeDashboardTotals(workspace: String): Flow<DashboardTotals>
+    fun observeDashboardTotals(workspace: String, businessId: String): Flow<DashboardTotals>
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertPerson(person: BakiPersonEntity): Long
@@ -103,8 +110,8 @@ interface FamilyKhataDao {
     @Query("DELETE FROM baki_people WHERE id = :personId")
     suspend fun deletePersonById(personId: Long)
 
-    @Query("SELECT * FROM baki_people WHERE workspace = :workspace ORDER BY name COLLATE NOCASE ASC")
-    fun observePeople(workspace: String): Flow<List<BakiPersonEntity>>
+    @Query("SELECT * FROM baki_people WHERE workspace = :workspace AND (workspace != 'SHOP' OR businessId = :businessId) ORDER BY name COLLATE NOCASE ASC")
+    fun observePeople(workspace: String, businessId: String): Flow<List<BakiPersonEntity>>
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertBakiEntry(entry: BakiEntryEntity)
@@ -166,17 +173,18 @@ interface FamilyKhataDao {
         FROM baki_people p
         LEFT JOIN baki_entries e ON p.id = e.personId
         WHERE p.workspace = :workspace
+          AND (p.workspace != 'SHOP' OR p.businessId = :businessId)
         GROUP BY p.id
         ORDER BY p.name COLLATE NOCASE ASC
         """
     )
-    fun observeBakiSummaries(workspace: String): Flow<List<BakiPersonSummary>>
+    fun observeBakiSummaries(workspace: String, businessId: String): Flow<List<BakiPersonSummary>>
 
     @Query("SELECT * FROM baki_entries WHERE personId = :personId ORDER BY createdAt DESC")
     fun observeBakiEntries(personId: Long): Flow<List<BakiEntryEntity>>
 
-    @Query("SELECT * FROM baki_people WHERE id = :personId AND workspace = :workspace LIMIT 1")
-    suspend fun getStatementPerson(personId: Long, workspace: String): BakiPersonEntity?
+    @Query("SELECT * FROM baki_people WHERE id = :personId AND workspace = :workspace AND (workspace != 'SHOP' OR businessId = :businessId) LIMIT 1")
+    suspend fun getStatementPerson(personId: Long, workspace: String, businessId: String): BakiPersonEntity?
 
     @Query("SELECT * FROM baki_entries WHERE personId = :personId ORDER BY createdAt ASC, id ASC")
     suspend fun getStatementEntries(personId: Long): List<BakiEntryEntity>
@@ -187,10 +195,11 @@ interface FamilyKhataDao {
         FROM baki_entries e
         INNER JOIN baki_people p ON p.id = e.personId
         WHERE p.workspace = :workspace
+          AND (p.workspace != 'SHOP' OR p.businessId = :businessId)
         ORDER BY e.createdAt ASC, e.id ASC
         """
     )
-    fun observeWorkspaceBakiEntries(workspace: String): Flow<List<BakiEntryEntity>>
+    fun observeWorkspaceBakiEntries(workspace: String, businessId: String): Flow<List<BakiEntryEntity>>
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertFinancialAccount(
@@ -218,6 +227,7 @@ interface FamilyKhataDao {
         LEFT JOIN financial_account_entries e
             ON e.accountId = a.id
         WHERE a.workspace = :workspace
+          AND (a.workspace != 'SHOP' OR a.businessId = :businessId)
         GROUP BY a.id
         ORDER BY
             a.isActive DESC,
@@ -225,7 +235,8 @@ interface FamilyKhataDao {
         """
     )
     fun observeFinancialAccounts(
-        workspace: String
+        workspace: String,
+        businessId: String
     ): Flow<List<FinancialAccountSummary>>
 
     @Query(
@@ -325,11 +336,13 @@ interface FamilyKhataDao {
         SELECT *
         FROM digital_service_transactions
         WHERE workspace = :workspace
+          AND (workspace != 'SHOP' OR businessId = :businessId)
         ORDER BY createdAt DESC, id DESC
         """
     )
     fun observeDigitalServiceTransactions(
-        workspace: String
+        workspace: String,
+        businessId: String
     ): Flow<List<DigitalServiceTransactionEntity>>
 
     @Query(

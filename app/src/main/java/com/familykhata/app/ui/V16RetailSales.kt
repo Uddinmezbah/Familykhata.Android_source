@@ -47,6 +47,7 @@ import com.familykhata.app.data.BakiPersonSummary
 import com.familykhata.app.data.ProductStockSummary
 import com.familykhata.app.data.RetailSaleEntity
 import com.familykhata.app.report.writeRetailInvoicePdf
+import com.google.mlkit.vision.codescanner.GmsBarcodeScanning
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
@@ -1473,6 +1474,14 @@ private fun RetailSaleForm(
     onDismiss: () -> Unit,
     onSave: (RetailSaleDraft) -> Unit
 ) {
+    val context = LocalContext.current
+    val barcodeScanner =
+        remember {
+            GmsBarcodeScanning.getClient(
+                context
+            )
+        }
+
     var invoiceNo by remember {
         mutableStateOf("")
     }
@@ -1542,6 +1551,115 @@ private fun RetailSaleForm(
         remember {
             mutableStateListOf<RetailCartLine>()
         }
+
+    fun addScannedProductToCart(
+        product: ProductStockSummary
+    ) {
+        val existingIndex =
+            cart.indexOfFirst {
+                it.productId ==
+                    product.id
+            }
+
+        if (existingIndex >= 0) {
+            val current =
+                cart[existingIndex]
+
+            val currentQuantity =
+                current.quantity
+                    .retailIntOrNull()
+                    ?.coerceAtLeast(0)
+                    ?: 0
+
+            val nextQuantity =
+                currentQuantity.toLong() +
+                    1L
+
+            val requiredBase =
+                nextQuantity *
+                    current.unitFactor
+                        .toLong()
+
+            if (
+                nextQuantity <=
+                    Int.MAX_VALUE.toLong() &&
+                requiredBase <=
+                    current.availableBase
+                        .toLong()
+            ) {
+                cart[existingIndex] =
+                    current.copy(
+                        quantity =
+                            nextQuantity
+                                .toString()
+                    )
+
+                Toast.makeText(
+                    context,
+                    v15Text(
+                        "${product.name} • পরিমাণ ${nextQuantity}",
+                        "${product.name} • Qty ${nextQuantity}"
+                    ),
+                    Toast.LENGTH_SHORT
+                ).show()
+            } else {
+                Toast.makeText(
+                    context,
+                    v15Text(
+                        "${product.name}-এর পর্যাপ্ত স্টক নেই",
+                        "Not enough stock for ${product.name}"
+                    ),
+                    Toast.LENGTH_SHORT
+                ).show()
+            }
+
+            return
+        }
+
+        if (product.totalStock <= 0) {
+            Toast.makeText(
+                context,
+                v15Text(
+                    "${product.name}-এর স্টক নেই",
+                    "${product.name} is out of stock"
+                ),
+                Toast.LENGTH_SHORT
+            ).show()
+
+            return
+        }
+
+        cart +=
+            RetailCartLine(
+                productId =
+                    product.id,
+                name =
+                    product.name,
+                baseUnit =
+                    product.unit,
+                selectedUnit =
+                    product.unit,
+                unitFactor = 1,
+                availableBase =
+                    product.totalStock,
+                basePrice =
+                    product.sellingPrice,
+                quantity = "1",
+                price =
+                    retailMoney(
+                        product.sellingPrice
+                    )
+            )
+
+        Toast.makeText(
+            context,
+            v15Text(
+                "${product.name} কার্টে যোগ হয়েছে",
+                "${product.name} added to cart"
+            ),
+            Toast.LENGTH_SHORT
+        ).show()
+    }
 
     val filteredProducts =
         products.filter { product ->
@@ -1677,6 +1795,104 @@ private fun RetailSaleForm(
                     modifier =
                         Modifier.fillMaxWidth()
                 )
+
+                OutlinedButton(
+                    onClick = {
+                        barcodeScanner
+                            .startScan()
+                            .addOnSuccessListener {
+                                    barcode ->
+
+                                val code =
+                                    barcode.rawValue
+                                        .orEmpty()
+                                        .trim()
+
+                                if (code.isBlank()) {
+                                    Toast.makeText(
+                                        context,
+                                        v15Text(
+                                            "বারকোড পাওয়া যায়নি",
+                                            "No barcode value found"
+                                        ),
+                                        Toast.LENGTH_SHORT
+                                    ).show()
+
+                                    return@addOnSuccessListener
+                                }
+
+                                val matches =
+                                    products.filter {
+                                        product ->
+
+                                        product.sku
+                                            .trim()
+                                            .equals(
+                                                code,
+                                                ignoreCase =
+                                                    true
+                                            )
+                                    }
+
+                                when {
+                                    matches.size == 1 -> {
+                                        error = null
+                                        search = ""
+
+                                        addScannedProductToCart(
+                                            matches.first()
+                                        )
+                                    }
+
+                                    matches.isEmpty() -> {
+                                        search = code
+
+                                        Toast.makeText(
+                                            context,
+                                            v15Text(
+                                                "এই বারকোডের পণ্য পাওয়া যায়নি: $code",
+                                                "No product found for barcode: $code"
+                                            ),
+                                            Toast.LENGTH_LONG
+                                        ).show()
+                                    }
+
+                                    else -> {
+                                        search = code
+
+                                        Toast.makeText(
+                                            context,
+                                            v15Text(
+                                                "একই বারকোড একাধিক পণ্যে আছে। SKU ঠিক করুন।",
+                                                "This barcode is assigned to multiple products. Fix the SKU."
+                                            ),
+                                            Toast.LENGTH_LONG
+                                        ).show()
+                                    }
+                                }
+                            }
+                            .addOnFailureListener {
+                                Toast.makeText(
+                                    context,
+                                    v15Text(
+                                        "বারকোড স্ক্যান করা যায়নি",
+                                        "Barcode scan failed"
+                                    ),
+                                    Toast.LENGTH_SHORT
+                                ).show()
+                            }
+                    },
+                    enabled = !saving,
+                    modifier =
+                        Modifier.fillMaxWidth()
+                ) {
+                    Text(
+                        v15Text(
+                            "▣ স্ক্যান করে কার্টে যোগ করুন",
+                            "▣ Scan & Add to Cart"
+                        )
+                    )
+                }
 
                 filteredProducts
                     .take(12)

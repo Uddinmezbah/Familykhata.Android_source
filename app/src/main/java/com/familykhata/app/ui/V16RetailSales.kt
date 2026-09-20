@@ -41,6 +41,7 @@ import androidx.compose.ui.unit.dp
 import androidx.core.content.FileProvider
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.familykhata.app.InventoryViewModel
+import com.familykhata.app.FamilyKhataViewModel
 import com.familykhata.app.RetailSaleLineInput
 import com.familykhata.app.data.BakiPersonSummary
 import com.familykhata.app.data.ProductStockSummary
@@ -92,6 +93,8 @@ internal fun V16RetailSalesScreen(
     onExit: () -> Unit
 ) {
     val vm: InventoryViewModel = viewModel()
+    val securityViewModel: FamilyKhataViewModel = viewModel()
+    val selectedBusinessId by securityViewModel.selectedBusinessId.collectAsState()
     val products by vm.products.collectAsState()
     val sales by vm.retailSales.collectAsState()
     val bakiPeople by vm.bakiPeople.collectAsState()
@@ -162,11 +165,13 @@ internal fun V16RetailSalesScreen(
 
     LaunchedEffect(
         workspace,
-        shopType
+        shopType,
+        selectedBusinessId
     ) {
         vm.setContext(
             workspaceValue = workspace,
-            shopType = shopType
+            shopType = shopType,
+            businessIdValue = selectedBusinessId
         )
     }
 

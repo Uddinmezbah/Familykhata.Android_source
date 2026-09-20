@@ -1175,7 +1175,8 @@ class InventoryViewModel(application: Application) : AndroidViewModel(applicatio
             requireNotNull(
                 bakiDao.getStatementPerson(
                     personId = personId,
-                    workspace = sale.workspace
+                    workspace = sale.workspace,
+                    businessId = businessId.value
                 )
             ) {
                 "Baki person not found"
@@ -1402,7 +1403,9 @@ class InventoryViewModel(application: Application) : AndroidViewModel(applicatio
                                 personId =
                                     resolvedBakiPersonId,
                                 workspace =
-                                    currentWorkspace
+                                    currentWorkspace,
+                                businessId =
+                                    businessId.value
                             )
                         ) {
                             "Baki person not found"

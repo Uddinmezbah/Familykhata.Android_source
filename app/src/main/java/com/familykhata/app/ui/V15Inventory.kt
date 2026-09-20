@@ -964,6 +964,9 @@ internal fun V15InventoryScreen(
                 onOpenSales = {
                     showRetailSales = true
                 },
+                onOpenPurchases = {
+                    showPurchases = true
+                },
                 onSelect = {
                     selectedId = it.id
                 }

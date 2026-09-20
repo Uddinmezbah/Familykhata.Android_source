@@ -1330,22 +1330,37 @@ private fun NewPurchaseForm(
                     return@Button
                 }
 
+                val safeSupplierId =
+                    requireNotNull(
+                        selectedSupplierId
+                    )
+
+                val safeDiscount =
+                    requireNotNull(
+                        parsedDiscount
+                    )
+
+                val safePaid =
+                    requireNotNull(
+                        parsedPaid
+                    )
+
                 saving = true
 
                 viewModel.createPurchase(
                     purchaseNo =
                         purchaseNo,
                     supplierId =
-                        selectedSupplierId,
+                        safeSupplierId,
                     lines =
                         parsedLines,
                     discount =
-                        parsedDiscount,
+                        safeDiscount,
                     initialPaid =
-                        parsedPaid,
+                        safePaid,
                     financialAccountId =
                         if (
-                            parsedPaid >
+                            safePaid >
                             0.0001
                         ) {
                             financialAccountId

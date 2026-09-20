@@ -17,6 +17,7 @@ import com.familykhata.app.data.FinancialAccountEntity
 import com.familykhata.app.data.FinancialAccountEntryEntity
 import com.familykhata.app.data.FinancialAccountSummary
 import com.familykhata.app.data.InventoryBackupBridge
+import com.familykhata.app.data.InventoryDatabase
 import com.familykhata.app.data.ProductEntity
 import com.familykhata.app.data.ProductUnitConversionEntity
 import com.familykhata.app.data.StockBatchEntity

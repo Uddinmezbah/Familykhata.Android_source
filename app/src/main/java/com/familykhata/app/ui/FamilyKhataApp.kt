@@ -2836,11 +2836,23 @@ private fun BakiEntryScreen(
         )
 
         if (person.phone.isNotBlank()) {
-            OutlinedButton(
-                onClick = { sendLedgerSms(context, person) },
-                modifier = Modifier.fillMaxWidth()
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
             ) {
-                Text(v15Text("SMS-এ হিসাব পাঠান", "Send account by SMS"))
+                OutlinedButton(
+                    onClick = { sendLedgerSms(context, person) },
+                    modifier = Modifier.weight(1f)
+                ) {
+                    Text("SMS")
+                }
+
+                Button(
+                    onClick = { sendLedgerWhatsApp(context, person) },
+                    modifier = Modifier.weight(1f)
+                ) {
+                    Text(v15Text("WhatsApp-এ তাগাদা", "Send on WhatsApp"))
+                }
             }
         }
 
@@ -3568,6 +3580,68 @@ private fun sendLedgerSms(context: Context, person: BakiPersonSummary) {
     }
     runCatching { context.startActivity(intent) }
         .onFailure { toast(context, v15Text("SMS অ্যাপ খোলা যায়নি","Unable to open SMS app")) }
+}
+
+private fun sendLedgerWhatsApp(context: Context, person: BakiPersonSummary) {
+    val balanceText = when {
+        person.balance > 0 -> v15Text(
+            "আপনার কাছে ${V14DisplayState.currencySymbol} ${money(person.balance)} পাওনা আছে।",
+            "You are owed ${V14DisplayState.currencySymbol} ${money(person.balance)}."
+        )
+        person.balance < 0 -> v15Text(
+            "আপনাকে ${V14DisplayState.currencySymbol} ${money(-person.balance)} পরিশোধযোগ্য আছে।",
+            "You owe ${V14DisplayState.currencySymbol} ${money(-person.balance)}."
+        )
+        else -> v15Text(
+            "আপনার হিসাব বর্তমানে সমান আছে।",
+            "Your account is currently settled."
+        )
+    }
+
+    val message = v15Text(
+        "আসসালামু আলাইকুম ${person.name}, হিসাবী খাতা অনুযায়ী $balanceText অনুগ্রহ করে সুবিধামতো হিসাবটি দেখবেন।",
+        "Hello ${person.name}, according to Hisabi Khata, $balanceText Please review the account when convenient."
+    )
+
+    val digits = person.phone.filter { it.isDigit() }
+    val whatsappNumber =
+        when {
+            digits.startsWith("880") -> digits
+            digits.length == 11 && digits.startsWith("01") ->
+                "880${digits.drop(1)}"
+            else -> digits
+        }
+
+    if (whatsappNumber.isBlank()) {
+        toast(
+            context,
+            v15Text(
+                "সঠিক ফোন নম্বর পাওয়া যায়নি",
+                "A valid phone number was not found"
+            )
+        )
+        return
+    }
+
+    val url =
+        "https://wa.me/$whatsappNumber?text=${Uri.encode(message)}"
+
+    runCatching {
+        context.startActivity(
+            Intent(
+                Intent.ACTION_VIEW,
+                Uri.parse(url)
+            )
+        )
+    }.onFailure {
+        toast(
+            context,
+            v15Text(
+                "WhatsApp খোলা যায়নি",
+                "Unable to open WhatsApp"
+            )
+        )
+    }
 }
 
 private fun shareApp(context: Context) {

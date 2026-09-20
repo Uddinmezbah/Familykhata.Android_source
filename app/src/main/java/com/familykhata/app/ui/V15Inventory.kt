@@ -719,6 +719,10 @@ internal fun V15InventoryScreen(
         mutableStateOf(false)
     }
 
+    var showPurchases by remember {
+        mutableStateOf(false)
+    }
+
     var showAddProduct by remember {
         mutableStateOf(false)
     }
@@ -750,6 +754,7 @@ internal fun V15InventoryScreen(
         active =
             selected != null ||
                 showRetailSales ||
+                showPurchases ||
                 showAddProduct ||
                 showAddStock ||
                 nestedEntry
@@ -776,6 +781,15 @@ internal fun V15InventoryScreen(
                 showRetailSales
     ) {
         showRetailSales = false
+    }
+    BackHandler(
+        enabled =
+            !showAddProduct &&
+                !showAddStock &&
+                !showRetailSales &&
+                showPurchases
+    ) {
+        showPurchases = false
     }
 
     BackHandler(
@@ -898,6 +912,16 @@ internal fun V15InventoryScreen(
                 showRetailSales = false
             }
         )
+    } else if (showPurchases) {
+        V17PurchaseScreen(
+            workspace = workspace,
+            businessId = businessId,
+            shopType = shopType,
+            canWrite = canWrite,
+            onExit = {
+                showPurchases = false
+            }
+        )
     } else if (selected == null) {
         if (nestedEntry) {
             V15DeepScreenContainer(
@@ -918,6 +942,9 @@ internal fun V15InventoryScreen(
                     },
                     onOpenSales = {
                         showRetailSales = true
+                    },
+                    onOpenPurchases = {
+                        showPurchases = true
                     },
                     onSelect = {
                         selectedId = it.id
@@ -974,6 +1001,7 @@ private fun ProductListScreen(
     securityViewModel: FamilyKhataViewModel,
     onAddProduct: () -> Unit,
     onOpenSales: () -> Unit,
+    onOpenPurchases: () -> Unit,
     onSelect: (ProductStockSummary) -> Unit
 ) {
     val context = LocalContext.current
@@ -1121,6 +1149,18 @@ private fun ProductListScreen(
                 v15Text(
                     "▣ বিক্রি ও ইনভয়েস",
                     "▣ Sales & Invoices"
+                )
+            )
+        }
+
+        OutlinedButton(
+            onClick = onOpenPurchases,
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            Text(
+                v15Text(
+                    "▣ ক্রয় ও সাপ্লায়ার",
+                    "▣ Purchases & Suppliers"
                 )
             )
         }

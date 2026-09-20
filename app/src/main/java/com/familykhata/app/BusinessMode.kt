@@ -196,6 +196,20 @@ fun businessDataKey(
     }
 }
 
+fun inventoryBusinessKey(
+    businessId: String,
+    shopType: String
+): String {
+    val cleanBusinessId =
+        businessId.trim()
+
+    return if (cleanBusinessId.isBlank()) {
+        "__NO_BUSINESS__"
+    } else {
+        "$cleanBusinessId::${businessDataKey(shopType)}"
+    }
+}
+
 fun businessWorkspaceKey(
     workspace: String,
     businessId: String

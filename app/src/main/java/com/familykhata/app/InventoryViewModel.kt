@@ -65,9 +65,7 @@ class InventoryViewModel(application: Application) : AndroidViewModel(applicatio
 
     private val businessKey =
         MutableStateFlow(
-            initialBusinessId.ifBlank {
-                "__NO_BUSINESS__"
-            }
+            "__NO_BUSINESS__"
         )
 
     private val businessId =
@@ -147,45 +145,67 @@ class InventoryViewModel(application: Application) : AndroidViewModel(applicatio
             return
         }
 
-        val targetBusinessId =
-            cleanBusinessId.ifBlank {
-                legacyBusinessKey
+        val targetBusinessKey =
+            if (workspaceValue == "SHOP") {
+                inventoryBusinessKey(
+                    cleanBusinessId,
+                    shopType
+                )
+            } else {
+                cleanBusinessId.ifBlank {
+                    legacyBusinessKey
+                }
             }
 
-        if (businessId.value != targetBusinessId) {
-            businessId.value = targetBusinessId
+        if (businessId.value != cleanBusinessId) {
+            businessId.value = cleanBusinessId
         }
 
-        if (businessKey.value != targetBusinessId) {
-            businessKey.value = targetBusinessId
+        if (businessKey.value != targetBusinessKey) {
+            businessKey.value = targetBusinessKey
         }
 
         viewModelScope.launch {
-            val originalBusinessId =
-                appPreferences.getString(
-                    "legacy_business_id",
-                    ""
-                ).orEmpty()
-
             if (
                 workspaceValue == "SHOP" &&
-                targetBusinessId == originalBusinessId
+                cleanBusinessId.isNotBlank()
             ) {
-                dao.claimExistingBusinessProducts(
+                dao.moveInventoryBusinessKey(
                     workspace = workspaceValue,
-                    legacyBusinessKey = legacyBusinessKey,
-                    targetBusinessId = targetBusinessId
+                    sourceBusinessKey = cleanBusinessId,
+                    targetBusinessKey = targetBusinessKey
                 )
-                dao.claimExistingBusinessRetailSales(
+
+                dao.moveRetailSalesBusinessKey(
                     workspace = workspaceValue,
-                    legacyBusinessKey = legacyBusinessKey,
-                    targetBusinessId = targetBusinessId
+                    sourceBusinessKey = cleanBusinessId,
+                    targetBusinessKey = targetBusinessKey
                 )
+
+                val originalBusinessId =
+                    appPreferences.getString(
+                        "legacy_business_id",
+                        ""
+                    ).orEmpty()
+
+                if (cleanBusinessId == originalBusinessId) {
+                    dao.claimExistingBusinessProducts(
+                        workspace = workspaceValue,
+                        legacyBusinessKey = legacyBusinessKey,
+                        targetBusinessId = targetBusinessKey
+                    )
+
+                    dao.claimExistingBusinessRetailSales(
+                        workspace = workspaceValue,
+                        legacyBusinessKey = legacyBusinessKey,
+                        targetBusinessId = targetBusinessKey
+                    )
+                }
             }
 
             dao.getRetailSalesOnce(
                 workspace = workspaceValue,
-                businessKey = targetBusinessId
+                businessKey = targetBusinessKey
             ).forEach { sale ->
                 runCatching {
                     reconcileRetailSaleBaki(sale)
@@ -197,6 +217,7 @@ class InventoryViewModel(application: Application) : AndroidViewModel(applicatio
             }
         }
     }
+
     fun setWorkspace(value: String) {
         if (workspace.value != value) workspace.value = value
     }

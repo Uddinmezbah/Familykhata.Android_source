@@ -193,6 +193,34 @@ interface InventoryDao {
         targetBusinessId: String
     ): Int
 
+    @Query(
+        """
+        UPDATE inventory_products
+        SET businessKey = :targetBusinessKey
+        WHERE workspace = :workspace
+          AND businessKey = :sourceBusinessKey
+        """
+    )
+    suspend fun moveInventoryBusinessKey(
+        workspace: String,
+        sourceBusinessKey: String,
+        targetBusinessKey: String
+    ): Int
+
+    @Query(
+        """
+        UPDATE retail_sales
+        SET businessKey = :targetBusinessKey
+        WHERE workspace = :workspace
+          AND businessKey = :sourceBusinessKey
+        """
+    )
+    suspend fun moveRetailSalesBusinessKey(
+        workspace: String,
+        sourceBusinessKey: String,
+        targetBusinessKey: String
+    ): Int
+
     @Query("SELECT * FROM inventory_products WHERE id = :productId LIMIT 1")
     suspend fun getProductOnce(productId: Long): ProductEntity?
 

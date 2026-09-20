@@ -340,7 +340,7 @@ class FamilyKhataViewModel(application: Application) : AndroidViewModel(applicat
                     businessId = cleanId,
                     name = cleanName,
                     businessType =
-                        businessType.trim(),
+                        cleanBusinessType,
                     phone = phone.trim(),
                     address = address.trim(),
                     logoPath = logoPath.trim(),
@@ -444,6 +444,63 @@ class FamilyKhataViewModel(application: Application) : AndroidViewModel(applicat
                     businessId
                 )
 
+            val cleanBusinessType =
+                businessType.trim()
+
+            if (
+                existing != null &&
+                businessDataKey(
+                    existing.businessType
+                ) != businessDataKey(
+                    cleanBusinessType
+                )
+            ) {
+                val inventoryDao =
+                    InventoryDatabase
+                        .get(getApplication())
+                        .dao()
+
+                val oldInventoryKey =
+                    inventoryBusinessKey(
+                        businessId,
+                        existing.businessType
+                    )
+
+                inventoryDao.moveInventoryBusinessKey(
+                    workspace = "SHOP",
+                    sourceBusinessKey = businessId,
+                    targetBusinessKey = oldInventoryKey
+                )
+
+                inventoryDao.moveRetailSalesBusinessKey(
+                    workspace = "SHOP",
+                    sourceBusinessKey = businessId,
+                    targetBusinessKey = oldInventoryKey
+                )
+
+                if (businessId == legacyBusinessId) {
+                    inventoryDao.moveInventoryBusinessKey(
+                        workspace = "SHOP",
+                        sourceBusinessKey =
+                            businessDataKey(
+                                existing.businessType
+                            ),
+                        targetBusinessKey =
+                            oldInventoryKey
+                    )
+
+                    inventoryDao.moveRetailSalesBusinessKey(
+                        workspace = "SHOP",
+                        sourceBusinessKey =
+                            businessDataKey(
+                                existing.businessType
+                            ),
+                        targetBusinessKey =
+                            oldInventoryKey
+                    )
+                }
+            }
+
             dao.upsertBusinessProfile(
                 BusinessProfileEntity(
                     businessId = businessId,
@@ -454,7 +511,7 @@ class FamilyKhataViewModel(application: Application) : AndroidViewModel(applicat
                                 "দোকান/প্রতিষ্ঠান"
                             },
                     businessType =
-                        businessType.trim(),
+                        cleanBusinessType,
                     phone = phone.trim(),
                     address = address.trim(),
                     logoPath = logoPath.trim(),

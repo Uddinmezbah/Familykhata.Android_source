@@ -69,7 +69,7 @@ class FamilyKhataViewModel(application: Application) : AndroidViewModel(applicat
             Context.MODE_PRIVATE
         )
 
-    private val legacyBusinessId: String =
+    private var legacyBusinessId: String =
         preferences.getString(
             "legacy_business_id",
             null
@@ -1938,6 +1938,62 @@ class FamilyKhataViewModel(application: Application) : AndroidViewModel(applicat
         else -> action
     }
 
+    private fun backupFileBase64(
+        path: String
+    ): String =
+        runCatching {
+            val file = java.io.File(path)
+
+            if (
+                path.isNotBlank() &&
+                file.exists() &&
+                file.isFile
+            ) {
+                android.util.Base64.encodeToString(
+                    file.readBytes(),
+                    android.util.Base64.NO_WRAP
+                )
+            } else {
+                ""
+            }
+        }.getOrDefault("")
+
+    private fun restoreBusinessLogo(
+        businessId: String,
+        encoded: String
+    ): String {
+        if (encoded.isBlank()) return ""
+
+        val safeKey =
+            businessId
+                .filter {
+                    it.isLetterOrDigit() ||
+                        it == '-' ||
+                        it == '_'
+                }
+                .take(80)
+                .ifBlank { "restored" }
+
+        val file =
+            java.io.File(
+                getApplication<Application>().filesDir,
+                "hisabi_shop_logo_${safeKey}.img"
+            )
+
+        val bytes =
+            android.util.Base64.decode(
+                encoded,
+                android.util.Base64.DEFAULT
+            )
+
+        require(bytes.isNotEmpty()) {
+            "Business logo data সঠিক নয়"
+        }
+
+        file.writeBytes(bytes)
+        return file.absolutePath
+    }
+
     fun createBackup(
         onReady: (String) -> Unit,
         onError: (String) -> Unit
@@ -1968,9 +2024,10 @@ class FamilyKhataViewModel(application: Application) : AndroidViewModel(applicat
 
                 JSONObject().apply {
                     put("format", "hisabi-khata-backup")
-                    put("version", 13)
+                    put("version", 14)
                     put("createdAt", System.currentTimeMillis())
                     put("selectedBusinessId", _selectedBusinessId.value)
+                    put("legacyBusinessId", legacyBusinessId)
                     put("businessProfiles", JSONArray().apply {
                         businessProfiles.forEach { profile ->
                             put(JSONObject().apply {
@@ -1979,6 +2036,7 @@ class FamilyKhataViewModel(application: Application) : AndroidViewModel(applicat
                                 put("businessType", profile.businessType)
                                 put("phone", profile.phone)
                                 put("address", profile.address)
+                                put("logoBase64", backupFileBase64(profile.logoPath))
                                 put("isActive", profile.isActive)
                                 put("createdAt", profile.createdAt)
                             })
@@ -2357,7 +2415,7 @@ class FamilyKhataViewModel(application: Application) : AndroidViewModel(applicat
                     "এটি হিসাবী খাতার সঠিক ব্যাকআপ ফাইল নয়"
                 }
                 val backupVersion = root.optInt("version")
-                require(backupVersion in 1..13) {
+                require(backupVersion in 1..14) {
                     "এই ব্যাকআপ ভার্সনটি এখনো সমর্থিত নয়"
                 }
 
@@ -2407,7 +2465,18 @@ class FamilyKhataViewModel(application: Application) : AndroidViewModel(applicat
                             businessType = item.optString("businessType", "").trim(),
                             phone = item.optString("phone", "").trim(),
                             address = item.optString("address", "").trim(),
-                            logoPath = "",
+                            logoPath =
+                                if (backupVersion >= 14) {
+                                    restoreBusinessLogo(
+                                        businessId,
+                                        item.optString(
+                                            "logoBase64",
+                                            ""
+                                        )
+                                    )
+                                } else {
+                                    ""
+                                },
                             isActive = item.optBoolean("isActive", true),
                             createdAt = item.optLong("createdAt", System.currentTimeMillis())
                         )
@@ -2437,9 +2506,21 @@ class FamilyKhataViewModel(application: Application) : AndroidViewModel(applicat
                 val validBusinessIds = restoredBusinessProfiles.map { it.businessId }.toSet()
 
                 val restoredOriginalBusinessId =
-                    restoredBusinessProfiles
-                        .minByOrNull { it.createdAt }
-                        ?.businessId
+                    (
+                        if (backupVersion >= 14) {
+                            root.optString(
+                                "legacyBusinessId",
+                                ""
+                            ).trim().takeIf {
+                                it in validBusinessIds
+                            }
+                        } else {
+                            null
+                        }
+                    )
+                        ?: restoredBusinessProfiles
+                            .minByOrNull { it.createdAt }
+                            ?.businessId
                         ?: restoredSelectedBusinessId
 
                 val transactionArray = root.getJSONArray("transactions")
@@ -3834,10 +3915,11 @@ class FamilyKhataViewModel(application: Application) : AndroidViewModel(applicat
                     }
                 }
 
+                legacyBusinessId = restoredOriginalBusinessId
                 _selectedBusinessId.value = restoredSelectedBusinessId
                 preferences.edit()
                     .putString("selected_business_id", restoredSelectedBusinessId)
-                    .putString("legacy_business_id", restoredSelectedBusinessId)
+                    .putString("legacy_business_id", restoredOriginalBusinessId)
                     .apply()
 
                 if (backupVersion >= 3) {
@@ -3942,14 +4024,34 @@ class FamilyKhataViewModel(application: Application) : AndroidViewModel(applicat
                         }
                     )
 
-                val restoredLegacyBusinessKey =
-                    businessDataKey(
-                        root.optJSONObject("settings")
+                val restoredOriginalProfile =
+                    restoredBusinessProfiles
+                        .firstOrNull { profile ->
+                            profile.businessId ==
+                                restoredOriginalBusinessId
+                        }
+
+                val restoredOriginalType =
+                    restoredOriginalProfile
+                        ?.businessType
+                        ?.trim()
+                        ?.takeIf { it.isNotBlank() }
+                        ?: root.optJSONObject("settings")
                             ?.optString(
                                 "businessType",
                                 ""
                             )
                             .orEmpty()
+
+                val restoredLegacyBusinessKey =
+                    businessDataKey(
+                        restoredOriginalType
+                    )
+
+                val restoredOriginalInventoryKey =
+                    inventoryBusinessKey(
+                        restoredOriginalBusinessId,
+                        restoredOriginalType
                     )
 
                 val restoredInventoryDao =
@@ -3957,13 +4059,42 @@ class FamilyKhataViewModel(application: Application) : AndroidViewModel(applicat
                         .get(getApplication())
                         .dao()
 
+                if (backupVersion >= 13) {
+                    restoredBusinessProfiles
+                        .forEach { profile ->
+                            val scopedKey =
+                                inventoryBusinessKey(
+                                    profile.businessId,
+                                    profile.businessType
+                                )
+
+                            restoredInventoryDao
+                                .moveInventoryBusinessKey(
+                                    workspace = "SHOP",
+                                    sourceBusinessKey =
+                                        profile.businessId,
+                                    targetBusinessKey =
+                                        scopedKey
+                                )
+
+                            restoredInventoryDao
+                                .moveRetailSalesBusinessKey(
+                                    workspace = "SHOP",
+                                    sourceBusinessKey =
+                                        profile.businessId,
+                                    targetBusinessKey =
+                                        scopedKey
+                                )
+                        }
+                }
+
                 restoredInventoryDao
                     .claimExistingBusinessProducts(
                         workspace = "SHOP",
                         legacyBusinessKey =
                             restoredLegacyBusinessKey,
                         targetBusinessId =
-                            restoredOriginalBusinessId
+                            restoredOriginalInventoryKey
                     )
 
                 restoredInventoryDao
@@ -3972,7 +4103,7 @@ class FamilyKhataViewModel(application: Application) : AndroidViewModel(applicat
                         legacyBusinessKey =
                             restoredLegacyBusinessKey,
                         targetBusinessId =
-                            restoredOriginalBusinessId
+                            restoredOriginalInventoryKey
                     )
 
                 V15BusinessBackupBridge
@@ -3993,6 +4124,15 @@ class FamilyKhataViewModel(application: Application) : AndroidViewModel(applicat
                         selectWorkspace(restoredWorkspace)
                     }
                 }
+
+                restoredBusinessProfiles
+                    .firstOrNull {
+                        it.businessId ==
+                            restoredSelectedBusinessId
+                    }
+                    ?.let { restoredProfile ->
+                        activateBusinessProfile(restoredProfile)
+                    }
 
                 transactions.size +
                     people.size +

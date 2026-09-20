@@ -550,6 +550,16 @@ fun FamilyKhataApp(viewModel: FamilyKhataViewModel) {
                                                 "＋ নতুন দোকান যোগ করুন",
                                                 "＋ Add new shop"
                                             )
+                                        )
+                                    },
+                                    onClick = {
+                                        newBusinessId =
+                                            UUID.randomUUID()
+                                                .toString()
+                                        showHomeProfileMenu = false
+                                        showNewBusinessDialog = true
+                                    }
+                                )
 
                                 DropdownMenuItem(
                                     text = {
@@ -565,16 +575,6 @@ fun FamilyKhataApp(viewModel: FamilyKhataViewModel) {
                                     onClick = {
                                         showHomeProfileMenu = false
                                         showDeleteBusinessDialog = true
-                                    }
-                                )
-                                        )
-                                    },
-                                    onClick = {
-                                        newBusinessId =
-                                            UUID.randomUUID()
-                                                .toString()
-                                        showHomeProfileMenu = false
-                                        showNewBusinessDialog = true
                                     }
                                 )
                             }

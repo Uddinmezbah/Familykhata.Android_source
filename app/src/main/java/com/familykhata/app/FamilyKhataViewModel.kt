@@ -9,6 +9,7 @@ import com.familykhata.app.data.AppDatabase
 import com.familykhata.app.data.BakiEntryEntity
 import com.familykhata.app.data.BakiPersonEntity
 import com.familykhata.app.data.BakiPersonSummary
+import com.familykhata.app.data.BusinessProfileEntity
 import com.familykhata.app.data.DashboardTotals
 import com.familykhata.app.data.DueReceivableItem
 import com.familykhata.app.data.DigitalServiceTransactionEntity
@@ -60,6 +61,208 @@ class FamilyKhataViewModel(application: Application) : AndroidViewModel(applicat
         "hisabi_khata_preferences",
         Context.MODE_PRIVATE
     )
+
+    private val businessProfilePreferences =
+        application.getSharedPreferences(
+            "hisabi_khata_v14_settings",
+            Context.MODE_PRIVATE
+        )
+
+    private val legacyBusinessId: String =
+        preferences.getString(
+            "legacy_business_id",
+            null
+        )?.takeIf {
+            it.isNotBlank()
+        } ?: UUID.randomUUID().toString().also { id ->
+            preferences.edit()
+                .putString(
+                    "legacy_business_id",
+                    id
+                )
+                .putString(
+                    "selected_business_id",
+                    id
+                )
+                .apply()
+        }
+
+    private val _selectedBusinessId =
+        MutableStateFlow(
+            preferences.getString(
+                "selected_business_id",
+                legacyBusinessId
+            )?.takeIf {
+                it.isNotBlank()
+            } ?: legacyBusinessId
+        )
+
+    val selectedBusinessId:
+        StateFlow<String> =
+        _selectedBusinessId.asStateFlow()
+
+    val businessProfiles:
+        StateFlow<List<BusinessProfileEntity>> =
+        dao.observeBusinessProfiles()
+            .stateIn(
+                viewModelScope,
+                SharingStarted.WhileSubscribed(
+                    5_000
+                ),
+                emptyList()
+            )
+
+    init {
+        if (
+            preferences.getString(
+                "selected_business_id",
+                null
+            ).isNullOrBlank()
+        ) {
+            preferences.edit()
+                .putString(
+                    "selected_business_id",
+                    legacyBusinessId
+                )
+                .apply()
+        }
+        ensureLegacyBusinessProfile()
+    }
+
+    private fun ensureLegacyBusinessProfile() {
+        viewModelScope.launch {
+            if (
+                dao.getBusinessProfile(
+                    legacyBusinessId
+                ) != null
+            ) {
+                return@launch
+            }
+
+            dao.upsertBusinessProfile(
+                BusinessProfileEntity(
+                    businessId =
+                        legacyBusinessId,
+                    name =
+                        businessProfilePreferences
+                            .getString(
+                                "business_name",
+                                ""
+                            )
+                            .orEmpty()
+                            .trim()
+                            .ifBlank {
+                                "দোকান/প্রতিষ্ঠান"
+                            },
+                    businessType =
+                        businessProfilePreferences
+                            .getString(
+                                "business_type",
+                                ""
+                            )
+                            .orEmpty()
+                            .trim(),
+                    phone =
+                        businessProfilePreferences
+                            .getString(
+                                "profile_phone",
+                                ""
+                            )
+                            .orEmpty()
+                            .trim(),
+                    address =
+                        businessProfilePreferences
+                            .getString(
+                                "business_address",
+                                ""
+                            )
+                            .orEmpty()
+                            .trim(),
+                    logoPath =
+                        businessProfilePreferences
+                            .getString(
+                                "business_logo_path",
+                                ""
+                            )
+                            .orEmpty()
+                            .trim()
+                )
+            )
+        }
+    }
+
+    fun selectBusiness(
+        businessId: String
+    ) {
+        val cleanId = businessId.trim()
+        if (
+            cleanId.isBlank() ||
+            cleanId == _selectedBusinessId.value
+        ) {
+            return
+        }
+
+        viewModelScope.launch {
+            val profile =
+                dao.getBusinessProfile(cleanId)
+                    ?: return@launch
+
+            if (!profile.isActive) {
+                return@launch
+            }
+
+            _selectedBusinessId.value =
+                cleanId
+
+            preferences.edit()
+                .putString(
+                    "selected_business_id",
+                    cleanId
+                )
+                .apply()
+        }
+    }
+
+    fun syncCurrentBusinessProfile(
+        businessName: String,
+        businessType: String,
+        phone: String,
+        address: String,
+        logoPath: String
+    ) {
+        val businessId =
+            _selectedBusinessId.value
+
+        viewModelScope.launch {
+            val existing =
+                dao.getBusinessProfile(
+                    businessId
+                )
+
+            dao.upsertBusinessProfile(
+                BusinessProfileEntity(
+                    businessId = businessId,
+                    name =
+                        businessName
+                            .trim()
+                            .ifBlank {
+                                "দোকান/প্রতিষ্ঠান"
+                            },
+                    businessType =
+                        businessType.trim(),
+                    phone = phone.trim(),
+                    address = address.trim(),
+                    logoPath = logoPath.trim(),
+                    isActive =
+                        existing?.isActive
+                            ?: true,
+                    createdAt =
+                        existing?.createdAt
+                            ?: System.currentTimeMillis()
+                )
+            )
+        }
+    }
 
     private val trialStartedAt: Long = preferences.getLong("trial_started_at", 0L).let { saved ->
         if (saved > 0L) saved else System.currentTimeMillis().also { started ->

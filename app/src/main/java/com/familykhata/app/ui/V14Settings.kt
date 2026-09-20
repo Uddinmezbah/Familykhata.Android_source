@@ -255,6 +255,15 @@ internal fun V14SettingsScreen(
                 .putString("business_logo_path", logo)
                 .apply()
 
+            viewModel.syncCurrentBusinessProfile(
+                businessName = business,
+                businessType = type,
+                phone = phone,
+                address = address,
+                logoPath = logo
+            )
+
+
             showProfile = false
         }
     }

@@ -235,6 +235,24 @@ class FamilyKhataViewModel(application: Application) : AndroidViewModel(applicat
                 legacyBusinessKey = legacyKey,
                 targetBusinessId = legacyBusinessId
             )
+
+            dao.getAllBusinessProfiles()
+                .filter {
+                    it.businessId != legacyBusinessId
+                }
+                .forEach { profile ->
+                    inventoryDao.moveProductsCreatedBefore(
+                        sourceBusinessId = profile.businessId,
+                        createdBefore = profile.createdAt,
+                        targetBusinessId = legacyBusinessId
+                    )
+
+                    inventoryDao.moveRetailSalesCreatedBefore(
+                        sourceBusinessId = profile.businessId,
+                        createdBefore = profile.createdAt,
+                        targetBusinessId = legacyBusinessId
+                    )
+                }
         }
     }
 
@@ -2310,6 +2328,12 @@ class FamilyKhataViewModel(application: Application) : AndroidViewModel(applicat
 
                 val validBusinessIds = restoredBusinessProfiles.map { it.businessId }.toSet()
 
+                val restoredOriginalBusinessId =
+                    restoredBusinessProfiles
+                        .minByOrNull { it.createdAt }
+                        ?.businessId
+                        ?: restoredSelectedBusinessId
+
                 val transactionArray = root.getJSONArray("transactions")
                 for (index in 0 until transactionArray.length()) {
                     val item = transactionArray.getJSONObject(index)
@@ -3831,7 +3855,7 @@ class FamilyKhataViewModel(application: Application) : AndroidViewModel(applicat
                         legacyBusinessKey =
                             restoredLegacyBusinessKey,
                         targetBusinessId =
-                            restoredSelectedBusinessId
+                            restoredOriginalBusinessId
                     )
 
                 restoredInventoryDao
@@ -3840,7 +3864,7 @@ class FamilyKhataViewModel(application: Application) : AndroidViewModel(applicat
                         legacyBusinessKey =
                             restoredLegacyBusinessKey,
                         targetBusinessId =
-                            restoredSelectedBusinessId
+                            restoredOriginalBusinessId
                     )
 
                 V15BusinessBackupBridge
@@ -3849,7 +3873,7 @@ class FamilyKhataViewModel(application: Application) : AndroidViewModel(applicat
                         scopedWorkspace =
                             businessWorkspaceKey(
                                 "SHOP",
-                                restoredSelectedBusinessId
+                                restoredOriginalBusinessId
                             )
                     )
 

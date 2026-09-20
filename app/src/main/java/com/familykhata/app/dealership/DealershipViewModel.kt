@@ -148,15 +148,7 @@ class DealershipViewModel(
             businessKey.value = key
         }
 
-        viewModelScope.launch {
-            inventoryDao.claimExistingBusinessProducts(
-                workspace =
-                    baseWorkspaceKey(workspaceValue),
-                legacyBusinessKey = legacyKey,
-                targetBusinessId = key
-            )
-        }
-    }
+}
 
     fun setWorkspace(value: String) {
         if (workspace.value != value) {

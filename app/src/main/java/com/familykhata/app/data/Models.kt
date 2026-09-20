@@ -27,6 +27,8 @@ data class TransactionEntity(
     val note: String,
     @ColumnInfo(defaultValue = "'FAMILY'")
     val workspace: String = "FAMILY",
+    @ColumnInfo(defaultValue = "''")
+    val businessId: String = "",
     val sourceKey: String? = null,
     val financialAccountId: Long? = null,
     val createdAt: Long = System.currentTimeMillis()
@@ -39,6 +41,7 @@ data class BakiPersonEntity(
     val phone: String = "",
     val note: String = "",
     @ColumnInfo(defaultValue = "'FAMILY'") val workspace: String = "FAMILY",
+    @ColumnInfo(defaultValue = "''") val businessId: String = "",
     val createdAt: Long = System.currentTimeMillis()
 )
 
@@ -105,6 +108,7 @@ data class FinancialAccountEntity(
     val provider: String = "",
     val openingBalance: Double = 0.0,
     val workspace: String = "SHOP",
+    @ColumnInfo(defaultValue = "''") val businessId: String = "",
     val isActive: Boolean = true,
     val createdAt: Long = System.currentTimeMillis()
 )
@@ -138,6 +142,7 @@ data class FinancialAccountEntryEntity(
     val sourceKey: String? = null,
     val note: String = "",
     val workspace: String = "SHOP",
+    @ColumnInfo(defaultValue = "''") val businessId: String = "",
     val createdAt: Long = System.currentTimeMillis()
 )
 
@@ -187,6 +192,7 @@ data class DigitalServiceTransactionEntity(
     val profit: Double,
     val note: String = "",
     val workspace: String = "SHOP",
+    @ColumnInfo(defaultValue = "''") val businessId: String = "",
     val createdAt: Long =
         System.currentTimeMillis()
 )

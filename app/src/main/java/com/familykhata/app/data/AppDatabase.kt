@@ -17,7 +17,7 @@ import androidx.sqlite.db.SupportSQLiteDatabase
         DigitalServiceTransactionEntity::class,
         BusinessProfileEntity::class
     ],
-    version = 8,
+    version = 9,
     exportSchema = false
 )
 abstract class AppDatabase : RoomDatabase() {
@@ -301,6 +301,17 @@ abstract class AppDatabase : RoomDatabase() {
                     )
                 }
             }
+
+        private val MIGRATION_8_9 =
+            object : Migration(8, 9) {
+                override fun migrate(db: SupportSQLiteDatabase) {
+                    db.execSQL("ALTER TABLE transactions ADD COLUMN businessId TEXT NOT NULL DEFAULT ''")
+                    db.execSQL("ALTER TABLE baki_people ADD COLUMN businessId TEXT NOT NULL DEFAULT ''")
+                    db.execSQL("ALTER TABLE financial_accounts ADD COLUMN businessId TEXT NOT NULL DEFAULT ''")
+                    db.execSQL("ALTER TABLE financial_account_entries ADD COLUMN businessId TEXT NOT NULL DEFAULT ''")
+                    db.execSQL("ALTER TABLE digital_service_transactions ADD COLUMN businessId TEXT NOT NULL DEFAULT ''")
+                }
+            }
         fun get(context: Context): AppDatabase = INSTANCE ?: synchronized(this) {
             INSTANCE ?: Room.databaseBuilder(
                 context.applicationContext,
@@ -314,7 +325,8 @@ abstract class AppDatabase : RoomDatabase() {
                     MIGRATION_4_5,
                     MIGRATION_5_6,
                     MIGRATION_6_7,
-                    MIGRATION_7_8
+                    MIGRATION_7_8,
+                    MIGRATION_8_9
                 )
                 .build()
                 .also { INSTANCE = it }

@@ -9,6 +9,21 @@ import kotlinx.coroutines.flow.Flow
 
 @Dao
 interface FamilyKhataDao {
+    @Query("UPDATE transactions SET businessId = :businessId WHERE workspace = 'SHOP' AND businessId = ''")
+    suspend fun backfillShopTransactionsBusinessId(businessId: String)
+
+    @Query("UPDATE baki_people SET businessId = :businessId WHERE workspace = 'SHOP' AND businessId = ''")
+    suspend fun backfillShopPeopleBusinessId(businessId: String)
+
+    @Query("UPDATE financial_accounts SET businessId = :businessId WHERE workspace = 'SHOP' AND businessId = ''")
+    suspend fun backfillShopAccountsBusinessId(businessId: String)
+
+    @Query("UPDATE financial_account_entries SET businessId = :businessId WHERE workspace = 'SHOP' AND businessId = ''")
+    suspend fun backfillShopAccountEntriesBusinessId(businessId: String)
+
+    @Query("UPDATE digital_service_transactions SET businessId = :businessId WHERE workspace = 'SHOP' AND businessId = ''")
+    suspend fun backfillShopDigitalServicesBusinessId(businessId: String)
+
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun upsertBusinessProfile(
         item: BusinessProfileEntity

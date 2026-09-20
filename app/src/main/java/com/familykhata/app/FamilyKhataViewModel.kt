@@ -127,6 +127,7 @@ class FamilyKhataViewModel(application: Application) : AndroidViewModel(applicat
                 .apply()
         }
         ensureLegacyBusinessProfile()
+        backfillLegacyBusinessScope()
     }
 
     private fun ensureLegacyBusinessProfile() {
@@ -191,6 +192,18 @@ class FamilyKhataViewModel(application: Application) : AndroidViewModel(applicat
         }
     }
 
+
+    private fun backfillLegacyBusinessScope() {
+        viewModelScope.launch {
+            database.withTransaction {
+                dao.backfillShopTransactionsBusinessId(legacyBusinessId)
+                dao.backfillShopPeopleBusinessId(legacyBusinessId)
+                dao.backfillShopAccountsBusinessId(legacyBusinessId)
+                dao.backfillShopAccountEntriesBusinessId(legacyBusinessId)
+                dao.backfillShopDigitalServicesBusinessId(legacyBusinessId)
+            }
+        }
+    }
     fun selectBusiness(
         businessId: String
     ) {

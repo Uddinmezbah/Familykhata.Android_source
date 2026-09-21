@@ -201,7 +201,10 @@ private fun receiptRows(
     sale: RetailSaleEntity,
     lines: List<RetailSaleLineEntity>,
     currency: String,
-    paperWidthMm: Int
+    paperWidthMm: Int,
+    businessName: String,
+    businessPhone: String,
+    businessAddress: String
 ): List<ThermalReceiptRow> {
     val normal =
         if (paperWidthMm == 80) {
@@ -239,11 +242,18 @@ private fun receiptRows(
                 0.0
             )
 
+    val receiptBusinessName =
+        businessName
+            .trim()
+            .ifBlank {
+                "হিসাবী খাতা"
+            }
+
     return buildList {
         add(
             ThermalReceiptRow(
                 text =
-                    "হিসাবী খাতা",
+                    receiptBusinessName,
                 sizePx =
                     header,
                 bold =
@@ -251,18 +261,54 @@ private fun receiptRows(
                 align =
                     1,
                 gapAfterPx =
-                    2
+                    3
             )
         )
+
+        if (
+            businessPhone
+                .trim()
+                .isNotBlank()
+        ) {
+            add(
+                ThermalReceiptRow(
+                    text =
+                        businessPhone.trim(),
+                    sizePx =
+                        small,
+                    align =
+                        1,
+                    gapAfterPx =
+                        2
+                )
+            )
+        }
+
+        if (
+            businessAddress
+                .trim()
+                .isNotBlank()
+        ) {
+            add(
+                ThermalReceiptRow(
+                    text =
+                        businessAddress.trim(),
+                    sizePx =
+                        small,
+                    align =
+                        1,
+                    gapAfterPx =
+                        4
+                )
+            )
+        }
 
         add(
             ThermalReceiptRow(
                 text =
-                    "HISABI KHATA",
+                    "Powered by Hisabi Khata",
                 sizePx =
                     small,
-                bold =
-                    true,
                 align =
                     1,
                 gapAfterPx =
@@ -484,7 +530,10 @@ private fun renderThermalReceipt(
     sale: RetailSaleEntity,
     lines: List<RetailSaleLineEntity>,
     currency: String,
-    paperWidthMm: Int
+    paperWidthMm: Int,
+    businessName: String,
+    businessPhone: String,
+    businessAddress: String
 ): Bitmap {
     val widthPx =
         if (paperWidthMm == 80) {
@@ -511,7 +560,13 @@ private fun renderThermalReceipt(
             sale = sale,
             lines = lines,
             currency = currency,
-            paperWidthMm = paperWidthMm
+            paperWidthMm = paperWidthMm,
+            businessName =
+                businessName,
+            businessPhone =
+                businessPhone,
+            businessAddress =
+                businessAddress
         )
 
     var height =
@@ -795,13 +850,41 @@ private suspend fun withThermalOutput(
                 address
             )
 
-        val socket =
+        var socket =
             device.createRfcommSocketToServiceRecord(
                 THERMAL_SPP_UUID
             )
 
         try {
-            socket.connect()
+            try {
+                socket.connect()
+            } catch (
+                secureError:
+                    Exception
+            ) {
+                runCatching {
+                    socket.close()
+                }
+
+                socket =
+                    device
+                        .createInsecureRfcommSocketToServiceRecord(
+                            THERMAL_SPP_UUID
+                        )
+
+                try {
+                    socket.connect()
+                } catch (
+                    insecureError:
+                        Exception
+                ) {
+                    insecureError.addSuppressed(
+                        secureError
+                    )
+
+                    throw insecureError
+                }
+            }
 
             val output =
                 socket.outputStream
@@ -929,7 +1012,10 @@ suspend fun printThermalInvoice(
     paperWidthMm: Int,
     sale: RetailSaleEntity,
     lines: List<RetailSaleLineEntity>,
-    currency: String
+    currency: String,
+    businessName: String = "",
+    businessPhone: String = "",
+    businessAddress: String = ""
 ) {
     require(
         paperWidthMm == 58 ||
@@ -953,7 +1039,13 @@ suspend fun printThermalInvoice(
                 lines = lines,
                 currency = currency,
                 paperWidthMm =
-                    paperWidthMm
+                    paperWidthMm,
+                businessName =
+                    businessName,
+                businessPhone =
+                    businessPhone,
+                businessAddress =
+                    businessAddress
             )
         }
 

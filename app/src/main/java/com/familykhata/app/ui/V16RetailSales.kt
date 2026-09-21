@@ -106,6 +106,8 @@ internal fun V16RetailSalesScreen(
     val vm: InventoryViewModel = viewModel()
     val securityViewModel: FamilyKhataViewModel = viewModel()
     val selectedBusinessId by securityViewModel.selectedBusinessId.collectAsState()
+    val businessProfiles by
+        securityViewModel.businessProfiles.collectAsState()
     val products by vm.products.collectAsState()
     val sales by vm.retailSales.collectAsState()
     val bakiPeople by vm.bakiPeople.collectAsState()
@@ -117,6 +119,18 @@ internal fun V16RetailSalesScreen(
             financialAccounts.filter {
                 it.isActive
             }
+        }
+
+    val selectedBusinessProfile =
+        remember(
+            businessProfiles,
+            selectedBusinessId
+        ) {
+            businessProfiles
+                .firstOrNull {
+                    it.businessId ==
+                        selectedBusinessId
+                }
         }
 
     val context = LocalContext.current
@@ -298,6 +312,18 @@ internal fun V16RetailSalesScreen(
         RetailSaleDetailScreen(
             sale = selectedSale,
             viewModel = vm,
+            businessName =
+                selectedBusinessProfile
+                    ?.name
+                    .orEmpty(),
+            businessPhone =
+                selectedBusinessProfile
+                    ?.phone
+                    .orEmpty(),
+            businessAddress =
+                selectedBusinessProfile
+                    ?.address
+                    .orEmpty(),
             onBack = {
                 selectedSaleId = null
             }
@@ -801,6 +827,9 @@ internal fun V16RetailSalesScreen(
 private fun RetailSaleDetailScreen(
     sale: RetailSaleEntity,
     viewModel: InventoryViewModel,
+    businessName: String,
+    businessPhone: String,
+    businessAddress: String,
     onBack: () -> Unit
 ) {
     val context =
@@ -880,6 +909,72 @@ private fun RetailSaleDetailScreen(
 
     var thermalPrinting by remember {
         mutableStateOf(false)
+    }
+
+    fun printThermalInvoiceToAddress(
+        address: String
+    ) {
+        if (
+            thermalPrinting ||
+            lines.isEmpty()
+        ) {
+            return
+        }
+
+        thermalPrinting = true
+        error = null
+
+        scope.launch {
+            try {
+                printThermalInvoice(
+                    context =
+                        context
+                            .applicationContext,
+                    address =
+                        address,
+                    paperWidthMm =
+                        paperWidthMm,
+                    sale =
+                        sale,
+                    lines =
+                        lines,
+                    currency =
+                        V14DisplayState
+                            .currencySymbol,
+                    businessName =
+                        businessName,
+                    businessPhone =
+                        businessPhone,
+                    businessAddress =
+                        businessAddress
+                )
+
+                Toast.makeText(
+                    context,
+                    v15Text(
+                        "Thermal invoice printer-এ পাঠানো হয়েছে",
+                        "Thermal invoice sent to printer"
+                    ),
+                    Toast.LENGTH_SHORT
+                ).show()
+            } catch (
+                cancelled:
+                    CancellationException
+            ) {
+                throw cancelled
+            } catch (
+                _: Exception
+            ) {
+                error =
+                    v15Text(
+                        "Printer-এর সাথে connection/print করা যায়নি। Printer on আছে এবং সঠিক device Pair করা আছে কিনা দেখুন।",
+                        "Could not connect or print. Check that the printer is on and paired."
+                    )
+            } finally {
+                thermalPrinting =
+                    false
+            }
+        }
     }
 
     fun loadPairedPrinters() {
@@ -1346,6 +1441,48 @@ private fun RetailSaleDetailScreen(
                 )
             }
 
+            val quickPrinterAddress =
+                selectedPrinterAddress
+                    ?.takeIf {
+                        it.isNotBlank()
+                    }
+
+            val hasBluetoothPermission =
+                Build.VERSION.SDK_INT <
+                    Build.VERSION_CODES.S ||
+                    ContextCompat.checkSelfPermission(
+                        context,
+                        Manifest.permission
+                            .BLUETOOTH_CONNECT
+                    ) ==
+                    PackageManager
+                        .PERMISSION_GRANTED
+
+            if (
+                quickPrinterAddress != null &&
+                hasBluetoothPermission
+            ) {
+                Button(
+                    onClick = {
+                        printThermalInvoiceToAddress(
+                            quickPrinterAddress
+                        )
+                    },
+                    enabled =
+                        !thermalPrinting &&
+                            lines.isNotEmpty(),
+                    modifier =
+                        Modifier.fillMaxWidth()
+                ) {
+                    Text(
+                        v15Text(
+                            "⚡ Quick Print • ${paperWidthMm}mm",
+                            "⚡ Quick Print • ${paperWidthMm}mm"
+                        )
+                    )
+                }
+            }
+
             OutlinedButton(
                 onClick = {
                     openThermalPrinterPicker()
@@ -1364,8 +1501,8 @@ private fun RetailSaleDetailScreen(
                         )
                     } else {
                         v15Text(
-                            "▣ Bluetooth Thermal Printer",
-                            "▣ Bluetooth Thermal Printer"
+                            "▣ Printer / Paper Settings",
+                            "▣ Printer / Paper Settings"
                         )
                     }
                 )
@@ -1616,51 +1753,12 @@ private fun RetailSaleDetailScreen(
                             )
                             .apply()
 
-                        scope.launch {
-                            try {
-                                printThermalInvoice(
-                                    context =
-                                        context
-                                            .applicationContext,
-                                    address =
-                                        address,
-                                    paperWidthMm =
-                                        paperWidthMm,
-                                    sale =
-                                        sale,
-                                    lines =
-                                        lines,
-                                    currency =
-                                        V14DisplayState
-                                            .currencySymbol
-                                )
+                        thermalPrinting =
+                            false
 
-                                Toast.makeText(
-                                    context,
-                                    v15Text(
-                                        "Thermal invoice printer-এ পাঠানো হয়েছে",
-                                        "Thermal invoice sent to printer"
-                                    ),
-                                    Toast.LENGTH_SHORT
-                                ).show()
-                            } catch (
-                                cancelled:
-                                    CancellationException
-                            ) {
-                                throw cancelled
-                            } catch (
-                                _: Exception
-                            ) {
-                                error =
-                                    v15Text(
-                                        "Printer-এর সাথে connection/print করা যায়নি। Printer on আছে এবং সঠিক device নির্বাচন করা হয়েছে কিনা দেখুন।",
-                                        "Could not connect or print. Check that the printer is on and the correct device is selected."
-                                    )
-                            } finally {
-                                thermalPrinting =
-                                    false
-                            }
-                        }
+                        printThermalInvoiceToAddress(
+                            address
+                        )
                     }
                 ) {
                     Text(

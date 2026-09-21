@@ -1661,6 +1661,73 @@ private fun RetailSaleForm(
         ).show()
     }
 
+    fun addExactSkuToCart(
+        rawCode: String
+    ) {
+        val code =
+            rawCode.trim()
+
+        if (code.isBlank()) {
+            Toast.makeText(
+                context,
+                v15Text(
+                    "Barcode / SKU লিখুন",
+                    "Enter a Barcode / SKU"
+                ),
+                Toast.LENGTH_SHORT
+            ).show()
+
+            return
+        }
+
+        val matches =
+            products.filter { product ->
+                product.sku
+                    .trim()
+                    .equals(
+                        code,
+                        ignoreCase = true
+                    )
+            }
+
+        when {
+            matches.size == 1 -> {
+                error = null
+                search = ""
+
+                addScannedProductToCart(
+                    matches.first()
+                )
+            }
+
+            matches.isEmpty() -> {
+                search = code
+
+                Toast.makeText(
+                    context,
+                    v15Text(
+                        "এই Barcode / SKU-এর পণ্য পাওয়া যায়নি: $code",
+                        "No product found for Barcode / SKU: $code"
+                    ),
+                    Toast.LENGTH_LONG
+                ).show()
+            }
+
+            else -> {
+                search = code
+
+                Toast.makeText(
+                    context,
+                    v15Text(
+                        "একই Barcode / SKU একাধিক পণ্যে আছে। আগে duplicate SKU ঠিক করুন।",
+                        "This Barcode / SKU is assigned to multiple products. Fix the duplicate SKU first."
+                    ),
+                    Toast.LENGTH_LONG
+                ).show()
+            }
+        }
+    }
+
     val filteredProducts =
         products.filter { product ->
             search.isBlank() ||
@@ -1786,8 +1853,8 @@ private fun RetailSaleForm(
                     label = {
                         Text(
                             v15Text(
-                                "পণ্য / বারকোড খুঁজুন",
-                                "Search product / barcode"
+                                "পণ্য / Barcode / SKU খুঁজুন",
+                                "Search product / Barcode / SKU"
                             )
                         )
                     },
@@ -1798,78 +1865,35 @@ private fun RetailSaleForm(
 
                 OutlinedButton(
                     onClick = {
+                        addExactSkuToCart(
+                            search
+                        )
+                    },
+                    enabled =
+                        !saving &&
+                            search.trim().isNotBlank(),
+                    modifier =
+                        Modifier.fillMaxWidth()
+                ) {
+                    Text(
+                        v15Text(
+                            "＋ Barcode / SKU দিয়ে দ্রুত যোগ",
+                            "＋ Quick add by Barcode / SKU"
+                        )
+                    )
+                }
+
+                OutlinedButton(
+                    onClick = {
                         barcodeScanner
                             .startScan()
                             .addOnSuccessListener {
                                     barcode ->
 
-                                val code =
+                                addExactSkuToCart(
                                     barcode.rawValue
                                         .orEmpty()
-                                        .trim()
-
-                                if (code.isBlank()) {
-                                    Toast.makeText(
-                                        context,
-                                        v15Text(
-                                            "বারকোড পাওয়া যায়নি",
-                                            "No barcode value found"
-                                        ),
-                                        Toast.LENGTH_SHORT
-                                    ).show()
-
-                                    return@addOnSuccessListener
-                                }
-
-                                val matches =
-                                    products.filter {
-                                        product ->
-
-                                        product.sku
-                                            .trim()
-                                            .equals(
-                                                code,
-                                                ignoreCase =
-                                                    true
-                                            )
-                                    }
-
-                                when {
-                                    matches.size == 1 -> {
-                                        error = null
-                                        search = ""
-
-                                        addScannedProductToCart(
-                                            matches.first()
-                                        )
-                                    }
-
-                                    matches.isEmpty() -> {
-                                        search = code
-
-                                        Toast.makeText(
-                                            context,
-                                            v15Text(
-                                                "এই বারকোডের পণ্য পাওয়া যায়নি: $code",
-                                                "No product found for barcode: $code"
-                                            ),
-                                            Toast.LENGTH_LONG
-                                        ).show()
-                                    }
-
-                                    else -> {
-                                        search = code
-
-                                        Toast.makeText(
-                                            context,
-                                            v15Text(
-                                                "একই বারকোড একাধিক পণ্যে আছে। SKU ঠিক করুন।",
-                                                "This barcode is assigned to multiple products. Fix the SKU."
-                                            ),
-                                            Toast.LENGTH_LONG
-                                        ).show()
-                                    }
-                                }
+                                )
                             }
                             .addOnFailureListener {
                                 Toast.makeText(

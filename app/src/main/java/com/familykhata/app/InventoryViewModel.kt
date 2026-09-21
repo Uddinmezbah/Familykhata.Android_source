@@ -83,6 +83,11 @@ class InventoryViewModel(application: Application) : AndroidViewModel(applicatio
             inventoryDb = database,
             appDb = bakiDatabase
         )
+    private val purchaseReturnService =
+        PurchaseReturnService(
+            inventoryDb = database,
+            appDb = bakiDatabase
+        )
     private val appPreferences = application.getSharedPreferences(
         "hisabi_khata_preferences",
         android.content.Context.MODE_PRIVATE
@@ -3358,6 +3363,52 @@ class InventoryViewModel(application: Application) : AndroidViewModel(applicatio
             }
 
             onDone(bill.id)
+        }
+    }
+
+    fun recordPurchaseReturn(
+        billId: Long,
+        purchaseLineId: Long,
+        quantity: Int,
+        refundFinancialAccountId: Long? = null,
+        note: String = "",
+        returnedAt: Long =
+            System.currentTimeMillis(),
+        onDone: (Boolean) -> Unit = {}
+    ) {
+        val currentWorkspace =
+            workspace.value
+
+        val currentBusinessKey =
+            businessKey.value
+
+        val currentLedgerBusinessId =
+            ledgerBusinessIdForInventoryContext(
+                currentWorkspace,
+                currentBusinessKey
+            )
+
+        viewModelScope.launch {
+            val success =
+                purchaseReturnService.record(
+                    billId = billId,
+                    lineId =
+                        purchaseLineId,
+                    quantity = quantity,
+                    refundAccountId =
+                        refundFinancialAccountId,
+                    note = note,
+                    returnedAt =
+                        returnedAt,
+                    workspace =
+                        currentWorkspace,
+                    businessKey =
+                        currentBusinessKey,
+                    ledgerBusinessId =
+                        currentLedgerBusinessId
+                )
+
+            onDone(success)
         }
     }
 

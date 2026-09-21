@@ -78,6 +78,11 @@ class InventoryViewModel(application: Application) : AndroidViewModel(applicatio
     private val dao = database.dao()
     private val bakiDatabase = AppDatabase.get(application)
     private val bakiDao = bakiDatabase.dao()
+    private val retailSaleReturnService =
+        RetailSaleReturnService(
+            inventoryDb = database,
+            appDb = bakiDatabase
+        )
     private val appPreferences = application.getSharedPreferences(
         "hisabi_khata_preferences",
         android.content.Context.MODE_PRIVATE
@@ -524,6 +529,43 @@ class InventoryViewModel(application: Application) : AndroidViewModel(applicatio
         saleId: Long
     ): Flow<List<RetailSaleReturnEntity>> =
         dao.observeRetailSaleReturns(saleId)
+
+    fun recordRetailSaleReturn(
+        saleId: Long,
+        saleLineId: Long,
+        quantity: Int,
+        returnType: String = "RESTOCK",
+        refundFinancialAccountId: Long? = null,
+        note: String = "",
+        returnedAt: Long = System.currentTimeMillis(),
+        onDone: (Boolean) -> Unit = {}
+    ) {
+        val currentWorkspace = workspace.value
+        val currentBusinessKey = businessKey.value
+        val currentLedgerBusinessId =
+            ledgerBusinessIdForInventoryContext(
+                currentWorkspace,
+                currentBusinessKey
+            )
+
+        viewModelScope.launch {
+            val success =
+                retailSaleReturnService.record(
+                    saleId = saleId,
+                    lineId = saleLineId,
+                    quantity = quantity,
+                    returnType = returnType,
+                    refundAccountId = refundFinancialAccountId,
+                    note = note,
+                    returnedAt = returnedAt,
+                    workspace = currentWorkspace,
+                    businessKey = currentBusinessKey,
+                    ledgerBusinessId = currentLedgerBusinessId
+                )
+
+            onDone(success)
+        }
+    }
 
     fun addProduct(
         name: String,
@@ -2256,10 +2298,41 @@ class InventoryViewModel(application: Application) : AndroidViewModel(applicatio
                             "Cancelled sale"
                         }
 
-                        val remainingDue =
+                        val saleReturns =
+                            dao.getRetailSaleReturnsOnce(
+                                sale.id
+                            )
+
+                        val returnedAmount =
+                            saleReturns.sumOf {
+                                it.amount
+                            }
+
+                        val refundedAmount =
+                            saleReturns.sumOf {
+                                it.refundAmount
+                            }
+
+                        val effectiveTotal =
                             (
                                 sale.total -
-                                    sale.paid
+                                    returnedAmount
+                            ).coerceAtLeast(
+                                0.0
+                            )
+
+                        val netPaid =
+                            (
+                                sale.paid -
+                                    refundedAmount
+                            ).coerceAtLeast(
+                                0.0
+                            )
+
+                        val remainingDue =
+                            (
+                                effectiveTotal -
+                                    netPaid
                             ).coerceAtLeast(
                                 0.0
                             )
@@ -2287,10 +2360,18 @@ class InventoryViewModel(application: Application) : AndroidViewModel(applicatio
                                 sale.total
                             )
 
+                        val newNetPaid =
+                            (
+                                newPaid -
+                                    refundedAmount
+                            ).coerceAtLeast(
+                                0.0
+                            )
+
                         val newStatus =
                             if (
-                                newPaid >=
-                                    sale.total -
+                                newNetPaid >=
+                                    effectiveTotal -
                                         0.0001
                             ) {
                                 "PAID"
@@ -2426,6 +2507,16 @@ class InventoryViewModel(application: Application) : AndroidViewModel(applicatio
                 }.getOrNull()
 
             if (saleBeforeCancellation == null) {
+                onDone(false)
+                return@launch
+            }
+
+            // A sale with recorded returns cannot be cancelled; return the remaining items instead.
+            if (
+                dao.getRetailSaleReturnsOnce(
+                    saleId
+                ).isNotEmpty()
+            ) {
                 onDone(false)
                 return@launch
             }

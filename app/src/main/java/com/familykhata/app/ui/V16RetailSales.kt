@@ -3,7 +3,12 @@ package com.familykhata.app.ui
 import android.content.ClipData
 import android.content.Intent
 import android.widget.Toast
+import android.Manifest
+import android.content.pm.PackageManager
+import android.os.Build
 import androidx.activity.compose.BackHandler
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -39,6 +44,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.core.content.FileProvider
+import androidx.core.content.ContextCompat
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.familykhata.app.InventoryViewModel
 import com.familykhata.app.FamilyKhataViewModel
@@ -47,6 +53,9 @@ import com.familykhata.app.data.BakiPersonSummary
 import com.familykhata.app.data.ProductStockSummary
 import com.familykhata.app.data.RetailSaleEntity
 import com.familykhata.app.report.writeRetailInvoicePdf
+import com.familykhata.app.report.ThermalPrinterDevice
+import com.familykhata.app.report.pairedThermalPrinters
+import com.familykhata.app.report.printThermalTest
 import com.google.mlkit.vision.codescanner.GmsBarcodeScanning
 import java.text.SimpleDateFormat
 import java.util.Date
@@ -825,6 +834,125 @@ private fun RetailSaleDetailScreen(
         mutableStateOf<String?>(null)
     }
 
+    val printerPreferences =
+        remember {
+            context.getSharedPreferences(
+                "hisabi_thermal_printer",
+                android.content.Context.MODE_PRIVATE
+            )
+        }
+
+    var printerDevices by remember {
+        mutableStateOf(
+            emptyList<ThermalPrinterDevice>()
+        )
+    }
+
+    var selectedPrinterAddress by remember {
+        mutableStateOf(
+            printerPreferences
+                .getString(
+                    "printer_address",
+                    null
+                )
+        )
+    }
+
+    var paperWidthMm by remember {
+        mutableStateOf(
+            printerPreferences
+                .getInt(
+                    "paper_width_mm",
+                    58
+                )
+                .takeIf {
+                    it == 58 ||
+                        it == 80
+                }
+                ?: 58
+        )
+    }
+
+    var showPrinterPicker by remember {
+        mutableStateOf(false)
+    }
+
+    var thermalPrinting by remember {
+        mutableStateOf(false)
+    }
+
+    fun loadPairedPrinters() {
+        val devices =
+            runCatching {
+                pairedThermalPrinters(
+                    context.applicationContext
+                )
+            }.getOrElse {
+                error =
+                    v15Text(
+                        "Paired Bluetooth device পড়া যায়নি।",
+                        "Unable to read paired Bluetooth devices."
+                    )
+
+                emptyList()
+            }
+
+        printerDevices = devices
+
+        if (
+            selectedPrinterAddress == null ||
+            devices.none {
+                it.address ==
+                    selectedPrinterAddress
+            }
+        ) {
+            selectedPrinterAddress =
+                devices.firstOrNull()
+                    ?.address
+        }
+
+        showPrinterPicker = true
+    }
+
+    val bluetoothPermissionLauncher =
+        rememberLauncherForActivityResult(
+            ActivityResultContracts
+                .RequestPermission()
+        ) { granted ->
+            if (granted) {
+                loadPairedPrinters()
+            } else {
+                error =
+                    v15Text(
+                        "Bluetooth printer ব্যবহার করতে Nearby devices permission দিন।",
+                        "Allow Nearby devices permission to use a Bluetooth printer."
+                    )
+            }
+        }
+
+    fun openThermalPrinterPicker() {
+        error = null
+
+        if (
+            Build.VERSION.SDK_INT >=
+            Build.VERSION_CODES.S &&
+            ContextCompat.checkSelfPermission(
+                context,
+                Manifest.permission
+                    .BLUETOOTH_CONNECT
+            ) !=
+            PackageManager.PERMISSION_GRANTED
+        ) {
+            bluetoothPermissionLauncher
+                .launch(
+                    Manifest.permission
+                        .BLUETOOTH_CONNECT
+                )
+        } else {
+            loadPairedPrinters()
+        }
+    }
+
     val due =
         (
             sale.total -
@@ -1217,7 +1345,49 @@ private fun RetailSaleDetailScreen(
                 )
             }
 
-            if (sharing) {
+            OutlinedButton(
+                onClick = {
+                    openThermalPrinterPicker()
+                },
+                enabled =
+                    !thermalPrinting,
+                modifier =
+                    Modifier.fillMaxWidth()
+            ) {
+                Text(
+                    if (thermalPrinting) {
+                        v15Text(
+                            "Printer-এ পাঠানো হচ্ছে…",
+                            "Sending to printer…"
+                        )
+                    } else {
+                        v15Text(
+                            "▣ Bluetooth Thermal Printer",
+                            "▣ Bluetooth Thermal Printer"
+                        )
+                    }
+                )
+            }
+
+            Text(
+                v15Text(
+                    "প্রথমবার printer-টি ফোনের Bluetooth Settings থেকে Pair করে নিন।",
+                    "Pair the printer first from your phone's Bluetooth Settings."
+                ),
+                style =
+                    MaterialTheme
+                        .typography
+                        .bodySmall,
+                color =
+                    MaterialTheme
+                        .colorScheme
+                        .onSurfaceVariant
+            )
+
+            if (
+                sharing ||
+                thermalPrinting
+            ) {
                 CircularProgressIndicator()
             }
 
@@ -1246,6 +1416,270 @@ private fun RetailSaleDetailScreen(
                         .onSurfaceVariant
             )
         }
+    }
+
+    if (showPrinterPicker) {
+        AlertDialog(
+            onDismissRequest = {
+                if (!thermalPrinting) {
+                    showPrinterPicker =
+                        false
+                }
+            },
+            title = {
+                Text(
+                    v15Text(
+                        "Thermal Printer নির্বাচন",
+                        "Select Thermal Printer"
+                    )
+                )
+            },
+            text = {
+                Column(
+                    modifier =
+                        Modifier
+                            .fillMaxWidth()
+                            .heightIn(
+                                max = 420.dp
+                            )
+                            .verticalScroll(
+                                rememberScrollState()
+                            ),
+                    verticalArrangement =
+                        Arrangement.spacedBy(
+                            8.dp
+                        )
+                ) {
+                    Text(
+                        v15Text(
+                            "Paper width",
+                            "Paper width"
+                        ),
+                        fontWeight =
+                            FontWeight.Bold
+                    )
+
+                    Row(
+                        modifier =
+                            Modifier.fillMaxWidth(),
+                        horizontalArrangement =
+                            Arrangement.spacedBy(
+                                8.dp
+                            )
+                    ) {
+                        if (
+                            paperWidthMm ==
+                            58
+                        ) {
+                            Button(
+                                onClick = {
+                                    paperWidthMm =
+                                        58
+                                },
+                                modifier =
+                                    Modifier.weight(
+                                        1f
+                                    )
+                            ) {
+                                Text("58mm")
+                            }
+                        } else {
+                            OutlinedButton(
+                                onClick = {
+                                    paperWidthMm =
+                                        58
+                                },
+                                modifier =
+                                    Modifier.weight(
+                                        1f
+                                    )
+                            ) {
+                                Text("58mm")
+                            }
+                        }
+
+                        if (
+                            paperWidthMm ==
+                            80
+                        ) {
+                            Button(
+                                onClick = {
+                                    paperWidthMm =
+                                        80
+                                },
+                                modifier =
+                                    Modifier.weight(
+                                        1f
+                                    )
+                            ) {
+                                Text("80mm")
+                            }
+                        } else {
+                            OutlinedButton(
+                                onClick = {
+                                    paperWidthMm =
+                                        80
+                                },
+                                modifier =
+                                    Modifier.weight(
+                                        1f
+                                    )
+                            ) {
+                                Text("80mm")
+                            }
+                        }
+                    }
+
+                    Text(
+                        v15Text(
+                            "Paired devices",
+                            "Paired devices"
+                        ),
+                        fontWeight =
+                            FontWeight.Bold
+                    )
+
+                    if (
+                        printerDevices.isEmpty()
+                    ) {
+                        Text(
+                            v15Text(
+                                "কোনো paired Bluetooth device পাওয়া যায়নি। আগে Android Bluetooth Settings থেকে printer Pair করুন।",
+                                "No paired Bluetooth device found. Pair the printer first in Android Bluetooth Settings."
+                            ),
+                            color =
+                                MaterialTheme
+                                    .colorScheme
+                                    .error
+                        )
+                    } else {
+                        printerDevices.forEach {
+                                device ->
+
+                            OutlinedButton(
+                                onClick = {
+                                    selectedPrinterAddress =
+                                        device.address
+                                },
+                                modifier =
+                                    Modifier.fillMaxWidth()
+                            ) {
+                                Text(
+                                    if (
+                                        selectedPrinterAddress ==
+                                        device.address
+                                    ) {
+                                        "✓ ${device.name} • ${device.address}"
+                                    } else {
+                                        "${device.name} • ${device.address}"
+                                    }
+                                )
+                            }
+                        }
+                    }
+                }
+            },
+            confirmButton = {
+                Button(
+                    enabled =
+                        selectedPrinterAddress !=
+                            null &&
+                            printerDevices.any {
+                                it.address ==
+                                    selectedPrinterAddress
+                            } &&
+                            !thermalPrinting,
+                    onClick = {
+                        val address =
+                            selectedPrinterAddress
+                                ?: return@Button
+
+                        showPrinterPicker =
+                            false
+
+                        thermalPrinting =
+                            true
+
+                        error = null
+
+                        printerPreferences
+                            .edit()
+                            .putString(
+                                "printer_address",
+                                address
+                            )
+                            .putInt(
+                                "paper_width_mm",
+                                paperWidthMm
+                            )
+                            .apply()
+
+                        scope.launch {
+                            try {
+                                printThermalTest(
+                                    context =
+                                        context
+                                            .applicationContext,
+                                    address =
+                                        address,
+                                    paperWidthMm =
+                                        paperWidthMm
+                                )
+
+                                Toast.makeText(
+                                    context,
+                                    v15Text(
+                                        "Thermal printer test print পাঠানো হয়েছে",
+                                        "Thermal printer test print sent"
+                                    ),
+                                    Toast.LENGTH_SHORT
+                                ).show()
+                            } catch (
+                                cancelled:
+                                    CancellationException
+                            ) {
+                                throw cancelled
+                            } catch (
+                                _: Exception
+                            ) {
+                                error =
+                                    v15Text(
+                                        "Printer-এর সাথে connection/print করা যায়নি। Printer on আছে এবং সঠিক device নির্বাচন করা হয়েছে কিনা দেখুন।",
+                                        "Could not connect or print. Check that the printer is on and the correct device is selected."
+                                    )
+                            } finally {
+                                thermalPrinting =
+                                    false
+                            }
+                        }
+                    }
+                ) {
+                    Text(
+                        v15Text(
+                            "Test Print",
+                            "Test Print"
+                        )
+                    )
+                }
+            },
+            dismissButton = {
+                TextButton(
+                    enabled =
+                        !thermalPrinting,
+                    onClick = {
+                        showPrinterPicker =
+                            false
+                    }
+                ) {
+                    Text(
+                        v15Text(
+                            "বাতিল",
+                            "Cancel"
+                        )
+                    )
+                }
+            }
+        )
     }
 }
 

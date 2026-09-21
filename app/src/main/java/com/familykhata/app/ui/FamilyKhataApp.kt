@@ -1267,6 +1267,17 @@ private fun BusinessDashboard(
     val trialStatus by
         viewModel.trialStatus.collectAsState()
 
+    val selectedBusinessId by
+        viewModel.selectedBusinessId.collectAsState()
+
+    val businessProfiles by
+        viewModel.businessProfiles.collectAsState()
+
+    val selectedBusinessType =
+        businessProfiles.firstOrNull {
+            it.businessId == selectedBusinessId
+        }?.businessType.orEmpty()
+
     var showFinancialAccounts by
         remember {
             mutableStateOf(false)
@@ -1275,6 +1286,11 @@ private fun BusinessDashboard(
     var showDigitalServiceMode by
         remember {
             mutableStateOf<String?>(null)
+        }
+
+    var showBusinessReports by
+        remember {
+            mutableStateOf(false)
         }
 
     val activeFinancialAccounts =
@@ -1575,6 +1591,15 @@ private fun BusinessDashboard(
             )
         }
 
+        BusinessActionCard(
+            symbol = "▤",
+            title = v15Text("রিপোর্ট", "Reports"),
+            subtitle = v15Text("বিক্রি • লাভ • বকেয়া • স্টক", "Sales • Profit • Due • Stock"),
+            accentColor = IncomeAccent,
+            modifier = Modifier.fillMaxWidth(),
+            onClick = { showBusinessReports = true }
+        )
+
         Surface(
             modifier =
                 Modifier
@@ -1609,6 +1634,14 @@ private fun BusinessDashboard(
                 showFinancialAccounts =
                     false
             }
+        )
+    }
+
+    if (showBusinessReports && selectedBusinessId.isNotBlank()) {
+        BusinessReportsDialog(
+            businessId = selectedBusinessId,
+            businessType = selectedBusinessType,
+            onDismiss = { showBusinessReports = false }
         )
     }
 

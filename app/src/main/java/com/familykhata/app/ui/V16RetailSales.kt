@@ -324,6 +324,9 @@ internal fun V16RetailSalesScreen(
                 selectedBusinessProfile
                     ?.address
                     .orEmpty(),
+            financialAccounts =
+                activeFinancialAccounts,
+            canWrite = canWrite,
             onBack = {
                 selectedSaleId = null
             }
@@ -830,6 +833,9 @@ private fun RetailSaleDetailScreen(
     businessName: String,
     businessPhone: String,
     businessAddress: String,
+    financialAccounts:
+        List<com.familykhata.app.data.FinancialAccountSummary>,
+    canWrite: Boolean,
     onBack: () -> Unit
 ) {
     val context =
@@ -851,6 +857,24 @@ private fun RetailSaleDetailScreen(
         linesFlow.collectAsState(
             initial = emptyList()
         )
+
+    val returnsFlow =
+        remember(sale.id) {
+            viewModel.observeRetailSaleReturns(sale.id)
+        }
+
+    val saleReturns by
+        returnsFlow.collectAsState(
+            initial = emptyList()
+        )
+
+    var returnLineId by remember(sale.id) {
+        mutableStateOf<Long?>(null)
+    }
+
+    var returnBusy by remember(sale.id) {
+        mutableStateOf(false)
+    }
 
     var sharing by remember(
         sale.id
@@ -1049,13 +1073,20 @@ private fun RetailSaleDetailScreen(
         }
     }
 
+    val returnedAmount =
+        saleReturns.sumOf { it.amount }
+
+    val refundedAmount =
+        saleReturns.sumOf { it.refundAmount }
+
+    val effectiveTotal =
+        (sale.total - returnedAmount).coerceAtLeast(0.0)
+
+    val netPaid =
+        (sale.paid - refundedAmount).coerceAtLeast(0.0)
+
     val due =
-        (
-            sale.total -
-                sale.paid
-        ).coerceAtLeast(
-            0.0
-        )
+        (effectiveTotal - netPaid).coerceAtLeast(0.0)
 
     V15DeepScreenContainer(
         title =
@@ -1188,6 +1219,21 @@ private fun RetailSaleDetailScreen(
                 )
             } else {
                 lines.forEach { line ->
+                    val returnedQuantity =
+                        saleReturns
+                            .filter {
+                                it.saleLineId ==
+                                    line.id
+                            }
+                            .sumOf {
+                                it.quantity
+                            }
+
+                    val returnableQuantity =
+                        (
+                            line.quantity -
+                                returnedQuantity
+                        ).coerceAtLeast(0)
                     Card(
                         modifier =
                             Modifier.fillMaxWidth(),
@@ -1243,6 +1289,40 @@ private fun RetailSaleDetailScreen(
                                 fontWeight =
                                     FontWeight.Bold
                             )
+                            if (
+                                returnedQuantity > 0
+                            ) {
+                                Text(
+                                    v15Text(
+                                        "ফেরত: ${returnedQuantity} ${line.unitSnapshot}",
+                                        "Returned: ${returnedQuantity} ${line.unitSnapshot}"
+                                    ),
+                                    style =
+                                        MaterialTheme.typography.bodySmall,
+                                    fontWeight =
+                                        FontWeight.SemiBold
+                                )
+                            }
+
+                            if (
+                                canWrite &&
+                                sale.status != "CANCELLED" &&
+                                returnableQuantity > 0
+                            ) {
+                                OutlinedButton(
+                                    onClick = {
+                                        returnLineId =
+                                            line.id
+                                    }
+                                ) {
+                                    Text(
+                                        v15Text(
+                                            "পণ্য ফেরত",
+                                            "Return item"
+                                        )
+                                    )
+                                }
+                            }
                         }
                     }
                 }
@@ -1553,6 +1633,88 @@ private fun RetailSaleDetailScreen(
                     MaterialTheme
                         .colorScheme
                         .onSurfaceVariant
+            )
+        }
+    }
+
+    val returnLine =
+        returnLineId?.let { id ->
+            lines.firstOrNull {
+                it.id == id
+            }
+        }
+
+    returnLine?.let { line ->
+        val returnedQuantity =
+            saleReturns
+                .filter {
+                    it.saleLineId ==
+                        line.id
+                }
+                .sumOf {
+                    it.quantity
+                }
+
+        val maxReturnQuantity =
+            (
+                line.quantity -
+                    returnedQuantity
+            ).coerceAtLeast(0)
+
+        if (maxReturnQuantity > 0) {
+            RetailSaleReturnDialog(
+                line = line,
+                maxQuantity =
+                    maxReturnQuantity,
+                financialAccounts =
+                    financialAccounts,
+                busy = returnBusy,
+                onDismiss = {
+                    if (!returnBusy) {
+                        returnLineId = null
+                    }
+                },
+                onSubmit = { draft ->
+                    if (!returnBusy) {
+                        returnBusy = true
+
+                        viewModel.recordRetailSaleReturn(
+                            saleId = sale.id,
+                            saleLineId = line.id,
+                            quantity =
+                                draft.quantity,
+                            returnType =
+                                draft.returnType,
+                            refundFinancialAccountId =
+                                draft.refundFinancialAccountId,
+                            note = draft.note
+                        ) { success ->
+                            returnBusy = false
+
+                            if (success) {
+                                returnLineId = null
+
+                                Toast.makeText(
+                                    context,
+                                    v15Text(
+                                        "পণ্য ফেরত সংরক্ষণ হয়েছে",
+                                        "Return saved"
+                                    ),
+                                    Toast.LENGTH_SHORT
+                                ).show()
+                            } else {
+                                Toast.makeText(
+                                    context,
+                                    v15Text(
+                                        "পণ্য ফেরত সংরক্ষণ করা যায়নি। পরিমাণ, বাকি/রিফান্ড ও হিসাব যাচাই করুন।",
+                                        "Could not save return. Check quantity, due/refund and account."
+                                    ),
+                                    Toast.LENGTH_LONG
+                                ).show()
+                            }
+                        }
+                    }
+                }
             )
         }
     }

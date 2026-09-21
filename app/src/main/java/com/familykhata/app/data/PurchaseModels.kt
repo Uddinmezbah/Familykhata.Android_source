@@ -1,5 +1,6 @@
 ﻿package com.familykhata.app.data
 
+import androidx.room.ColumnInfo
 import androidx.room.Entity
 import androidx.room.ForeignKey
 import androidx.room.Index
@@ -177,6 +178,9 @@ data class PurchaseReturnEntity(
     val stockBatchId: Long? = null,
     val baseQuantity: Int,
     val amount: Double,
+    @ColumnInfo(defaultValue = "0.0")
+    val refundAmount: Double = 0.0,
+    val refundFinancialAccountId: Long? = null,
     val note: String = "",
     val returnedAt: Long = System.currentTimeMillis(),
     val createdAt: Long = System.currentTimeMillis()

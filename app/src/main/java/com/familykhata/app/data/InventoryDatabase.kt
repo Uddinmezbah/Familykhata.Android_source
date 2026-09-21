@@ -132,7 +132,7 @@ import com.familykhata.app.production.ProductionItemRoleEntity
         PurchaseReturnEntity::class,
         ProductUnitConversionEntity::class
     ],
-    version = 19,
+    version = 20,
     exportSchema = false
 )
 abstract class InventoryDatabase : RoomDatabase() {
@@ -2866,6 +2866,23 @@ abstract class InventoryDatabase : RoomDatabase() {
                     )
                 }
             }
+        private val MIGRATION_19_20 =
+            object : Migration(
+                19,
+                20
+            ) {
+                override fun migrate(
+                    db: SupportSQLiteDatabase
+                ) {
+                    db.execSQL(
+                        "ALTER TABLE `purchase_returns` ADD COLUMN `refundAmount` REAL NOT NULL DEFAULT 0.0"
+                    )
+                    db.execSQL(
+                        "ALTER TABLE `purchase_returns` ADD COLUMN `refundFinancialAccountId` INTEGER"
+                    )
+                }
+            }
+
         fun get(context: Context): InventoryDatabase = INSTANCE ?: synchronized(this) {
             INSTANCE ?: Room.databaseBuilder(
                 context.applicationContext,
@@ -2890,7 +2907,8 @@ abstract class InventoryDatabase : RoomDatabase() {
                     MIGRATION_15_16,
                     MIGRATION_16_17,
                     MIGRATION_17_18,
-                    MIGRATION_18_19
+                    MIGRATION_18_19,
+                    MIGRATION_19_20
                 )
                 .build()
                 .also { INSTANCE = it }

@@ -174,6 +174,14 @@ object PurchaseBackupBridge {
                                     item.baseQuantity
                                 )
                                 put("amount", item.amount)
+                                put("refundAmount", item.refundAmount)
+
+                                item.refundFinancialAccountId?.let {
+                                    put(
+                                        "refundFinancialAccountId",
+                                        it
+                                    )
+                                }
                                 put("note", item.note)
                                 put(
                                     "returnedAt",
@@ -531,6 +539,26 @@ object PurchaseBackupBridge {
                                 item.getDouble(
                                     "amount"
                                 ),
+                            refundAmount =
+                                item.optDouble(
+                                    "refundAmount",
+                                    0.0
+                                ),
+                            refundFinancialAccountId =
+                                if (
+                                    item.has(
+                                        "refundFinancialAccountId"
+                                    ) &&
+                                    !item.isNull(
+                                        "refundFinancialAccountId"
+                                    )
+                                ) {
+                                    item.getLong(
+                                        "refundFinancialAccountId"
+                                    )
+                                } else {
+                                    null
+                                },
                             note =
                                 item.optString(
                                     "note",
@@ -986,6 +1014,55 @@ object PurchaseBackupBridge {
                     item.amount >= 0.0
             ) {
                 "Purchase return data সঠিক নয়"
+            }
+
+            require(
+                item.refundAmount.isFinite() &&
+                    item.refundAmount >= 0.0 &&
+                    item.refundAmount <=
+                        item.amount + 0.01
+            ) {
+                "Purchase return refund amount সঠিক নয়"
+            }
+
+            if (
+                item.refundAmount > 0.0001
+            ) {
+                val refundAccountId =
+                    requireNotNull(
+                        item.refundFinancialAccountId
+                    ) {
+                        "Purchase return refund account পাওয়া যায়নি"
+                    }
+
+                val refundAccount =
+                    requireNotNull(
+                        accountById[
+                            refundAccountId
+                        ]
+                    ) {
+                        "Purchase return refund account পাওয়া যায়নি"
+                    }
+
+                require(
+                    refundAccount.workspace ==
+                        bill.workspace
+                ) {
+                    "Purchase return refund workspace সঠিক নয়"
+                }
+
+                if (
+                    bill.workspace == "SHOP"
+                ) {
+                    require(
+                        refundAccount.businessId ==
+                            bill.businessKey
+                                .substringBefore("::")
+                                .trim()
+                    ) {
+                        "Purchase return refund business সঠিক নয়"
+                    }
+                }
             }
         }
     }

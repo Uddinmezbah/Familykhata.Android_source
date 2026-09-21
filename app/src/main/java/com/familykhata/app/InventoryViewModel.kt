@@ -23,6 +23,7 @@ import com.familykhata.app.data.PurchaseSupplierSummary
 import com.familykhata.app.data.RetailSaleEntity
 import com.familykhata.app.data.RetailSaleLineEntity
 import com.familykhata.app.data.RetailSalePaymentEntity
+import com.familykhata.app.data.RetailSaleReturnEntity
 import com.familykhata.app.data.RetailSaleStockAllocationEntity
 import com.familykhata.app.data.StockBatchEntity
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -518,6 +519,11 @@ class InventoryViewModel(application: Application) : AndroidViewModel(applicatio
         saleId: Long
     ): Flow<List<RetailSaleLineEntity>> =
         dao.observeRetailSaleLines(saleId)
+
+    fun observeRetailSaleReturns(
+        saleId: Long
+    ): Flow<List<RetailSaleReturnEntity>> =
+        dao.observeRetailSaleReturns(saleId)
 
     fun addProduct(
         name: String,

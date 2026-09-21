@@ -364,6 +364,57 @@ interface InventoryDao {
         item: RetailSaleStockAllocationEntity
     ): Long
 
+    @Insert(onConflict = OnConflictStrategy.ABORT)
+    suspend fun insertRetailSaleReturn(
+        item: RetailSaleReturnEntity
+    ): Long
+
+    @Query(
+        """
+        SELECT *
+        FROM retail_sale_returns
+        WHERE saleId = :saleId
+        ORDER BY returnedAt ASC, id ASC
+        """
+    )
+    suspend fun getRetailSaleReturnsOnce(
+        saleId: Long
+    ): List<RetailSaleReturnEntity>
+
+    @Query(
+        """
+        SELECT *
+        FROM retail_sale_returns
+        WHERE saleId = :saleId
+        ORDER BY returnedAt DESC, id DESC
+        """
+    )
+    fun observeRetailSaleReturns(
+        saleId: Long
+    ): Flow<List<RetailSaleReturnEntity>>
+
+    @Query(
+        """
+        SELECT *
+        FROM retail_sale_returns
+        WHERE saleLineId = :saleLineId
+        ORDER BY returnedAt ASC, id ASC
+        """
+    )
+    suspend fun getRetailSaleReturnsForLineOnce(
+        saleLineId: Long
+    ): List<RetailSaleReturnEntity>
+
+    @Query(
+        """
+        SELECT COALESCE(SUM(baseQuantity), 0)
+        FROM retail_sale_returns
+        WHERE saleLineId = :saleLineId
+        """
+    )
+    suspend fun getRetailReturnedBaseQuantity(
+        saleLineId: Long
+    ): Int
     @Insert(
         onConflict = OnConflictStrategy.ABORT
     )

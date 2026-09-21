@@ -258,3 +258,46 @@ data class RetailSaleStockAllocationEntity(
     val unitCost: Double,
     val createdAt: Long = System.currentTimeMillis()
 )
+@Entity(
+    tableName = "retail_sale_returns",
+    foreignKeys = [
+        ForeignKey(
+            entity = RetailSaleEntity::class,
+            parentColumns = ["id"],
+            childColumns = ["saleId"],
+            onDelete = ForeignKey.CASCADE
+        ),
+        ForeignKey(
+            entity = RetailSaleLineEntity::class,
+            parentColumns = ["id"],
+            childColumns = ["saleLineId"],
+            onDelete = ForeignKey.CASCADE
+        )
+    ],
+    indices = [
+        Index("saleId"),
+        Index("saleLineId"),
+        Index(value = ["eventKey"], unique = true)
+    ]
+)
+data class RetailSaleReturnEntity(
+    @PrimaryKey(autoGenerate = true)
+    val id: Long = 0,
+    val eventKey: String,
+    val saleId: Long,
+    val saleLineId: Long,
+    val productId: Long,
+    val productNameSnapshot: String,
+    val unitSnapshot: String,
+    val unitFactor: Int,
+    val quantity: Int,
+    val baseQuantity: Int,
+    val amount: Double,
+    val cost: Double,
+    val returnType: String = "RESTOCK",
+    val refundAmount: Double = 0.0,
+    val refundFinancialAccountId: Long? = null,
+    val note: String = "",
+    val returnedAt: Long = System.currentTimeMillis(),
+    val createdAt: Long = System.currentTimeMillis()
+)

@@ -123,6 +123,7 @@ import com.familykhata.app.production.ProductionItemRoleEntity
         RetailSaleEntity::class,
         RetailSaleLineEntity::class,
         RetailSaleStockAllocationEntity::class,
+        RetailSaleReturnEntity::class,
         RetailSalePaymentEntity::class,
         PurchaseSupplierEntity::class,
         PurchaseBillEntity::class,
@@ -131,7 +132,7 @@ import com.familykhata.app.production.ProductionItemRoleEntity
         PurchaseReturnEntity::class,
         ProductUnitConversionEntity::class
     ],
-    version = 18,
+    version = 19,
     exportSchema = false
 )
 abstract class InventoryDatabase : RoomDatabase() {
@@ -2819,6 +2820,52 @@ abstract class InventoryDatabase : RoomDatabase() {
                 }
             }
 
+        private val MIGRATION_18_19 =
+            object : Migration(
+                18,
+                19
+            ) {
+                override fun migrate(
+                    db: SupportSQLiteDatabase
+                ) {
+                    db.execSQL(
+                        """
+                        CREATE TABLE IF NOT EXISTS `retail_sale_returns` (
+                            `id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+                            `eventKey` TEXT NOT NULL,
+                            `saleId` INTEGER NOT NULL,
+                            `saleLineId` INTEGER NOT NULL,
+                            `productId` INTEGER NOT NULL,
+                            `productNameSnapshot` TEXT NOT NULL,
+                            `unitSnapshot` TEXT NOT NULL,
+                            `unitFactor` INTEGER NOT NULL,
+                            `quantity` INTEGER NOT NULL,
+                            `baseQuantity` INTEGER NOT NULL,
+                            `amount` REAL NOT NULL,
+                            `cost` REAL NOT NULL,
+                            `returnType` TEXT NOT NULL,
+                            `refundAmount` REAL NOT NULL,
+                            `refundFinancialAccountId` INTEGER,
+                            `note` TEXT NOT NULL,
+                            `returnedAt` INTEGER NOT NULL,
+                            `createdAt` INTEGER NOT NULL,
+                            FOREIGN KEY(`saleId`) REFERENCES `retail_sales`(`id`) ON UPDATE NO ACTION ON DELETE CASCADE,
+                            FOREIGN KEY(`saleLineId`) REFERENCES `retail_sale_lines`(`id`) ON UPDATE NO ACTION ON DELETE CASCADE
+                        )
+                        """.trimIndent()
+                    )
+
+                    db.execSQL(
+                        "CREATE INDEX IF NOT EXISTS `index_retail_sale_returns_saleId` ON `retail_sale_returns` (`saleId`)"
+                    )
+                    db.execSQL(
+                        "CREATE INDEX IF NOT EXISTS `index_retail_sale_returns_saleLineId` ON `retail_sale_returns` (`saleLineId`)"
+                    )
+                    db.execSQL(
+                        "CREATE UNIQUE INDEX IF NOT EXISTS `index_retail_sale_returns_eventKey` ON `retail_sale_returns` (`eventKey`)"
+                    )
+                }
+            }
         fun get(context: Context): InventoryDatabase = INSTANCE ?: synchronized(this) {
             INSTANCE ?: Room.databaseBuilder(
                 context.applicationContext,
@@ -2842,7 +2889,8 @@ abstract class InventoryDatabase : RoomDatabase() {
                     MIGRATION_14_15,
                     MIGRATION_15_16,
                     MIGRATION_16_17,
-                    MIGRATION_17_18
+                    MIGRATION_17_18,
+                    MIGRATION_18_19
                 )
                 .build()
                 .also { INSTANCE = it }

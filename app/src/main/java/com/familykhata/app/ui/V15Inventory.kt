@@ -1008,6 +1008,7 @@ internal fun V15InventoryScreen(
         ) {
             ProductDetailScreen(
                 product = selected,
+                products = products,
                 canWrite = canWrite,
                 viewModel = vm,
                 securityViewModel = securityViewModel,
@@ -1763,6 +1764,7 @@ private fun ProductCard(
 @Composable
 private fun ProductDetailScreen(
     product: ProductStockSummary,
+    products: List<ProductStockSummary>,
     canWrite: Boolean,
     viewModel: InventoryViewModel,
     securityViewModel: FamilyKhataViewModel,

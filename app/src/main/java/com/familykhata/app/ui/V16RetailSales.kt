@@ -1763,6 +1763,14 @@ private fun RetailSaleForm(
             }
         }
 
+    val totalCartQuantity =
+        cart.sumOf { item ->
+            item.quantity
+                .retailIntOrNull()
+                ?.coerceAtLeast(0)
+                ?: 0
+        }
+
     val discountValue =
         discount.retailDoubleOrNull()
             ?: 0.0
@@ -1929,44 +1937,21 @@ private fun RetailSaleForm(
 
                         OutlinedButton(
                             onClick = {
-                                if (!alreadyAdded) {
-                                    cart +=
-                                        RetailCartLine(
-                                            productId =
-                                                product.id,
-                                            name =
-                                                product.name,
-                                            baseUnit =
-                                                product.unit,
-                                            selectedUnit =
-                                                product.unit,
-                                            unitFactor =
-                                                1,
-                                            availableBase =
-                                                product.totalStock,
-                                            basePrice =
-                                                product.sellingPrice,
-                                            quantity =
-                                                "1",
-                                            price =
-                                                retailMoney(
-                                                    product
-                                                        .sellingPrice
-                                                )
-                                        )
-                                }
+                                addScannedProductToCart(
+                                    product
+                                )
                             },
                             enabled =
-                                !alreadyAdded &&
-                                    !saving,
+                                !saving &&
+                                    product.totalStock > 0,
                             modifier =
                                 Modifier.fillMaxWidth()
                         ) {
                             Text(
                                 if (alreadyAdded) {
                                     v15Text(
-                                        "✓ ${product.name}",
-                                        "✓ ${product.name}"
+                                        "＋1 ${product.name} • কার্টে আছে",
+                                        "＋1 ${product.name} • In cart"
                                     )
                                 } else {
                                     v15Text(
@@ -2221,6 +2206,99 @@ private fun RetailSaleForm(
                                     )
                                 }
 
+                                Row(
+                                    modifier =
+                                        Modifier.fillMaxWidth(),
+                                    horizontalArrangement =
+                                        Arrangement.spacedBy(8.dp)
+                                ) {
+                                    OutlinedButton(
+                                        onClick = {
+                                            val currentQuantity =
+                                                item.quantity
+                                                    .retailIntOrNull()
+                                                    ?: 1
+
+                                            if (
+                                                currentQuantity >
+                                                1
+                                            ) {
+                                                cart[index] =
+                                                    item.copy(
+                                                        quantity =
+                                                            (
+                                                                currentQuantity -
+                                                                    1
+                                                            ).toString()
+                                                    )
+                                            }
+                                        },
+                                        enabled =
+                                            !saving &&
+                                                (
+                                                    item.quantity
+                                                        .retailIntOrNull()
+                                                        ?: 1
+                                                ) > 1,
+                                        modifier =
+                                            Modifier.weight(1f)
+                                    ) {
+                                        Text("− 1")
+                                    }
+
+                                    OutlinedButton(
+                                        onClick = {
+                                            val currentQuantity =
+                                                item.quantity
+                                                    .retailIntOrNull()
+                                                    ?.coerceAtLeast(
+                                                        0
+                                                    )
+                                                    ?: 0
+
+                                            val nextQuantity =
+                                                currentQuantity
+                                                    .toLong() +
+                                                    1L
+
+                                            val requiredBase =
+                                                nextQuantity *
+                                                    item.unitFactor
+                                                        .toLong()
+
+                                            if (
+                                                nextQuantity <=
+                                                    Int.MAX_VALUE
+                                                        .toLong() &&
+                                                requiredBase <=
+                                                    item.availableBase
+                                                        .toLong()
+                                            ) {
+                                                cart[index] =
+                                                    item.copy(
+                                                        quantity =
+                                                            nextQuantity
+                                                                .toString()
+                                                    )
+                                            } else {
+                                                Toast.makeText(
+                                                    context,
+                                                    v15Text(
+                                                        "${item.name}-এর পর্যাপ্ত স্টক নেই",
+                                                        "Not enough stock for ${item.name}"
+                                                    ),
+                                                    Toast.LENGTH_SHORT
+                                                ).show()
+                                            }
+                                        },
+                                        enabled = !saving,
+                                        modifier =
+                                            Modifier.weight(1f)
+                                    ) {
+                                        Text("＋ 1")
+                                    }
+                                }
+
                                 if (
                                     item.unitFactor > 1
                                 ) {
@@ -2426,6 +2504,70 @@ private fun RetailSaleForm(
                     }
                 }
 
+                if (cart.isNotEmpty()) {
+                    Card(
+                        modifier =
+                            Modifier.fillMaxWidth(),
+                        colors =
+                            CardDefaults.cardColors(
+                                containerColor =
+                                    MaterialTheme
+                                        .colorScheme
+                                        .surfaceVariant
+                                        .copy(
+                                            alpha = 0.5f
+                                        )
+                            )
+                    ) {
+                        Column(
+                            modifier =
+                                Modifier.padding(
+                                    12.dp
+                                ),
+                            verticalArrangement =
+                                Arrangement.spacedBy(
+                                    4.dp
+                                )
+                        ) {
+                            Text(
+                                v15Text(
+                                    "চেকআউট সারাংশ",
+                                    "Checkout summary"
+                                ),
+                                fontWeight =
+                                    FontWeight.Bold
+                            )
+
+                            Text(
+                                v15Text(
+                                    "পণ্য: ${cart.size} • মোট পরিমাণ: $totalCartQuantity",
+                                    "Items: ${cart.size} • Total qty: $totalCartQuantity"
+                                )
+                            )
+
+                            Text(
+                                v15Text(
+                                    "সাবটোটাল: ${V14DisplayState.currencySymbol}${retailMoney(subtotal)} • ছাড়: ${V14DisplayState.currencySymbol}${retailMoney(discountValue)}",
+                                    "Subtotal: ${V14DisplayState.currencySymbol}${retailMoney(subtotal)} • Discount: ${V14DisplayState.currencySymbol}${retailMoney(discountValue)}"
+                                ),
+                                style =
+                                    MaterialTheme
+                                        .typography
+                                        .bodySmall
+                            )
+
+                            Text(
+                                v15Text(
+                                    "মোট: ${V14DisplayState.currencySymbol}${retailMoney(total)} • আদায়: ${V14DisplayState.currencySymbol}${retailMoney(paidValue)} • বাকি: ${V14DisplayState.currencySymbol}${retailMoney(due)}",
+                                    "Total: ${V14DisplayState.currencySymbol}${retailMoney(total)} • Paid: ${V14DisplayState.currencySymbol}${retailMoney(paidValue)} • Due: ${V14DisplayState.currencySymbol}${retailMoney(due)}"
+                                ),
+                                fontWeight =
+                                    FontWeight.SemiBold
+                            )
+                        }
+                    }
+                }
+
                 if (due > 0.0001) {
                     Text(
                         v15Text(
@@ -2438,6 +2580,70 @@ private fun RetailSaleForm(
                         fontWeight =
                             FontWeight.Bold
                     )
+                }
+
+                if (cart.isNotEmpty()) {
+                    Card(
+                        modifier =
+                            Modifier.fillMaxWidth(),
+                        colors =
+                            CardDefaults.cardColors(
+                                containerColor =
+                                    MaterialTheme
+                                        .colorScheme
+                                        .surfaceVariant
+                                        .copy(
+                                            alpha = 0.5f
+                                        )
+                            )
+                    ) {
+                        Column(
+                            modifier =
+                                Modifier.padding(
+                                    12.dp
+                                ),
+                            verticalArrangement =
+                                Arrangement.spacedBy(
+                                    4.dp
+                                )
+                        ) {
+                            Text(
+                                v15Text(
+                                    "চেকআউট সারাংশ",
+                                    "Checkout summary"
+                                ),
+                                fontWeight =
+                                    FontWeight.Bold
+                            )
+
+                            Text(
+                                v15Text(
+                                    "পণ্য: ${cart.size} • মোট পরিমাণ: $totalCartQuantity",
+                                    "Items: ${cart.size} • Total qty: $totalCartQuantity"
+                                )
+                            )
+
+                            Text(
+                                v15Text(
+                                    "সাবটোটাল: ${V14DisplayState.currencySymbol}${retailMoney(subtotal)} • ছাড়: ${V14DisplayState.currencySymbol}${retailMoney(discountValue)}",
+                                    "Subtotal: ${V14DisplayState.currencySymbol}${retailMoney(subtotal)} • Discount: ${V14DisplayState.currencySymbol}${retailMoney(discountValue)}"
+                                ),
+                                style =
+                                    MaterialTheme
+                                        .typography
+                                        .bodySmall
+                            )
+
+                            Text(
+                                v15Text(
+                                    "মোট: ${V14DisplayState.currencySymbol}${retailMoney(total)} • আদায়: ${V14DisplayState.currencySymbol}${retailMoney(paidValue)} • বাকি: ${V14DisplayState.currencySymbol}${retailMoney(due)}",
+                                    "Total: ${V14DisplayState.currencySymbol}${retailMoney(total)} • Paid: ${V14DisplayState.currencySymbol}${retailMoney(paidValue)} • Due: ${V14DisplayState.currencySymbol}${retailMoney(due)}"
+                                ),
+                                fontWeight =
+                                    FontWeight.SemiBold
+                            )
+                        }
+                    }
                 }
 
                 if (due > 0.0001) {

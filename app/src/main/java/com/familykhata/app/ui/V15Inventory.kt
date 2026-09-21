@@ -710,6 +710,7 @@ internal fun V15InventoryScreen(
 ) {
     val vm: InventoryViewModel = viewModel()
     val securityViewModel: FamilyKhataViewModel = viewModel()
+    val context = LocalContext.current
     val products by vm.products.collectAsState()
     var selectedId by remember {
         mutableStateOf<Long?>(null)
@@ -831,6 +832,32 @@ internal fun V15InventoryScreen(
                 onSave = { input ->
                     val p =
                         input.product
+
+                    val cleanSku =
+                        p.sku.trim()
+
+                    val duplicateSku =
+                        cleanSku.isNotBlank() &&
+                            products.any {
+                                it.sku.trim()
+                                    .equals(
+                                        cleanSku,
+                                        ignoreCase = true
+                                    )
+                            }
+
+                    if (duplicateSku) {
+                        Toast.makeText(
+                            context,
+                            v15Text(
+                                "এই Barcode / SKU ইতিমধ্যে এই দোকান/ক্যাটাগরিতে আছে।",
+                                "This Barcode / SKU already exists in this shop/category."
+                            ),
+                            Toast.LENGTH_LONG
+                        ).show()
+
+                        return@AddProductForm
+                    }
 
                     vm.addProduct(
                         name = p.name,
@@ -1314,6 +1341,33 @@ private fun ProductListScreen(
                 editingProduct = null
             }
         ) { input, batchUpdates ->
+            val cleanSku =
+                input.sku.trim()
+
+            val duplicateSku =
+                cleanSku.isNotBlank() &&
+                    products.any {
+                        it.id != product.id &&
+                            it.sku.trim()
+                                .equals(
+                                    cleanSku,
+                                    ignoreCase = true
+                                )
+                    }
+
+            if (duplicateSku) {
+                Toast.makeText(
+                    context,
+                    v15Text(
+                        "এই Barcode / SKU অন্য একটি পণ্যে ব্যবহার করা আছে।",
+                        "This Barcode / SKU is already used by another product."
+                    ),
+                    Toast.LENGTH_LONG
+                ).show()
+
+                return@EditProductDialog
+            }
+
             viewModel.updateProduct(
                 item = product,
                 name = input.name,
@@ -1988,6 +2042,33 @@ private fun ProductDetailScreen(
             batches = batches,
             onDismiss = { showEdit = false }
         ) { input, batchUpdates ->
+            val cleanSku =
+                input.sku.trim()
+
+            val duplicateSku =
+                cleanSku.isNotBlank() &&
+                    products.any {
+                        it.id != product.id &&
+                            it.sku.trim()
+                                .equals(
+                                    cleanSku,
+                                    ignoreCase = true
+                                )
+                    }
+
+            if (duplicateSku) {
+                Toast.makeText(
+                    context,
+                    v15Text(
+                        "এই Barcode / SKU অন্য একটি পণ্যে ব্যবহার করা আছে।",
+                        "This Barcode / SKU is already used by another product."
+                    ),
+                    Toast.LENGTH_LONG
+                ).show()
+
+                return@EditProductDialog
+            }
+
             viewModel.updateProduct(
                 item = product,
                 name = input.name,

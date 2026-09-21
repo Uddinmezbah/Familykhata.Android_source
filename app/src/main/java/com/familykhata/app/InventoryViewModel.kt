@@ -551,6 +551,12 @@ class InventoryViewModel(application: Application) : AndroidViewModel(applicatio
         val cleanName = name.trim()
         if (cleanName.isBlank()) return
 
+        val cleanSku =
+            sku.trim()
+
+        val currentBusinessKey =
+            businessKey.value
+
         val cleanUnit =
             unit.trim()
                 .ifBlank { "pcs" }
@@ -650,6 +656,19 @@ class InventoryViewModel(application: Application) : AndroidViewModel(applicatio
         viewModelScope.launch {
             runCatching {
                 database.withTransaction {
+                    if (cleanSku.isNotBlank()) {
+                        require(
+                            dao.countProductSkuConflicts(
+                                workspace = workspace,
+                                businessKey =
+                                    currentBusinessKey,
+                                sku = cleanSku
+                            ) == 0
+                        ) {
+                            "Duplicate Barcode / SKU"
+                        }
+                    }
+
                     val productId =
                         dao.insertProduct(
                             ProductEntity(
@@ -752,6 +771,9 @@ class InventoryViewModel(application: Application) : AndroidViewModel(applicatio
     ) {
         if (name.isBlank()) return
 
+        val cleanSku =
+            sku.trim()
+
         val cleanUnit =
             unit.trim()
                 .ifBlank { "pcs" }
@@ -782,6 +804,22 @@ class InventoryViewModel(application: Application) : AndroidViewModel(applicatio
         viewModelScope.launch {
             runCatching {
                 database.withTransaction {
+                    if (cleanSku.isNotBlank()) {
+                        require(
+                            dao.countProductSkuConflicts(
+                                workspace =
+                                    item.workspace,
+                                businessKey =
+                                    item.businessKey,
+                                sku = cleanSku,
+                                excludeProductId =
+                                    item.id
+                            ) == 0
+                        ) {
+                            "Duplicate Barcode / SKU"
+                        }
+                    }
+
                     dao.updateProduct(
                         productId = item.id,
                         name = name.trim(),

@@ -2369,23 +2369,61 @@ private fun RetailSaleForm(
                         Modifier.fillMaxWidth()
                 )
 
-                OutlinedButton(
-                    onClick = {
-                        paid =
-                            retailMoney(total)
-                    },
-                    enabled =
-                        total >= 0.0 &&
-                            !saving,
+                Row(
                     modifier =
-                        Modifier.fillMaxWidth()
+                        Modifier.fillMaxWidth(),
+                    horizontalArrangement =
+                        Arrangement.spacedBy(8.dp)
                 ) {
-                    Text(
-                        v15Text(
-                            "সম্পূর্ণ পরিশোধ",
-                            "Mark fully paid"
+                    OutlinedButton(
+                        onClick = {
+                            paid =
+                                retailMoney(total)
+
+                            paymentMethod =
+                                "CASH"
+
+                            selectedFinancialAccountId =
+                                financialAccounts
+                                    .firstOrNull {
+                                        it.type ==
+                                            "CASH"
+                                    }
+                                    ?.id
+                                    ?: selectedFinancialAccountId
+                                    ?: financialAccounts
+                                        .singleOrNull()
+                                        ?.id
+                        },
+                        enabled =
+                            total >= 0.0 &&
+                                !saving,
+                        modifier =
+                            Modifier.weight(1f)
+                    ) {
+                        Text(
+                            v15Text(
+                                "নগদ সম্পূর্ণ",
+                                "Full cash"
+                            )
                         )
-                    )
+                    }
+
+                    OutlinedButton(
+                        onClick = {
+                            paid = "0"
+                        },
+                        enabled = !saving,
+                        modifier =
+                            Modifier.weight(1f)
+                    ) {
+                        Text(
+                            v15Text(
+                                "বাকি রাখুন",
+                                "Keep due"
+                            )
+                        )
+                    }
                 }
 
                 if (due > 0.0001) {

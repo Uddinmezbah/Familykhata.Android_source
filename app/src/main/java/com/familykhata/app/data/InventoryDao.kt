@@ -226,6 +226,25 @@ interface InventoryDao {
 
     @Query(
         """
+        SELECT COUNT(*)
+        FROM inventory_products
+        WHERE workspace = :workspace
+          AND businessKey = :businessKey
+          AND id != :excludeProductId
+          AND TRIM(sku) != ''
+          AND LOWER(TRIM(sku)) =
+              LOWER(TRIM(:sku))
+        """
+    )
+    suspend fun countProductSkuConflicts(
+        workspace: String,
+        businessKey: String,
+        sku: String,
+        excludeProductId: Long = 0L
+    ): Int
+
+    @Query(
+        """
         SELECT *
         FROM inventory_product_units
         WHERE productId = :productId

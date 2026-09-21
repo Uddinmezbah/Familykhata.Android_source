@@ -56,6 +56,7 @@ import com.familykhata.app.report.writeRetailInvoicePdf
 import com.familykhata.app.report.ThermalPrinterDevice
 import com.familykhata.app.report.pairedThermalPrinters
 import com.familykhata.app.report.printThermalTest
+import com.familykhata.app.report.printThermalInvoice
 import com.google.mlkit.vision.codescanner.GmsBarcodeScanning
 import java.text.SimpleDateFormat
 import java.util.Date
@@ -1350,7 +1351,8 @@ private fun RetailSaleDetailScreen(
                     openThermalPrinterPicker()
                 },
                 enabled =
-                    !thermalPrinting,
+                    !thermalPrinting &&
+                        lines.isNotEmpty(),
                 modifier =
                     Modifier.fillMaxWidth()
             ) {
@@ -1616,21 +1618,28 @@ private fun RetailSaleDetailScreen(
 
                         scope.launch {
                             try {
-                                printThermalTest(
+                                printThermalInvoice(
                                     context =
                                         context
                                             .applicationContext,
                                     address =
                                         address,
                                     paperWidthMm =
-                                        paperWidthMm
+                                        paperWidthMm,
+                                    sale =
+                                        sale,
+                                    lines =
+                                        lines,
+                                    currency =
+                                        V14DisplayState
+                                            .currencySymbol
                                 )
 
                                 Toast.makeText(
                                     context,
                                     v15Text(
-                                        "Thermal printer test print পাঠানো হয়েছে",
-                                        "Thermal printer test print sent"
+                                        "Thermal invoice printer-এ পাঠানো হয়েছে",
+                                        "Thermal invoice sent to printer"
                                     ),
                                     Toast.LENGTH_SHORT
                                 ).show()
@@ -1656,8 +1665,8 @@ private fun RetailSaleDetailScreen(
                 ) {
                     Text(
                         v15Text(
-                            "Test Print",
-                            "Test Print"
+                            "Invoice Print",
+                            "Print Invoice"
                         )
                     )
                 }

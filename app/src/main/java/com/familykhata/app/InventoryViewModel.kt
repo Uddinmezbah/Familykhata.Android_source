@@ -18,6 +18,7 @@ import com.familykhata.app.data.PurchaseBillEntity
 import com.familykhata.app.data.PurchaseBillLineEntity
 import com.familykhata.app.data.PurchaseBillSummary
 import com.familykhata.app.data.PurchasePaymentEntity
+import com.familykhata.app.data.PurchaseReturnEntity
 import com.familykhata.app.data.PurchaseSupplierEntity
 import com.familykhata.app.data.PurchaseSupplierSummary
 import com.familykhata.app.data.RetailSaleEntity
@@ -3365,6 +3366,20 @@ class InventoryViewModel(application: Application) : AndroidViewModel(applicatio
             onDone(bill.id)
         }
     }
+
+    fun observePurchaseBillLines(
+        billId: Long
+    ): Flow<List<PurchaseBillLineEntity>> =
+        dao.observePurchaseBillLines(
+            billId
+        )
+
+    fun observePurchaseReturns(
+        billId: Long
+    ): Flow<List<PurchaseReturnEntity>> =
+        dao.observePurchaseReturns(
+            billId
+        )
 
     fun recordPurchaseReturn(
         billId: Long,

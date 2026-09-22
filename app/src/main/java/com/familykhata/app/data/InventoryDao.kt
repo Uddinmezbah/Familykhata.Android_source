@@ -768,6 +768,18 @@ interface InventoryDao {
     @Query(
         """
         SELECT *
+        FROM purchase_bill_lines
+        WHERE billId = :billId
+        ORDER BY id ASC
+        """
+    )
+    fun observePurchaseBillLines(
+        billId: Long
+    ): Flow<List<PurchaseBillLineEntity>>
+
+    @Query(
+        """
+        SELECT *
         FROM purchase_payments
         WHERE billId = :billId
         ORDER BY paidAt ASC, id ASC
@@ -788,6 +800,18 @@ interface InventoryDao {
     suspend fun getPurchaseReturnsOnce(
         billId: Long
     ): List<PurchaseReturnEntity>
+
+    @Query(
+        """
+        SELECT *
+        FROM purchase_returns
+        WHERE billId = :billId
+        ORDER BY returnedAt DESC, id DESC
+        """
+    )
+    fun observePurchaseReturns(
+        billId: Long
+    ): Flow<List<PurchaseReturnEntity>>
 
     @Query(
         """

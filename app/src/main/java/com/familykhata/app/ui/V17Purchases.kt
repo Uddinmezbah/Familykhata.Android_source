@@ -108,6 +108,10 @@ internal fun V17PurchaseScreen(
         mutableStateOf<PurchaseBillSummary?>(null)
     }
 
+    var returningBill by remember {
+        mutableStateOf<PurchaseBillSummary?>(null)
+    }
+
     val context = LocalContext.current
 
     LaunchedEffect(
@@ -395,6 +399,9 @@ internal fun V17PurchaseScreen(
                         canWrite = canWrite,
                         onPay = {
                             payingBill = bill
+                        },
+                        onReturn = {
+                            returningBill = bill
                         }
                     )
                 }
@@ -491,6 +498,19 @@ internal fun V17PurchaseScreen(
             }
         )
     }
+    returningBill?.let { bill ->
+        PurchaseBillReturnDialog(
+            viewModel = vm,
+            bill = bill,
+            financialAccounts =
+                activeAccounts,
+            canWrite = canWrite,
+            onDismiss = {
+                returningBill = null
+            }
+        )
+    }
+
 }
 
 @Composable
@@ -608,7 +628,8 @@ private fun SupplierCard(
 private fun PurchaseBillCard(
     bill: PurchaseBillSummary,
     canWrite: Boolean,
-    onPay: () -> Unit
+    onPay: () -> Unit,
+    onReturn: () -> Unit
 ) {
     Card(
         modifier =
@@ -687,6 +708,24 @@ private fun PurchaseBillCard(
                         v15Text(
                             "বাকি পরিশোধ",
                             "Pay Due"
+                        )
+                    )
+                }
+            }
+
+            if (
+                canWrite &&
+                bill.status != "CANCELLED"
+            ) {
+                OutlinedButton(
+                    onClick = onReturn,
+                    modifier =
+                        Modifier.fillMaxWidth()
+                ) {
+                    Text(
+                        v15Text(
+                            "ক্রয় ফেরত",
+                            "Purchase Return"
                         )
                     )
                 }

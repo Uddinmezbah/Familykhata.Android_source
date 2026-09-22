@@ -3472,15 +3472,46 @@ class InventoryViewModel(application: Application) : AndroidViewModel(applicatio
                             bill.id
                         )
 
-                    val alreadyPaid =
+                    val returns =
+                        dao.getPurchaseReturnsOnce(
+                            bill.id
+                        )
+
+                    val grossPaid =
                         payments.sumOf {
                             it.amount
                         }
 
-                    val due =
+                    val returnedAmount =
+                        returns.sumOf {
+                            it.amount
+                        }
+
+                    val refundedAmount =
+                        returns.sumOf {
+                            it.refundAmount
+                        }
+
+                    val effectiveTotal =
                         (
                             bill.total -
-                                alreadyPaid
+                                returnedAmount
+                        ).coerceAtLeast(
+                            0.0
+                        )
+
+                    val netPaid =
+                        (
+                            grossPaid -
+                                refundedAmount
+                        ).coerceAtLeast(
+                            0.0
+                        )
+
+                    val due =
+                        (
+                            effectiveTotal -
+                                netPaid
                         ).coerceAtLeast(
                             0.0
                         )

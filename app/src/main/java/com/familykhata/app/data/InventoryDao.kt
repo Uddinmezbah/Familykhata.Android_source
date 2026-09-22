@@ -639,58 +639,79 @@ interface InventoryDao {
             s.address AS address,
             s.note AS note,
             s.isActive AS isActive,
-            COUNT(DISTINCT b.id) AS purchaseCount,
-            COALESCE(
-                SUM(
-                    CASE
-                        WHEN b.status != 'CANCELLED'
-                        THEN b.total
-                        ELSE 0
-                    END
-                ),
-                0
-            ) AS totalPurchase,
-            COALESCE(
-                (
+            (
+                SELECT COUNT(*)
+                FROM purchase_bills pb
+                WHERE pb.supplierId = s.id
+            ) AS purchaseCount,
+            COALESCE((
+                SELECT SUM(
+                    MAX(0, pb.total - COALESCE((
+                        SELECT SUM(r.amount)
+                        FROM purchase_returns r
+                        WHERE r.billId = pb.id
+                    ), 0))
+                )
+                FROM purchase_bills pb
+                WHERE pb.supplierId = s.id
+                  AND pb.status != 'CANCELLED'
+            ), 0) AS totalPurchase,
+            MAX(
+                0,
+                COALESCE((
                     SELECT SUM(p.amount)
                     FROM purchase_payments p
                     INNER JOIN purchase_bills pb
                         ON pb.id = p.billId
                     WHERE pb.supplierId = s.id
                       AND pb.status != 'CANCELLED'
-                ),
-                0
+                ), 0) -
+                COALESCE((
+                    SELECT SUM(r.refundAmount)
+                    FROM purchase_returns r
+                    INNER JOIN purchase_bills pb
+                        ON pb.id = r.billId
+                    WHERE pb.supplierId = s.id
+                      AND pb.status != 'CANCELLED'
+                ), 0)
             ) AS paid,
             MAX(
                 0,
-                COALESCE(
-                    SUM(
-                        CASE
-                            WHEN b.status != 'CANCELLED'
-                            THEN b.total
-                            ELSE 0
-                        END
-                    ),
-                    0
-                ) -
-                COALESCE(
-                    (
+                COALESCE((
+                    SELECT SUM(
+                        MAX(0, pb.total - COALESCE((
+                            SELECT SUM(r.amount)
+                            FROM purchase_returns r
+                            WHERE r.billId = pb.id
+                        ), 0))
+                    )
+                    FROM purchase_bills pb
+                    WHERE pb.supplierId = s.id
+                      AND pb.status != 'CANCELLED'
+                ), 0) -
+                MAX(
+                    0,
+                    COALESCE((
                         SELECT SUM(p.amount)
                         FROM purchase_payments p
                         INNER JOIN purchase_bills pb
                             ON pb.id = p.billId
                         WHERE pb.supplierId = s.id
                           AND pb.status != 'CANCELLED'
-                    ),
-                    0
+                    ), 0) -
+                    COALESCE((
+                        SELECT SUM(r.refundAmount)
+                        FROM purchase_returns r
+                        INNER JOIN purchase_bills pb
+                            ON pb.id = r.billId
+                        WHERE pb.supplierId = s.id
+                          AND pb.status != 'CANCELLED'
+                    ), 0)
                 )
             ) AS due
         FROM purchase_suppliers s
-        LEFT JOIN purchase_bills b
-            ON b.supplierId = s.id
         WHERE s.workspace = :workspace
           AND s.businessKey = :businessKey
-        GROUP BY s.id
         ORDER BY s.isActive DESC,
                  s.name COLLATE NOCASE ASC
         """
@@ -777,11 +798,44 @@ interface InventoryDao {
             s.name AS supplierName,
             b.subtotal AS subtotal,
             b.discount AS discount,
-            b.total AS total,
-            COALESCE(SUM(p.amount), 0) AS paid,
+            MAX(0, b.total - COALESCE((
+                SELECT SUM(r.amount)
+                FROM purchase_returns r
+                WHERE r.billId = b.id
+            ), 0)) AS total,
             MAX(
                 0,
-                b.total - COALESCE(SUM(p.amount), 0)
+                COALESCE((
+                    SELECT SUM(p.amount)
+                    FROM purchase_payments p
+                    WHERE p.billId = b.id
+                ), 0) -
+                COALESCE((
+                    SELECT SUM(r.refundAmount)
+                    FROM purchase_returns r
+                    WHERE r.billId = b.id
+                ), 0)
+            ) AS paid,
+            MAX(
+                0,
+                MAX(0, b.total - COALESCE((
+                    SELECT SUM(r.amount)
+                    FROM purchase_returns r
+                    WHERE r.billId = b.id
+                ), 0)) -
+                MAX(
+                    0,
+                    COALESCE((
+                        SELECT SUM(p.amount)
+                        FROM purchase_payments p
+                        WHERE p.billId = b.id
+                    ), 0) -
+                    COALESCE((
+                        SELECT SUM(r.refundAmount)
+                        FROM purchase_returns r
+                        WHERE r.billId = b.id
+                    ), 0)
+                )
             ) AS due,
             b.status AS status,
             b.note AS note,
@@ -789,11 +843,8 @@ interface InventoryDao {
         FROM purchase_bills b
         INNER JOIN purchase_suppliers s
             ON s.id = b.supplierId
-        LEFT JOIN purchase_payments p
-            ON p.billId = b.id
         WHERE b.workspace = :workspace
           AND b.businessKey = :businessKey
-        GROUP BY b.id
         ORDER BY b.purchasedAt DESC,
                  b.id DESC
         """

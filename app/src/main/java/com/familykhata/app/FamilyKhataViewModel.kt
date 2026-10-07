@@ -2489,6 +2489,7 @@ class FamilyKhataViewModel(application: Application) : AndroidViewModel(applicat
         viewModelScope.launch {
             runCatching {
                 val transactions = dao.getAllTransactions()
+                val khataFolders = dao.getAllKhataFolders()
                 val people = dao.getAllPeople()
                 val entries = dao.getAllBakiEntries()
                 val financialAccounts =
@@ -2519,7 +2520,7 @@ class FamilyKhataViewModel(application: Application) : AndroidViewModel(applicat
 
                 JSONObject().apply {
                     put("format", "hisabi-khata-backup")
-                    put("version", 15)
+                    put("version", 16)
                     put("createdAt", System.currentTimeMillis())
                     put("selectedBusinessId", _selectedBusinessId.value)
                     put("legacyBusinessId", legacyBusinessId)
@@ -2570,6 +2571,18 @@ class FamilyKhataViewModel(application: Application) : AndroidViewModel(applicat
                         )
                     )
 
+                    put("khataFolders", JSONArray().apply {
+                        khataFolders.forEach { folder ->
+                            put(JSONObject().apply {
+                                put("id", folder.id)
+                                put("name", folder.name)
+                                put("workspace", folder.workspace)
+                                put("isArchived", folder.isArchived)
+                                put("createdAt", folder.createdAt)
+                            })
+                        }
+                    })
+
                     put("transactions", JSONArray().apply {
                         transactions.forEach { item ->
                             put(JSONObject().apply {
@@ -2580,6 +2593,7 @@ class FamilyKhataViewModel(application: Application) : AndroidViewModel(applicat
                                 put("note", item.note)
                                 put("workspace", item.workspace)
                                 put("businessId", item.businessId)
+                                put("khataFolderId", item.khataFolderId)
                                 item.sourceKey?.let {
                                     put(
                                         "sourceKey",
@@ -2918,11 +2932,12 @@ class FamilyKhataViewModel(application: Application) : AndroidViewModel(applicat
                     "এটি হিসাবী খাতার সঠিক ব্যাকআপ ফাইল নয়"
                 }
                 val backupVersion = root.optInt("version")
-                require(backupVersion in 1..15) {
+                require(backupVersion in 1..16) {
                     "এই ব্যাকআপ ভার্সনটি এখনো সমর্থিত নয়"
                 }
 
                 val transactions = mutableListOf<TransactionEntity>()
+                val khataFolders = mutableListOf<KhataFolderEntity>()
                 val people = mutableListOf<BakiPersonEntity>()
                 val entries =
                     mutableListOf<BakiEntryEntity>()
@@ -3026,6 +3041,38 @@ class FamilyKhataViewModel(application: Application) : AndroidViewModel(applicat
                             ?.businessId
                         ?: restoredSelectedBusinessId
 
+                                if (backupVersion >= 16) {
+                    val folderArray = root.optJSONArray("khataFolders") ?: JSONArray()
+                    val seenFolderIds = mutableSetOf<Long>()
+
+                    for (index in 0 until folderArray.length()) {
+                        val item = folderArray.getJSONObject(index)
+                        val id = item.getLong("id")
+                        val name = item.getString("name").trim()
+                        val workspace = item.getString("workspace")
+
+                        require(id > 0L && id !in seenFolderIds) { "Khata folder ID সঠিক নয়" }
+                        require(name.isNotBlank()) { "Khata folder name খালি হতে পারে না" }
+                        require(workspace == "PERSONAL" || workspace == "FAMILY") { "Khata folder workspace সঠিক নয়" }
+
+                        seenFolderIds += id
+                        khataFolders += KhataFolderEntity(
+                            id = id,
+                            name = name,
+                            workspace = workspace,
+                            isArchived = item.optBoolean("isArchived", false),
+                            createdAt = item.optLong("createdAt", System.currentTimeMillis())
+                        )
+                    }
+
+                    require(khataFolders.any { it.workspace == "PERSONAL" }) { "Personal khata folder পাওয়া যায়নি" }
+                    require(khataFolders.any { it.workspace == "FAMILY" }) { "Family khata folder পাওয়া যায়নি" }
+                } else {
+                    val now = System.currentTimeMillis()
+                    khataFolders += KhataFolderEntity(id = 1L, name = "পুরোনো ব্যক্তিগত হিসাব", workspace = "PERSONAL", createdAt = now)
+                    khataFolders += KhataFolderEntity(id = 2L, name = "পুরোনো পারিবারিক হিসাব", workspace = "FAMILY", createdAt = now + 1L)
+                }
+
                 val transactionArray = root.getJSONArray("transactions")
                 for (index in 0 until transactionArray.length()) {
                     val item = transactionArray.getJSONObject(index)
@@ -3050,6 +3097,21 @@ class FamilyKhataViewModel(application: Application) : AndroidViewModel(applicat
                                 }
                             } else restoredSelectedBusinessId
                         } else "",
+                        khataFolderId =
+                            if (workspace == "SHOP") {
+                                0L
+                            } else if (backupVersion >= 16) {
+                                val requestedFolderId = item.optLong("khataFolderId", 0L)
+                                khataFolders.firstOrNull {
+                                    it.id == requestedFolderId && it.workspace == workspace
+                                }?.id ?: khataFolders.first {
+                                    it.workspace == workspace
+                                }.id
+                            } else if (workspace == "PERSONAL") {
+                                1L
+                            } else {
+                                2L
+                            },
                         sourceKey =
                             if (
                                 backupVersion >= 10
@@ -4416,6 +4478,11 @@ class FamilyKhataViewModel(application: Application) : AndroidViewModel(applicat
                     dao.clearBakiEntries()
                     dao.clearPeople()
                     dao.clearTransactions()
+                    dao.clearKhataFolders()
+
+                    khataFolders.forEach {
+                        dao.insertKhataFolder(it)
+                    }
 
                     transactions.forEach {
                         dao.insertTransaction(it)

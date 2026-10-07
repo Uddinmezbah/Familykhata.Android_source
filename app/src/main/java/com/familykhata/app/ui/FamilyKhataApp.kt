@@ -623,12 +623,6 @@ fun FamilyKhataApp(viewModel: FamilyKhataViewModel) {
                                 softWrap = false
                             )
 
-                            Text(
-                                "TEST 1.7",
-                                style = MaterialTheme.typography.labelLarge,
-                                fontWeight = FontWeight.ExtraBold,
-                                color = workspaceAccent(workspace)
-                            )
                         }
 
                         Spacer(
@@ -1243,8 +1237,8 @@ private fun BusinessDashboard(
                 )
                 Text(
                     v15Text(
-                        "এটি আয় থেকে খরচ বাদ দেওয়ার হিসাব; Cash/Bank ব্যালেন্স নিচে আলাদা।",
-                        "Income minus expense. Cash and bank balances are tracked separately below."
+                        "এটি আয় থেকে খরচ বাদ দেওয়ার হিসাব।",
+                        "Income minus expense."
                     ),
                     style = MaterialTheme.typography.bodySmall,
                     color = Color.White
@@ -1290,114 +1284,6 @@ private fun BusinessDashboard(
                 accentColor = PayableAccent,
                 onClick = onPayable
             )
-        }
-
-        Surface(
-            modifier =
-                Modifier
-                    .fillMaxWidth()
-                    .clickable {
-                        showFinancialAccounts = true
-                    },
-            shape =
-                RoundedCornerShape(20.dp),
-            color =
-                ShopAccent.copy(
-                    alpha = 0.09f
-                ),
-            border =
-                BorderStroke(
-                    1.dp,
-                    ShopAccent.copy(
-                        alpha = 0.22f
-                    )
-                )
-        ) {
-            Column(
-                modifier =
-                    Modifier.padding(16.dp),
-                verticalArrangement =
-                    Arrangement.spacedBy(5.dp)
-            ) {
-                Row(
-                    modifier =
-                        Modifier.fillMaxWidth(),
-                    verticalAlignment =
-                        Alignment.CenterVertically
-                ) {
-                    Column(
-                        modifier =
-                            Modifier.weight(1f)
-                    ) {
-                        Text(
-                            v15Text(
-                                "ক্যাশ • ব্যাংক",
-                                "Cash • Bank"
-                            ),
-                            fontWeight =
-                                FontWeight.Bold
-                        )
-
-                        Text(
-                            v15Text(
-                                "${activeFinancialAccounts.size}টি সক্রিয় অ্যাকাউন্ট",
-                                "${activeFinancialAccounts.size} active accounts"
-                            ),
-                            style =
-                                MaterialTheme
-                                    .typography
-                                    .bodySmall,
-                            color =
-                                MaterialTheme
-                                    .colorScheme
-                                    .onSurfaceVariant
-                        )
-                    }
-
-                    Text(
-                        if (
-                            V14DisplayState
-                                .summaryVisible
-                        ) {
-                            "${V14DisplayState.currencySymbol} ${money(totalFinancialBalance)}"
-                        } else {
-                            "••••"
-                        },
-                        style =
-                            MaterialTheme
-                                .typography
-                                .titleLarge,
-                        fontWeight =
-                            FontWeight.ExtraBold,
-                        color =
-                            ShopAccent
-                    )
-                }
-
-                Text(
-                    v15Text(
-                        "এই খাতায় ট্র্যাক করা Cash ও Bank অ্যাকাউন্টের ব্যালেন্স এবং নিজের অ্যাকাউন্টের মধ্যে টাকা ট্রান্সফার।",
-                        "Balances tracked in this account ledger for Cash and Bank accounts, with internal transfers."
-                    ),
-                    style =
-                        MaterialTheme
-                            .typography
-                            .bodySmall
-                )
-
-                Text(
-                    v15Text(
-                        "নিজের এক অ্যাকাউন্ট থেকে অন্য অ্যাকাউন্টে Transfer আয় বা খরচ নয়।",
-                        "Transfers between your own accounts are not income or expense."
-                    ),
-                    style =
-                        MaterialTheme
-                            .typography
-                            .labelSmall,
-                    color =
-                        NeutralAccent
-                )
-            }
         }
 
         DueDashboardSection(
@@ -1488,17 +1374,6 @@ private fun BusinessDashboard(
         }
     }
 
-    if (showFinancialAccounts) {
-        V16FinancialAccountsDialog(
-            viewModel = viewModel,
-            canWrite =
-                true,
-            onDismiss = {
-                showFinancialAccounts =
-                    false
-            }
-        )
-    }
 
     if (showBusinessReports && selectedBusinessId.isNotBlank()) {
         BusinessReportsDialog(
@@ -1687,7 +1562,7 @@ private fun AddTransactionScreen(
         )
         if (isBusiness) {
             Text(
-                v15Text("দোকান/প্রতিষ্ঠানের আয় বা খরচ যোগ করুন এবং কোন অ্যাকাউন্টে টাকা আসবে/যাবে তা নির্বাচন করুন।", "Record business income or expense and select the account receiving or paying the money."),
+                v15Text("দোকান/প্রতিষ্ঠানের আয় বা খরচ সরাসরি যোগ করুন।", "Record business income or expense directly."),
                 style = MaterialTheme.typography.bodySmall
             )
         }
@@ -1717,44 +1592,6 @@ private fun AddTransactionScreen(
             )
         }
 
-        if (isBusiness) {
-            Text(
-                v15Text(
-                    "টাকা কোন অ্যাকাউন্টে আসবে/যাবে?",
-                    "Which account receives/pays the money?"
-                ),
-                fontWeight =
-                    FontWeight.Bold
-            )
-
-            if (
-                activeFinancialAccounts
-                    .isEmpty()
-            ) {
-                Text(
-                    v15Text(
-                        "আগে Cash • Bank থেকে অন্তত একটি অ্যাকাউন্ট তৈরি করুন।",
-                        "Create at least one Cash or Bank account first."
-                    ),
-                    style =
-                        MaterialTheme.typography.bodySmall,
-                    color =
-                        MaterialTheme.colorScheme.error
-                )
-            } else {
-                TransactionAccountPicker(
-                    accounts =
-                        activeFinancialAccounts,
-                    selectedId =
-                        selectedFinancialAccountId,
-                    onSelect = {
-                        selectedFinancialAccountId =
-                            it
-                        error = null
-                    }
-                )
-            }
-        }
 
         OutlinedTextField(
             amount,
@@ -1784,9 +1621,7 @@ private fun AddTransactionScreen(
                             "Enter a valid amount"
                         )
                 } else if (
-                    isBusiness &&
-                    selectedFinancialAccountId ==
-                        null
+                    false && isBusiness && selectedFinancialAccountId == null
                 ) {
                     error =
                         v15Text(
@@ -1799,12 +1634,7 @@ private fun AddTransactionScreen(
                         amount = value,
                         category = category,
                         note = note,
-                        financialAccountId =
-                            if (isBusiness) {
-                                selectedFinancialAccountId
-                            } else {
-                                null
-                            }
+                        financialAccountId = null
                     ) { success ->
                         if (success) {
                             amount = ""
@@ -2444,36 +2274,6 @@ private fun TransactionRow(
                         }
                     }
 
-                    if (isBusiness) {
-                        Text(
-                            v15Text(
-                                "Cash / Bank / Wallet account",
-                                "Cash / Bank / Wallet account"
-                            ),
-                            fontWeight =
-                                FontWeight.Bold
-                        )
-
-                        val selectableAccounts =
-                            financialAccounts
-                                .filter {
-                                    it.isActive ||
-                                        it.id ==
-                                            selectedFinancialAccountId
-                                }
-
-                        TransactionAccountPicker(
-                            accounts =
-                                selectableAccounts,
-                            selectedId =
-                                selectedFinancialAccountId,
-                            onSelect = {
-                                selectedFinancialAccountId =
-                                    it
-                                error = null
-                            }
-                        )
-                    }
 
                     OutlinedTextField(
                         value = amount,
@@ -2551,9 +2351,7 @@ private fun TransactionRow(
                                     "Enter a valid amount"
                                 )
                         } else if (
-                            isBusiness &&
-                            selectedFinancialAccountId ==
-                                null
+                            false && isBusiness && selectedFinancialAccountId == null
                         ) {
                             error =
                                 v15Text(
@@ -2567,14 +2365,7 @@ private fun TransactionRow(
                                 amount = parsed,
                                 category = category,
                                 note = note,
-                                financialAccountId =
-                                    if (
-                                        isBusiness
-                                    ) {
-                                        selectedFinancialAccountId
-                                    } else {
-                                        null
-                                    }
+                                financialAccountId = null
                             ) { success ->
                                 if (success) {
                                     showEdit =
@@ -3294,8 +3085,8 @@ private fun MoreScreen(viewModel: FamilyKhataViewModel) {
 
         MoreActionCard(
             symbol = "⇩",
-            title = v15Text("ব্যাকআপ তৈরি করুন","Create backup"),
-            subtitle = v15Text("সব ওয়ার্কস্পেসের আয়-খরচ ও বাকি হিসাব একটি JSON ফাইলে রাখুন","Save all workspace accounts in one JSON backup file")
+            title = v15Text("Google Drive / Files ব্যাকআপ","Google Drive / Files backup"),
+            subtitle = v15Text("Google Drive নির্বাচন করলে ফোন হারালেও এই JSON ব্যাকআপ থেকে সব হিসাব ফিরিয়ে আনতে পারবেন","Choose Google Drive to keep a JSON backup that can be restored after a lost or changed phone")
         ) {
             viewModel.createBackup(
                 onReady = { json ->
@@ -3309,7 +3100,7 @@ private fun MoreScreen(viewModel: FamilyKhataViewModel) {
         MoreActionCard(
             symbol = "⇧",
             title = v15Text("ব্যাকআপ রিস্টোর করুন","Restore backup"),
-            subtitle = v15Text("আগের হিসাবী খাতা ব্যাকআপ থেকে সব ডেটা ফিরিয়ে আনুন","Restore all data from a previous Hisabi Khata backup")
+            subtitle = v15Text("Google Drive/Files থেকে আগের ব্যাকআপ বেছে নিয়ে সব হিসাব ফিরিয়ে আনুন","Choose a previous backup from Google Drive/Files and restore all accounts")
         ) {
             openBackupFile.launch(arrayOf("application/json", "text/plain"))
         }
@@ -3321,13 +3112,6 @@ private fun MoreScreen(viewModel: FamilyKhataViewModel) {
             subtitle = v15Text("পরিবার, বন্ধু বা ব্যবসায়িক পরিচিতদের হিসাবী খাতা জানান","Share Hisabi Khata with family, friends or business contacts")
         ) {
             shareApp(context)
-        }
-        MoreActionCard(
-            symbol = "★",
-            title = v15Text("রিভিউ দিন","Write a review"),
-            subtitle = v15Text("Play Store-এ প্রকাশের পর এখান থেকে রেটিং ও রিভিউ দেওয়া যাবে","Rate and review the app after it is published on Play Store")
-        ) {
-            openPlayStore(context)
         }
         MoreActionCard(
             symbol = "✦",

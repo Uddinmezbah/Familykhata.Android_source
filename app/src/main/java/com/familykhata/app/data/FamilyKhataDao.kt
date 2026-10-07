@@ -59,6 +59,12 @@ interface FamilyKhataDao {
     suspend fun clearBusinessProfiles()
 
 
+    @Query("SELECT * FROM khata_folders ORDER BY id ASC")
+    suspend fun getAllKhataFolders(): List<KhataFolderEntity>
+
+    @Query("DELETE FROM khata_folders")
+    suspend fun clearKhataFolders()
+
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertKhataFolder(
         item: KhataFolderEntity

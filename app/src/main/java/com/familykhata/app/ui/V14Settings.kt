@@ -142,8 +142,17 @@ internal fun V14SettingsScreen(
         ) {
             TextButton(onClick = onClose) { Text("✕") }
             Text(v15Text("সেটিংস","Settings"), style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.ExtraBold)
-            Text("VERIFY 1.7 KHATA", color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.ExtraBold)
+            Text("v1.7", color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.ExtraBold)
         }
+
+        Text(
+            "Developed by MD Mezbah Uddin",
+            modifier = Modifier.fillMaxWidth(),
+            textAlign = TextAlign.Center,
+            style = MaterialTheme.typography.labelLarge,
+            fontWeight = FontWeight.Bold,
+            color = MaterialTheme.colorScheme.primary
+        )
 
         Card(
             onClick = { showProfile = true },
@@ -206,7 +215,7 @@ internal fun V14SettingsScreen(
         SettingsSectionTitle(v15Text("দ্রুত কাজ","Quick actions"))
         SettingsActionCard("👥", v15Text("কাস্টমার / ব্যক্তি খাতা","Customer / person ledger"), v15Text("নাম বা ফোন দিয়ে খুঁজুন, বাকি ও লেনদেন দেখুন","Search by name or phone and view dues and transactions")) { onOpenLedger() }
         SettingsActionCard("📦", v15Text("পণ্য / স্টক / Expiry","Products / Stock / Expiry"), v15Text("ব্যাচ, কেনার তারিখ, মেয়াদ ও low-stock দেখুন","View batch, purchase date, expiry and low stock")) { onOpenProducts() }
-        SettingsActionCard("↥", v15Text("ডাটা ব্যাকআপ ও রিপোর্ট","Data backup & reports"), v15Text("JSON Backup/Restore এবং CSV রিপোর্ট","JSON backup/restore and CSV reports")) { onOpenMore() }
+        SettingsActionCard("☁", v15Text("ক্লাউড ব্যাকআপ ও রিপোর্ট","Cloud backup & reports"), v15Text("Google Drive/Files backup, restore এবং CSV রিপোর্ট","Google Drive/Files backup, restore and CSV reports")) { onOpenMore() }
         SettingsActionCard("▶", v15Text("কিভাবে ব্যবহার করব?","How to use?"), v15Text("ব্যবহারের নিয়ম ও ভিডিও টিউটোরিয়াল","Usage guide and video tutorial")) { openUrlV14(context, TUTORIAL_URL_V14) }
         SettingsActionCard("☏", v15Text("আমাদের সাথে যোগাযোগ করুন","Contact us"), "WhatsApp / SMS / Website") { openSupportChooser(context) }
 
@@ -217,7 +226,7 @@ internal fun V14SettingsScreen(
         SettingsActionCard("✦", v15Text("ফিচার রিকোয়েস্ট","Feature request"), v15Text("যে নতুন সুবিধা চান তা জানান","Tell us which new feature you want")) { openUrlV14(context, FEATURE_URL_V14) }
 
         Text(
-            v15Text("হিসাবী খাতা v1.7-test-khata • Offline-first • লোকাল ডেটা","Hisabi Khata v1.7-test-khata • Offline-first • Local data") + "\nDeveloped by Md Mezbah Uddin",
+            v15Text("হিসাবী খাতা v1.7-test-khata • Offline + Cloud Backup","Hisabi Khata v1.7-test-khata • Offline + Cloud Backup") + "\nDeveloped by MD Mezbah Uddin",
             modifier = Modifier.fillMaxWidth().padding(vertical = 10.dp),
             textAlign = TextAlign.Center,
             style = MaterialTheme.typography.bodySmall,

@@ -226,7 +226,7 @@ internal fun V14SettingsScreen(
         SettingsActionCard("✦", v15Text("ফিচার রিকোয়েস্ট","Feature request"), v15Text("যে নতুন সুবিধা চান তা জানান","Tell us which new feature you want")) { openUrlV14(context, FEATURE_URL_V14) }
 
         Text(
-            v15Text("হিসাবী খাতা v1.7-test-khata • Offline + Cloud Backup","Hisabi Khata v1.7-test-khata • Offline + Cloud Backup") + "\nDeveloped by MD Mezbah Uddin",
+            v15Text("হিসাবী খাতা v1.7 • Offline + Cloud Backup","Hisabi Khata v1.7 • Offline + Cloud Backup") + "\nDeveloped by MD Mezbah Uddin",
             modifier = Modifier.fillMaxWidth().padding(vertical = 10.dp),
             textAlign = TextAlign.Center,
             style = MaterialTheme.typography.bodySmall,
@@ -507,7 +507,7 @@ private fun LanguageDialog(context: Context, onDismiss: () -> Unit) {
                     OutlinedButton(onClick = { V15LanguageState.setLanguage(context, "bn"); onDismiss() }, modifier = Modifier.fillMaxWidth()) { Text("বাংলা") }
                     Button(onClick = { V15LanguageState.setLanguage(context, "en"); onDismiss() }, modifier = Modifier.fillMaxWidth()) { Text("English ✓") }
                 }
-                Text("Bangla and English are the supported languages in v1.5.", style = MaterialTheme.typography.bodySmall)
+                Text("Bangla and English are the supported languages in v1.7.", style = MaterialTheme.typography.bodySmall)
             }
         },
         confirmButton = { TextButton(onClick = onDismiss) { Text("Close") } }

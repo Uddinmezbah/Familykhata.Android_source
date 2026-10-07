@@ -877,7 +877,7 @@ private fun BrandHeader(workspace: String) {
                 }
             }
             Text(
-                "v1.5 • Customers, Stock & Expiry",
+                "v1.7 • Offline + Cloud Backup",
                 style = MaterialTheme.typography.labelSmall,
                 fontWeight = FontWeight.SemiBold,
                 color = accent
@@ -1620,14 +1620,6 @@ private fun AddTransactionScreen(
                             "সঠিক টাকার পরিমাণ লিখুন",
                             "Enter a valid amount"
                         )
-                } else if (
-                    false && isBusiness && selectedFinancialAccountId == null
-                ) {
-                    error =
-                        v15Text(
-                            "একটি Cash/Bank account নির্বাচন করুন",
-                            "Select a Cash/Bank account"
-                        )
                 } else {
                     viewModel.addTransaction(
                         type = type,
@@ -1643,20 +1635,10 @@ private fun AddTransactionScreen(
                             error = null
                         } else {
                             error =
-                                if (
-                                    type ==
-                                        "EXPENSE"
-                                ) {
-                                    v15Text(
-                                        "অ্যাকাউন্টে পর্যাপ্ত ব্যালেন্স নেই বা তথ্য সঠিক নয়",
-                                        "Insufficient account balance or invalid data"
-                                    )
-                                } else {
-                                    v15Text(
-                                        "লেনদেন সংরক্ষণ করা যায়নি",
-                                        "Could not save transaction"
-                                    )
-                                }
+                                v15Text(
+                                    "লেনদেন সংরক্ষণ করা যায়নি",
+                                    "Could not save transaction"
+                                )
                         }
                     }
                 }
@@ -1779,6 +1761,20 @@ private fun HistoryScreen(
     val financialAccounts by
         viewModel.financialAccounts
             .collectAsState()
+
+    val businessProfiles by
+        viewModel.businessProfiles
+            .collectAsState()
+
+    val selectedBusinessId by
+        viewModel.selectedBusinessId
+            .collectAsState()
+
+    val selectedBusinessProfile =
+        businessProfiles.firstOrNull {
+            it.businessId ==
+                selectedBusinessId
+        }
 
     val isBusiness =
         workspace == "SHOP"
@@ -1915,6 +1911,8 @@ private fun HistoryScreen(
                 TransactionRow(
                     item = item,
                     isBusiness = isBusiness,
+                    businessProfile =
+                        selectedBusinessProfile,
                     canWrite = canWrite,
                     financialAccounts =
                         financialAccounts,
@@ -1932,6 +1930,8 @@ private fun HistoryScreen(
 private fun TransactionRow(
     item: TransactionEntity,
     isBusiness: Boolean,
+    businessProfile:
+        com.familykhata.app.data.BusinessProfileEntity?,
     canWrite: Boolean,
     financialAccounts:
         List<FinancialAccountSummary>,
@@ -1955,6 +1955,10 @@ private fun TransactionRow(
     }
 
     var showDelete by remember(item.id) {
+        mutableStateOf(false)
+    }
+
+    var showVoucher by remember(item.id) {
         mutableStateOf(false)
     }
 
@@ -2077,6 +2081,26 @@ private fun TransactionRow(
                         .onSurfaceVariant
             )
 
+            if (
+                isBusiness &&
+                item.type == "INCOME"
+            ) {
+                OutlinedButton(
+                    onClick = {
+                        showVoucher = true
+                    },
+                    modifier =
+                        Modifier.fillMaxWidth()
+                ) {
+                    Text(
+                        v15Text(
+                            "ভাউচার PDF শেয়ার",
+                            "Share voucher PDF"
+                        )
+                    )
+                }
+            }
+
             if (canWrite) {
                 Row(
                     modifier =
@@ -2116,6 +2140,17 @@ private fun TransactionRow(
                 }
             }
         }
+    }
+
+    if (showVoucher) {
+        BusinessVoucherDialog(
+            transaction = item,
+            businessProfile =
+                businessProfile,
+            onDismiss = {
+                showVoucher = false
+            }
+        )
     }
 
     if (showDelete) {
@@ -2350,14 +2385,6 @@ private fun TransactionRow(
                                     "সঠিক টাকার পরিমাণ লিখুন",
                                     "Enter a valid amount"
                                 )
-                        } else if (
-                            false && isBusiness && selectedFinancialAccountId == null
-                        ) {
-                            error =
-                                v15Text(
-                                    "একটি account নির্বাচন করুন",
-                                    "Select an account"
-                                )
                         } else {
                             viewModel.updateTransaction(
                                 item = item,
@@ -2373,8 +2400,8 @@ private fun TransactionRow(
                                 } else {
                                     error =
                                         v15Text(
-                                            "আপডেট করা যায়নি। Account balance ও তথ্য যাচাই করুন।",
-                                            "Could not update. Check account balance and data."
+                                            "লেনদেন আপডেট করা যায়নি",
+                                            "Could not update transaction"
                                         )
                                 }
                             }
@@ -3153,7 +3180,7 @@ private fun MoreScreen(viewModel: FamilyKhataViewModel) {
                 modifier = Modifier.padding(16.dp),
                 verticalArrangement = Arrangement.spacedBy(4.dp)
             ) {
-                Text(v15Text("হিসাবী খাতা v1.5","Hisabi Khata v1.5"), fontWeight = FontWeight.Bold)
+                Text(v15Text("হিসাবী খাতা v1.7","Hisabi Khata v1.7"), fontWeight = FontWeight.Bold)
                 Text(
                     v15Text("আপনার টাকা-পয়সার সহজ হিসাব • ডেটা আপনার ডিভাইসে থাকে","Simple money tracking • Your data stays on your device"),
                     style = MaterialTheme.typography.bodySmall

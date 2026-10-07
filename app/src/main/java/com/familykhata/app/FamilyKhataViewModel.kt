@@ -936,21 +936,14 @@ class FamilyKhataViewModel(application: Application) : AndroidViewModel(applicat
             _selectedWorkspace.value
         val businessId = businessIdForWorkspace(workspace)
 
-        if (
-            workspace == "SHOP" &&
-            financialAccountId == null
-        ) {
-            onDone(false)
-            return
-        }
-
         viewModelScope.launch {
             val success =
                 runCatching {
                     database.withTransaction {
                         val account =
                             if (
-                                workspace == "SHOP"
+                                workspace == "SHOP" &&
+                                financialAccountId != null
                             ) {
                                 requireNotNull(
                                     dao.getFinancialAccountOnce(
@@ -966,24 +959,6 @@ class FamilyKhataViewModel(application: Application) : AndroidViewModel(applicat
                             } else {
                                 null
                             }
-
-                        if (
-                            cleanType ==
-                                "EXPENSE" &&
-                            account != null
-                        ) {
-                            val available =
-                                requireNotNull(
-                                    dao.getFinancialAccountBalanceOnce(
-                                        account.id
-                                    )
-                                )
-
-                            require(
-                                available + 0.0001 >=
-                                    amount
-                            )
-                        }
 
                         val now =
                             System.currentTimeMillis()
@@ -1754,11 +1729,7 @@ class FamilyKhataViewModel(application: Application) : AndroidViewModel(applicat
                 "EXPENSE"
             ) ||
             !amount.isFinite() ||
-            amount <= 0.0 ||
-            (
-                item.workspace == "SHOP" &&
-                    financialAccountId == null
-            )
+            amount <= 0.0
         ) {
             onDone(false)
             return
@@ -1801,7 +1772,9 @@ class FamilyKhataViewModel(application: Application) : AndroidViewModel(applicat
                         val account =
                             if (
                                 current.workspace ==
-                                    "SHOP"
+                                    "SHOP" &&
+                                financialAccountId !=
+                                    null
                             ) {
                                 requireNotNull(
                                     dao.getFinancialAccountOnce(
@@ -1821,69 +1794,6 @@ class FamilyKhataViewModel(application: Application) : AndroidViewModel(applicat
                             } else {
                                 null
                             }
-
-                        val newDelta =
-                            if (
-                                cleanType ==
-                                    "INCOME"
-                            ) {
-                                amount
-                            } else {
-                                -amount
-                            }
-
-                        if (
-                            oldEntry != null &&
-                            (
-                                account == null ||
-                                oldEntry.accountId !=
-                                    account.id
-                            )
-                        ) {
-                            val oldAccountBalance =
-                                requireNotNull(
-                                    dao.getFinancialAccountBalanceOnce(
-                                        oldEntry.accountId
-                                    )
-                                )
-
-                            val oldAccountAfterRemoval =
-                                oldAccountBalance -
-                                    oldEntry.balanceDelta
-
-                            require(
-                                oldAccountAfterRemoval >=
-                                    -0.0001
-                            )
-                        }
-
-                        if (account != null) {
-                            val targetBalance =
-                                requireNotNull(
-                                    dao.getFinancialAccountBalanceOnce(
-                                        account.id
-                                    )
-                                )
-
-                            val oldDeltaOnTarget =
-                                oldEntry
-                                    ?.takeIf {
-                                        it.accountId ==
-                                            account.id
-                                    }
-                                    ?.balanceDelta
-                                    ?: 0.0
-
-                            val targetAfterUpdate =
-                                targetBalance -
-                                    oldDeltaOnTarget +
-                                    newDelta
-
-                            require(
-                                targetAfterUpdate >=
-                                    -0.0001
-                            )
-                        }
 
                         dao.deleteFinancialAccountEntryBySourceKey(
                             entryKey

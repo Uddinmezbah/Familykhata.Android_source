@@ -29,8 +29,26 @@ data class TransactionEntity(
     val workspace: String = "FAMILY",
     @ColumnInfo(defaultValue = "''")
     val businessId: String = "",
+    @ColumnInfo(defaultValue = "0")
+    val khataFolderId: Long = 0,
     val sourceKey: String? = null,
     val financialAccountId: Long? = null,
+    val createdAt: Long = System.currentTimeMillis()
+)
+
+
+@Entity(
+    tableName = "khata_folders",
+    indices = [
+        Index(value = ["workspace", "name"])
+    ]
+)
+data class KhataFolderEntity(
+    @PrimaryKey(autoGenerate = true)
+    val id: Long = 0,
+    val name: String,
+    val workspace: String,
+    val isArchived: Boolean = false,
     val createdAt: Long = System.currentTimeMillis()
 )
 

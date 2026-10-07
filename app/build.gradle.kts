@@ -16,8 +16,8 @@ android {
         applicationId = "com.hisabikhata.app"
         minSdk = 24
         targetSdk = 36
-        versionCode = 16
-        versionName = "1.6.0"
+        versionCode = 1702
+        versionName = "1.7.0-test-khata-verify"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         vectorDrawables.useSupportLibrary = true

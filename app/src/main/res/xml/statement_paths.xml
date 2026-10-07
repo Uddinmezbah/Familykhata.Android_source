@@ -3,4 +3,5 @@
     <cache-path name="statements" path="ledger_statements/" />
     <cache-path name="retail_invoices" path="retail_invoices/" />
     <cache-path name="delivery_challans" path="delivery_challans/" />
+    <cache-path name="khata_reports" path="khata_reports/" />
 </paths>

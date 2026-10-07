@@ -279,7 +279,6 @@ internal fun RequiredPinSetupScreen(
 @Composable
 internal fun CommercialToolsSection(viewModel: FamilyKhataViewModel) {
     val context = LocalContext.current
-    val trialStatus by viewModel.trialStatus.collectAsState()
     val pinConfigured by viewModel.isPinConfigured.collectAsState()
     val workspace by viewModel.selectedWorkspace.collectAsState()
 
@@ -307,13 +306,6 @@ internal fun CommercialToolsSection(viewModel: FamilyKhataViewModel) {
             }
         }
     }
-
-    Text(
-        v15Text("ব্যবহারের মেয়াদ","Usage period"),
-        style = MaterialTheme.typography.titleMedium,
-        fontWeight = FontWeight.Bold
-    )
-    TrialNotice(trialStatus)
 
     Text(
         v15Text("সময় অনুযায়ী রিপোর্ট","Reports by period"),

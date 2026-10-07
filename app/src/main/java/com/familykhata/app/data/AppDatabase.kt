@@ -10,6 +10,7 @@ import androidx.sqlite.db.SupportSQLiteDatabase
 @Database(
     entities = [
         TransactionEntity::class,
+        KhataFolderEntity::class,
         BakiPersonEntity::class,
         BakiEntryEntity::class,
         FinancialAccountEntity::class,
@@ -17,7 +18,7 @@ import androidx.sqlite.db.SupportSQLiteDatabase
         DigitalServiceTransactionEntity::class,
         BusinessProfileEntity::class
     ],
-    version = 9,
+    version = 10,
     exportSchema = false
 )
 abstract class AppDatabase : RoomDatabase() {
@@ -312,6 +313,75 @@ abstract class AppDatabase : RoomDatabase() {
                     db.execSQL("ALTER TABLE digital_service_transactions ADD COLUMN businessId TEXT NOT NULL DEFAULT ''")
                 }
             }
+
+        private val MIGRATION_9_10 =
+            object : Migration(9, 10) {
+                override fun migrate(db: SupportSQLiteDatabase) {
+                    db.execSQL(
+                        """
+                        ALTER TABLE transactions
+                        ADD COLUMN khataFolderId INTEGER NOT NULL DEFAULT 0
+                        """.trimIndent()
+                    )
+
+                    db.execSQL(
+                        """
+                        CREATE TABLE IF NOT EXISTS `khata_folders` (
+                            `id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+                            `name` TEXT NOT NULL,
+                            `workspace` TEXT NOT NULL,
+                            `isArchived` INTEGER NOT NULL,
+                            `createdAt` INTEGER NOT NULL
+                        )
+                        """.trimIndent()
+                    )
+
+                    db.execSQL(
+                        """
+                        CREATE INDEX IF NOT EXISTS
+                        `index_khata_folders_workspace_name`
+                        ON `khata_folders` (`workspace`, `name`)
+                        """.trimIndent()
+                    )
+
+                    val now = System.currentTimeMillis()
+
+                    db.execSQL(
+                        """
+                        INSERT INTO khata_folders
+                        (id, name, workspace, isArchived, createdAt)
+                        VALUES
+                        (1, 'পুরোনো ব্যক্তিগত হিসাব', 'PERSONAL', 0, $now)
+                        """.trimIndent()
+                    )
+
+                    db.execSQL(
+                        """
+                        INSERT INTO khata_folders
+                        (id, name, workspace, isArchived, createdAt)
+                        VALUES
+                        (2, 'পুরোনো পারিবারিক হিসাব', 'FAMILY', 0, ${now + 1})
+                        """.trimIndent()
+                    )
+
+                    db.execSQL(
+                        """
+                        UPDATE transactions
+                        SET khataFolderId = 1
+                        WHERE workspace = 'PERSONAL'
+                        """.trimIndent()
+                    )
+
+                    db.execSQL(
+                        """
+                        UPDATE transactions
+                        SET khataFolderId = 2
+                        WHERE workspace = 'FAMILY'
+                        """.trimIndent()
+                    )
+                }
+            }
+
         fun get(context: Context): AppDatabase = INSTANCE ?: synchronized(this) {
             INSTANCE ?: Room.databaseBuilder(
                 context.applicationContext,
@@ -326,7 +396,8 @@ abstract class AppDatabase : RoomDatabase() {
                     MIGRATION_5_6,
                     MIGRATION_6_7,
                     MIGRATION_7_8,
-                    MIGRATION_8_9
+                    MIGRATION_8_9,
+                    MIGRATION_9_10
                 )
                 .build()
                 .also { INSTANCE = it }

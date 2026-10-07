@@ -142,7 +142,7 @@ internal fun V14SettingsScreen(
         ) {
             TextButton(onClick = onClose) { Text("✕") }
             Text(v15Text("সেটিংস","Settings"), style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.ExtraBold)
-            Text("VERIFY 1.7 KHATA", color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.ExtraBold)
+            Text("v1.7-test-khata", color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.Bold)
         }
 
         Card(

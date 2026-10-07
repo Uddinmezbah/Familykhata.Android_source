@@ -604,30 +604,28 @@ fun FamilyKhataApp(viewModel: FamilyKhataViewModel) {
 
                     if (tab == Tab.DASHBOARD) {
                         Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.SpaceBetween,
-                            verticalAlignment = Alignment.CenterVertically
+                            modifier =
+                                Modifier.fillMaxWidth(),
+                            horizontalArrangement =
+                                Arrangement.SpaceBetween,
+                            verticalAlignment =
+                                Alignment.CenterVertically
                         ) {
                             Text(
                                 v15Text(
-                                    "Hisabi Khata",
+                                    "হিসাবী খাতা",
                                     "Hisabi Khata"
                                 ),
                                 modifier =
                                     Modifier
                                         .weight(1f)
                                         .padding(end = 8.dp),
-                                style = MaterialTheme.typography.headlineMedium,
-                                fontWeight = FontWeight.ExtraBold,
+                                style =
+                                    MaterialTheme.typography.headlineMedium,
+                                fontWeight =
+                                    FontWeight.ExtraBold,
                                 maxLines = 1,
                                 softWrap = false
-                            )
-
-                            Text(
-                                "TEST 1.7",
-                                style = MaterialTheme.typography.labelLarge,
-                                fontWeight = FontWeight.ExtraBold,
-                                color = workspaceAccent(workspace)
                             )
                         }
 
@@ -1244,7 +1242,7 @@ private fun BusinessDashboard(
                 Text(
                     v15Text(
                         "এটি আয় থেকে খরচ বাদ দেওয়ার হিসাব; Cash/Bank ব্যালেন্স নিচে আলাদা।",
-                        "Income minus expense. Cash and bank balances are tracked separately below."
+                        "Income minus expense. Cash, bank and wallet balances are tracked separately below."
                     ),
                     style = MaterialTheme.typography.bodySmall,
                     color = Color.White
@@ -1331,7 +1329,7 @@ private fun BusinessDashboard(
                     ) {
                         Text(
                             v15Text(
-                                "ক্যাশ • ব্যাংক",
+                                "ক্যাশ • ব্যাংক • ওয়ালেট",
                                 "Cash • Bank"
                             ),
                             fontWeight =
@@ -1376,8 +1374,8 @@ private fun BusinessDashboard(
 
                 Text(
                     v15Text(
-                        "এই খাতায় ট্র্যাক করা Cash ও Bank অ্যাকাউন্টের ব্যালেন্স এবং নিজের অ্যাকাউন্টের মধ্যে টাকা ট্রান্সফার।",
-                        "Balances tracked in this account ledger for Cash and Bank accounts, with internal transfers."
+                        "এই খাতায় ট্র্যাক করা Cash, bKash, Nagad, Rocket, Bank ইত্যাদির ব্যালেন্স এবং নিজের অ্যাকাউন্টের মধ্যে টাকা ট্রান্সফার।",
+                        "Balances tracked in this account ledger for Cash, bKash, Nagad, Rocket, Bank and other accounts, with internal transfers."
                     ),
                     style =
                         MaterialTheme
@@ -1437,49 +1435,6 @@ private fun BusinessDashboard(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.spacedBy(10.dp)
         ) {
-            BusinessActionCard(
-                symbol = "৳",
-                title = v15Text("খাতা", "Ledger"),
-                subtitle = v15Text("কাস্টমার/সাপ্লায়ার", "Customer/Supplier"),
-                accentColor = ReceivableAccent,
-                modifier = Modifier.weight(1f),
-                onClick = onLedger
-            )
-            BusinessActionCard(
-                symbol = "≡",
-                title = v15Text("লেনদেন", "Transactions"),
-                subtitle = v15Text("সব আয়-খরচের ইতিহাস", "All income/expense history"),
-                accentColor = ShopAccent,
-                modifier = Modifier.weight(1f),
-                onClick = onHistory
-            )
-        }
-        BusinessActionCard(
-            symbol = "▤",
-            title = v15Text("রিপোর্ট", "Reports"),
-            subtitle = v15Text("বিক্রি • লাভ • বকেয়া • স্টক", "Sales • Profit • Due • Stock"),
-            accentColor = IncomeAccent,
-            modifier = Modifier.fillMaxWidth(),
-            onClick = { showBusinessReports = true }
-        )
-
-        Surface(
-            modifier =
-                Modifier
-                    .fillMaxWidth()
-                    .clickable { onLedger() },
-            shape = RoundedCornerShape(18.dp),
-            color = ShopAccent.copy(alpha = 0.09f)
-        ) {
-            Column(
-                modifier = Modifier.padding(16.dp),
-                verticalArrangement = Arrangement.spacedBy(4.dp)
-            ) {
-                Text(v15Text("ব্যবসার খাতা", "Business ledger"), fontWeight = FontWeight.Bold)
-                Text(
-                    v15Text("কাস্টমার/সাপ্লায়ার: $ledgerCount জন • পাবো ${V14DisplayState.currencySymbol} ${money(receivable)} • দেবো ${V14DisplayState.currencySymbol} ${money(payable)}", "Customers/Suppliers: $ledgerCount • Receivable ${V14DisplayState.currencySymbol} ${money(receivable)} • Payable ${V14DisplayState.currencySymbol} ${money(payable)}"),
-                    style = MaterialTheme.typography.bodySmall
-                )
                 Text(
                     v15Text("পরবর্তী ধাপে পণ্য-স্টক, ক্রয়-বিক্রি, ইনভয়েস/চালান ও রিপোর্ট যোগ হবে।", "Manage products, stock, purchases, sales and reports from the business tools."),
                     style = MaterialTheme.typography.bodySmall

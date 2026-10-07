@@ -50,27 +50,6 @@ private val v16AccountKinds =
             provider = ""
         ),
         V16AccountKind(
-            key = "BKASH",
-            bangla = "বিকাশ",
-            english = "bKash",
-            type = "MOBILE_WALLET",
-            provider = "bKash"
-        ),
-        V16AccountKind(
-            key = "NAGAD",
-            bangla = "নগদ",
-            english = "Nagad",
-            type = "MOBILE_WALLET",
-            provider = "Nagad"
-        ),
-        V16AccountKind(
-            key = "ROCKET",
-            bangla = "রকেট",
-            english = "Rocket",
-            type = "MOBILE_WALLET",
-            provider = "Rocket"
-        ),
-        V16AccountKind(
             key = "BANK",
             bangla = "ব্যাংক",
             english = "Bank",
@@ -887,8 +866,8 @@ fun V16FinancialAccountsDialog(
                         ) {
                             Text(
                                 v15Text(
-                                    "এখনও কোনো Cash/Bank/Wallet account নেই। প্রথমে একটি অ্যাকাউন্ট যোগ করুন।",
-                                    "No Cash, Bank or Wallet account yet. Add your first account."
+                                    "এখনও কোনো Cash/Bank account নেই। প্রথমে একটি অ্যাকাউন্ট যোগ করুন।",
+                                    "No Cash or Bank account yet. Add your first account."
                                 ),
                                 style =
                                     MaterialTheme
@@ -906,18 +885,6 @@ fun V16FinancialAccountsDialog(
                                 }
                         }
 
-                        if (!canWrite) {
-                            Text(
-                                v15Text(
-                                    "Trial শেষ হওয়ায় নতুন account বা transfer বন্ধ আছে; আগের হিসাব দেখা যাবে।",
-                                    "New accounts and transfers are disabled after trial expiry; existing records remain visible."
-                                ),
-                                style =
-                                    MaterialTheme
-                                        .typography
-                                        .bodySmall
-                            )
-                        }
                     }
                 }
 

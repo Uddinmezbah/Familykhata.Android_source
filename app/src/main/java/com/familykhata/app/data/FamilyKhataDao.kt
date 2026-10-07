@@ -58,6 +58,66 @@ interface FamilyKhataDao {
     @Query("DELETE FROM business_profiles")
     suspend fun clearBusinessProfiles()
 
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insertKhataFolder(
+        item: KhataFolderEntity
+    ): Long
+
+    @Query(
+        """
+        SELECT *
+        FROM khata_folders
+        WHERE workspace = :workspace
+          AND isArchived = 0
+        ORDER BY createdAt ASC, id ASC
+        """
+    )
+    fun observeKhataFolders(
+        workspace: String
+    ): Flow<List<KhataFolderEntity>>
+
+    @Query(
+        """
+        SELECT *
+        FROM khata_folders
+        WHERE id = :folderId
+        LIMIT 1
+        """
+    )
+    suspend fun getKhataFolderOnce(
+        folderId: Long
+    ): KhataFolderEntity?
+
+    @Query(
+        """
+        SELECT *
+        FROM khata_folders
+        WHERE workspace = :workspace
+          AND isArchived = 0
+        ORDER BY createdAt ASC, id ASC
+        LIMIT 1
+        """
+    )
+    suspend fun getFirstActiveKhataFolder(
+        workspace: String
+    ): KhataFolderEntity?
+
+    @Query(
+        """
+        SELECT *
+        FROM khata_folders
+        WHERE workspace = :workspace
+          AND isArchived = 0
+          AND LOWER(name) = LOWER(:name)
+        LIMIT 1
+        """
+    )
+    suspend fun findActiveKhataFolderByName(
+        workspace: String,
+        name: String
+    ): KhataFolderEntity?
+
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertTransaction(
         item: TransactionEntity
@@ -98,8 +158,21 @@ interface FamilyKhataDao {
         transactionId: Long
     ): TransactionEntity?
 
-    @Query("SELECT * FROM transactions WHERE workspace = :workspace AND (workspace != 'SHOP' OR businessId = :businessId) ORDER BY createdAt DESC")
-    fun observeTransactions(workspace: String, businessId: String): Flow<List<TransactionEntity>>
+    @Query(
+        """
+        SELECT *
+        FROM transactions
+        WHERE workspace = :workspace
+          AND (workspace != 'SHOP' OR businessId = :businessId)
+          AND (workspace = 'SHOP' OR khataFolderId = :khataFolderId)
+        ORDER BY createdAt DESC
+        """
+    )
+    fun observeTransactions(
+        workspace: String,
+        businessId: String,
+        khataFolderId: Long
+    ): Flow<List<TransactionEntity>>
 
     @Query(
         """
@@ -109,9 +182,14 @@ interface FamilyKhataDao {
         FROM transactions
         WHERE workspace = :workspace
           AND (workspace != 'SHOP' OR businessId = :businessId)
+          AND (workspace = 'SHOP' OR khataFolderId = :khataFolderId)
         """
     )
-    fun observeDashboardTotals(workspace: String, businessId: String): Flow<DashboardTotals>
+    fun observeDashboardTotals(
+        workspace: String,
+        businessId: String,
+        khataFolderId: Long
+    ): Flow<DashboardTotals>
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertPerson(person: BakiPersonEntity): Long

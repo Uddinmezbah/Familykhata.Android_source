@@ -1525,6 +1525,7 @@ private fun ProductCard(
     }
 
     Card(
+        onClick = onSelect,
         modifier =
             Modifier.fillMaxWidth(),
         colors =

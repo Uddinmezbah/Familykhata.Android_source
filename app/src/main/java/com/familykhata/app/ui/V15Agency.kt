@@ -441,6 +441,7 @@ private fun AgencyProjectCard(
     onDelete: () -> Unit
 ) {
     Card(
+        onClick = onOpen,
         modifier =
             Modifier.fillMaxWidth()
     ) {

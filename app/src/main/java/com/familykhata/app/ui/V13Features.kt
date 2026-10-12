@@ -401,80 +401,15 @@ internal fun BakiEntryActionRow(
 @Composable
 internal fun PurchaseAndTutorialSection() {
     val context = LocalContext.current
-    var showPremium by remember {
-        mutableStateOf(false)
-    }
 
     Text(
         v15Text(
-            "প্ল্যান ও সহায়তা",
-            "Plans & support"
+            "সহায়তা",
+            "Support"
         ),
-        style =
-            MaterialTheme.typography.titleMedium,
+        style = MaterialTheme.typography.titleMedium,
         fontWeight = FontWeight.Bold
     )
-
-    Text(
-        v15Text(
-            "৩০ দিনের ট্রায়াল শেষে নতুন হিসাব যোগ/সম্পাদনার জন্য Premium নিন। পুরনো ডেটা মুছে যাবে না।",
-            "After the 30-day trial, get Premium to add or edit records. Existing data will not be deleted."
-        ),
-        style =
-            MaterialTheme.typography.bodySmall,
-        color =
-            MaterialTheme.colorScheme
-                .onSurfaceVariant
-    )
-
-    Card(
-        modifier = Modifier.fillMaxWidth(),
-        colors =
-            CardDefaults.cardColors(
-                containerColor =
-                    PlanAccent.copy(alpha = 0.07f)
-            ),
-        border =
-            BorderStroke(
-                1.dp,
-                PlanAccent.copy(alpha = 0.18f)
-            )
-    ) {
-        Column(
-            modifier = Modifier.padding(14.dp),
-            verticalArrangement =
-                Arrangement.spacedBy(8.dp)
-        ) {
-            Text(
-                v15Text(
-                    "Premium প্ল্যান",
-                    "Premium plans"
-                ),
-                fontWeight = FontWeight.Bold
-            )
-
-            Text(
-                "৳99 / মাস  •  ৳899 / বছর  •  ৳2,999 Lifetime",
-                style =
-                    MaterialTheme.typography.bodySmall
-            )
-
-            Button(
-                onClick = {
-                    showPremium = true
-                },
-                modifier =
-                    Modifier.fillMaxWidth()
-            ) {
-                Text(
-                    v15Text(
-                        "প্ল্যান দেখুন / কিনুন",
-                        "View plans / Buy"
-                    )
-                )
-            }
-        }
-    }
 
     Card(
         onClick = {
@@ -484,21 +419,17 @@ internal fun PurchaseAndTutorialSection() {
             )
         },
         modifier = Modifier.fillMaxWidth(),
-        colors =
-            CardDefaults.cardColors(
-                containerColor =
-                    DueTodayAccent.copy(alpha = 0.07f)
-            ),
-        border =
-            BorderStroke(
-                1.dp,
-                DueTodayAccent.copy(alpha = 0.18f)
-            )
+        colors = CardDefaults.cardColors(
+            containerColor = DueTodayAccent.copy(alpha = 0.07f)
+        ),
+        border = BorderStroke(
+            1.dp,
+            DueTodayAccent.copy(alpha = 0.18f)
+        )
     ) {
         Column(
             modifier = Modifier.padding(14.dp),
-            verticalArrangement =
-                Arrangement.spacedBy(4.dp)
+            verticalArrangement = Arrangement.spacedBy(4.dp)
         ) {
             Text(
                 v15Text(
@@ -513,15 +444,8 @@ internal fun PurchaseAndTutorialSection() {
                     "নতুন খাতা, বাকি, পরিশোধ, ব্যাকআপ ও রিপোর্ট ব্যবহারের গাইড দেখুন।",
                     "See the guide for ledgers, dues, payments, backups and reports."
                 ),
-                style =
-                    MaterialTheme.typography.bodySmall
+                style = MaterialTheme.typography.bodySmall
             )
-        }
-    }
-
-    if (showPremium) {
-        V15PremiumDialog {
-            showPremium = false
         }
     }
 }

@@ -16,8 +16,8 @@ android {
         applicationId = "com.hisabikhata.app"
         minSdk = 24
         targetSdk = 36
-        versionCode = 1704
-        versionName = "1.7.0"
+        versionCode = 1705
+        versionName = "1.7.1"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         vectorDrawables.useSupportLibrary = true

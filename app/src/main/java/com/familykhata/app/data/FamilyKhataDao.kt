@@ -517,6 +517,21 @@ interface FamilyKhataDao {
     suspend fun getAllDigitalServiceTransactions():
         List<DigitalServiceTransactionEntity>
 
+    @Query("SELECT * FROM digital_service_transactions WHERE serviceType = :serviceType ORDER BY id ASC")
+    suspend fun getDigitalServiceTransactionsByType(
+        serviceType: String
+    ): List<DigitalServiceTransactionEntity>
+
+    @Query("DELETE FROM digital_service_transactions WHERE eventKey = :eventKey")
+    suspend fun deleteDigitalServiceTransactionByEventKey(
+        eventKey: String
+    ): Int
+
+    @Query("DELETE FROM transactions WHERE sourceKey = :sourceKey")
+    suspend fun deleteTransactionBySourceKey(
+        sourceKey: String
+    ): Int
+
     @Query(
         "DELETE FROM digital_service_transactions"
     )

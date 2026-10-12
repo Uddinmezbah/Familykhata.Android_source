@@ -1647,11 +1647,7 @@ class FamilyKhataViewModel(application: Application) : AndroidViewModel(applicat
             !matchesCurrentScope(
                 item.workspace,
                 item.businessId
-            ) ||
-            item.sourceKey
-                ?.startsWith(
-                    "DIGITAL_SERVICE:"
-                ) == true
+            )
         ) {
             return
         }
@@ -1673,25 +1669,86 @@ class FamilyKhataViewModel(application: Application) : AndroidViewModel(applicat
                         )
                     )
 
-                    require(
+                    val digitalSourceKey =
                         current.sourceKey
-                            ?.startsWith(
-                                "DIGITAL_SERVICE:"
-                            ) != true
-                    )
+                            ?.takeIf {
+                                it.startsWith(
+                                    "DIGITAL_SERVICE:"
+                                )
+                            }
 
-                    if (
-                        current.financialAccountId !=
-                            null
-                    ) {
+                    if (digitalSourceKey != null) {
+                        val eventKey =
+                            digitalSourceKey
+                                .removePrefix(
+                                    "DIGITAL_SERVICE:"
+                                )
+                                .substringBefore(":")
+                                .trim()
+
+                        require(eventKey.isNotBlank())
+
                         dao.deleteFinancialAccountEntryBySourceKey(
-                            "TRANSACTION:" +
-                                current.id
+                            "DIGITAL_SERVICE:$eventKey:SOURCE"
+                        )
+                        dao.deleteFinancialAccountEntryBySourceKey(
+                            "DIGITAL_SERVICE:$eventKey:DESTINATION"
+                        )
+                        dao.deleteTransactionBySourceKey(
+                            "DIGITAL_SERVICE:$eventKey:PROFIT"
+                        )
+                        dao.deleteDigitalServiceTransactionByEventKey(
+                            eventKey
+                        )
+                    } else {
+                        if (current.financialAccountId != null) {
+                            dao.deleteFinancialAccountEntryBySourceKey(
+                                "TRANSACTION:" + current.id
+                            )
+                        }
+
+                        dao.deleteTransaction(current)
+                    }
+                }
+            }
+        }
+    }
+
+    fun deleteLegacyAgentCashOutData(
+        onDone: (Int) -> Unit = {},
+        onError: (String) -> Unit = {}
+    ) {
+        viewModelScope.launch {
+            runCatching {
+                database.withTransaction {
+                    val rows =
+                        dao.getDigitalServiceTransactionsByType(
+                            "AGENT_CASH_OUT"
+                        )
+
+                    rows.forEach { row ->
+                        val eventKey = row.eventKey
+                        dao.deleteFinancialAccountEntryBySourceKey(
+                            "DIGITAL_SERVICE:$eventKey:SOURCE"
+                        )
+                        dao.deleteFinancialAccountEntryBySourceKey(
+                            "DIGITAL_SERVICE:$eventKey:DESTINATION"
+                        )
+                        dao.deleteTransactionBySourceKey(
+                            "DIGITAL_SERVICE:$eventKey:PROFIT"
+                        )
+                        dao.deleteDigitalServiceTransactionByEventKey(
+                            eventKey
                         )
                     }
 
-                    dao.deleteTransaction(current)
+                    rows.size
                 }
+            }.onSuccess(onDone).onFailure {
+                onError(
+                    it.message
+                        ?: "পুরোনো Agent Cash Out ডেটা মুছতে সমস্যা হয়েছে"
+                )
             }
         }
     }

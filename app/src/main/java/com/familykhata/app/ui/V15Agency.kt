@@ -213,6 +213,10 @@ internal fun V15AgencyScreen(
             )
         }
 
+        AgencyReportSection(
+            projects = projects
+        )
+
         if (canWrite) {
             Row(
                 modifier =

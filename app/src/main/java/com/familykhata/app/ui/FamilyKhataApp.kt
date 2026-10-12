@@ -2942,6 +2942,7 @@ private fun MoreScreen(viewModel: FamilyKhataViewModel) {
 
     var backupJson by remember { mutableStateOf<String?>(null) }
     var pendingRestoreJson by remember { mutableStateOf<String?>(null) }
+    var showLegacyAgentCleanup by remember { mutableStateOf(false) }
 
     val backupReminderNeeded =
         lastBackupAt == 0L ||
@@ -3018,7 +3019,7 @@ private fun MoreScreen(viewModel: FamilyKhataViewModel) {
                     }
 
                     val version = root.optInt("version")
-                    require(version in 1..15) {
+                    require(version in 1..16) {
                         v15Text(
                             "এই ব্যাকআপ ভার্সনটি সমর্থিত নয়",
                             "This backup version is not supported"
@@ -3132,6 +3133,20 @@ private fun MoreScreen(viewModel: FamilyKhataViewModel) {
             openBackupFile.launch(arrayOf("application/json", "text/plain"))
         }
 
+        MoreActionCard(
+            symbol = "⌫",
+            title = v15Text(
+                "পুরোনো Agent Cash Out ডেটা পরিষ্কার",
+                "Clean legacy Agent Cash Out data"
+            ),
+            subtitle = v15Text(
+                "পুরোনো Agent Cash Out-এর service, profit ও linked account entry মুছুন",
+                "Remove legacy Agent Cash Out service, profit and linked account records"
+            )
+        ) {
+            showLegacyAgentCleanup = true
+        }
+
         MoreSectionTitle(v15Text("শেয়ার ও মতামত","Share & feedback"))
         MoreActionCard(
             symbol = "↗",
@@ -3187,6 +3202,44 @@ private fun MoreScreen(viewModel: FamilyKhataViewModel) {
                 )
             }
         }
+    }
+
+    if (showLegacyAgentCleanup) {
+        ProtectedDeleteDialog(
+            viewModel = viewModel,
+            title = v15Text(
+                "পুরোনো Agent Cash Out ডেটা মুছবেন?",
+                "Delete legacy Agent Cash Out data?"
+            ),
+            message = v15Text(
+                "শুধু পুরোনো Agent Cash Out-এর service record, linked profit transaction ও linked account entries মুছে যাবে। অন্য হিসাব থাকবে।",
+                "Only legacy Agent Cash Out service records, linked profit transactions and linked account entries will be removed. Other records will stay."
+            ),
+            confirmLabel = v15Text(
+                "ডেটা পরিষ্কার করুন",
+                "Clean data"
+            ),
+            onDismiss = {
+                showLegacyAgentCleanup = false
+            },
+            onConfirmed = {
+                viewModel.deleteLegacyAgentCashOutData(
+                    onDone = { count ->
+                        toast(
+                            context,
+                            v15Text(
+                                "$count টি পুরোনো Agent Cash Out রেকর্ড মুছে গেছে",
+                                "$count legacy Agent Cash Out record(s) removed"
+                            )
+                        )
+                        showLegacyAgentCleanup = false
+                    },
+                    onError = {
+                        toast(context, it)
+                    }
+                )
+            }
+        )
     }
 
     pendingRestoreJson?.let { json ->
